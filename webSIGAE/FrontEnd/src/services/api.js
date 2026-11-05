@@ -736,3 +736,27 @@ export async function solicitarCitacion({ estudianteId, docenteId, fecha, tramo,
   });
   return handleResponse(res);
 }
+
+// ── APODERADO TITULAR Y SUPLENTES (RF57 / CU90, CU91) ────────
+
+// CU90: titular y suplentes actuales del estudiante (Administrador)
+export async function getApoderadosEstudiante(estudianteId) {
+  const res = await fetch(`${BASE_URL}/estudiantes/${estudianteId}/apoderados`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// CU90: designar el titular y hasta 4 suplentes
+export async function designarApoderadosEstudiante(estudianteId, { titularId, suplenteIds }) {
+  const res = await fetch(`${BASE_URL}/estudiantes/${estudianteId}/apoderados`, {
+    method : 'PUT',
+    headers: authHeaders(),
+    body   : JSON.stringify({ titularId: Number(titularId), suplenteIds: suplenteIds.map(Number) }),
+  });
+  return handleResponse(res);
+}
+
+// CU91: contactos del titular y los suplentes (Docente del estudiante o Administrador)
+export async function getContactosApoderados(estudianteId) {
+  const res = await fetch(`${BASE_URL}/citaciones/estudiante/${estudianteId}/contactos`, { headers: authHeaders() });
+  return handleResponse(res);
+}

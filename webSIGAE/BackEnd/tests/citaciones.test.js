@@ -398,11 +398,27 @@ describe('Pruebas Unitarias - CU74–CU79: Módulo de Citaciones', () => {
   test('CU79: un apoderado no puede consultar el historial de un estudiante ajeno', async () => {
     req.user = { id: 8, roles: ['Apoderado'] };
     req.params.estudianteId = '222222222';
-    pool.query.mockResolvedValueOnce([[{ Estudiante_Id: 222222222, Curso_Id: 222, Apoderado_Usuario_Id: 4 }]]);
+    pool.query
+      .mockResolvedValueOnce([[{ Estudiante_Id: 222222222, Curso_Id: 222, Apoderado_Usuario_Id: 4 }]])
+      .mockResolvedValueOnce([[]]); // tampoco es suplente
 
     await citacionController.getHistorialCitaciones(req, res);
 
     expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  test('RF57/CU79: un apoderado suplente puede consultar el historial del estudiante', async () => {
+    req.user = { id: 8, roles: ['Apoderado'] };
+    req.params.estudianteId = '222222222';
+    pool.query
+      .mockResolvedValueOnce([[{ Estudiante_Id: 222222222, Curso_Id: 222, Apoderado_Usuario_Id: 4 }]])
+      .mockResolvedValueOnce([[{ 1: 1 }]]) // es suplente
+      .mockResolvedValueOnce([[]]);        // sin citaciones
+
+    await citacionController.getHistorialCitaciones(req, res);
+
+    expect(pool.query.mock.calls[1][1]).toEqual([222222222, 8, 8]);
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 
   test('CU79 Flujo correcto: devuelve las citaciones con sus registros de historial', async () => {

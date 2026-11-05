@@ -6,8 +6,8 @@ import {
   getCursos,
   editarEstudiante,
   getApoderados,
-  editarAsociacionEstudiante,
 } from "../../services/api";
+import ApoderadosEstudianteModal from "../../components/ApoderadosEstudianteModal";
 import {
   validarDireccion,
   formatearDireccion,
@@ -52,10 +52,8 @@ function Estudiantes() {
 
   // CU39: editar asociaciones (apoderado) sin modificar los datos personales
   const [apoderadosOpciones, setApoderadosOpciones] = useState([]);
+  // RF57 / CU90: titular y hasta 4 suplentes (incluye el flujo de CU39)
   const [editandoAsociacion, setEditandoAsociacion] = useState(null);
-  const [nuevoApoderadoId, setNuevoApoderadoId] = useState("");
-  const [guardandoAsociacion, setGuardandoAsociacion] = useState(false);
-  const [msgErrorAsociacion, setMsgErrorAsociacion] = useState("");
   const [msgExitoAsociacion, setMsgExitoAsociacion] = useState("");
 
   useEffect(() => {
@@ -195,40 +193,16 @@ function Estudiantes() {
     }
   };
 
-  // CU39: editar asociaciones (apoderado) sin modificar los datos personales del estudiante
+  // CU39 / CU90: editar los apoderados asociados sin modificar los datos personales del estudiante
   const abrirEdicionAsociacion = (estudiante) => {
-    setEditandoAsociacion(estudiante);
-    setNuevoApoderadoId(estudiante.Apoderado_Usuario_Id ?? "");
-    setMsgErrorAsociacion("");
     setMsgExitoAsociacion("");
+    setEditandoAsociacion(estudiante);
   };
 
-  // CU39 - Excepción "Cancela operación": cierra sin llamar al backend, la ficha queda sin modificaciones
-  const cerrarEdicionAsociacion = () => setEditandoAsociacion(null);
-
-  const guardarAsociacion = async (e, confirmarEliminacion = false) => {
-    if (e) e.preventDefault();
-    setMsgErrorAsociacion("");
-    setMsgExitoAsociacion("");
-    setGuardandoAsociacion(true);
-    try {
-      const apoderadoId = nuevoApoderadoId === "" ? null : Number(nuevoApoderadoId);
-      const data = await editarAsociacionEstudiante(editandoAsociacion.Estudiante_Id, apoderadoId, confirmarEliminacion);
-
-      // CU39 - Excepción "Elimina última asociación": pide una segunda confirmación antes de aplicar
-      if (data.requiereConfirmacion) {
-        if (window.confirm(data.mensaje)) await guardarAsociacion(null, true);
-        return;
-      }
-
-      setMsgExitoAsociacion(data.mensaje || "Asociaciones actualizadas correctamente");
-      await cargarEstudiantes({ curso: filtroCurso, estado: filtroEstado });
-    } catch (error) {
-      // CU39 - Excepción "Apoderado ya vinculado"
-      setMsgErrorAsociacion(error.message || "No fue posible actualizar las asociaciones");
-    } finally {
-      setGuardandoAsociacion(false);
-    }
+  const alGuardarAsociacion = async (mensaje) => {
+    setEditandoAsociacion(null);
+    setMsgExitoAsociacion(mensaje);
+    await cargarEstudiantes({ curso: filtroCurso, estado: filtroEstado });
   };
 
   if (loading) {
@@ -291,6 +265,13 @@ function Estudiantes() {
         </button>
       </div>
 
+      {msgExitoAsociacion && (
+        <div className="success-message cit-exito">
+          <span>{msgExitoAsociacion}</span>
+          <button type="button" className="btn-cerrar" onClick={() => setMsgExitoAsociacion("")} aria-label="Cerrar aviso">✕</button>
+        </div>
+      )}
+
       {errorCarga && (
         <div className="usuarios-empty" style={{ color: "#dc2626" }}>
           {errorCarga}
@@ -348,7 +329,7 @@ function Estudiantes() {
                             Editar ficha
                           </button>
                           <button className="btn-roles" onClick={() => abrirEdicionAsociacion(e)}>
-                            Editar asociaciones
+                            Apoderados
                           </button>
                         </div>
                       </td>
@@ -443,69 +424,14 @@ function Estudiantes() {
         </div>
       )}
 
-      {/* CU39: modal de edición de asociaciones (apoderado) sin modificar datos personales */}
+      {/* CU39 / CU90: apoderado titular y suplentes, sin modificar datos personales */}
       {editandoAsociacion && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div className="form-card" style={{ width: "460px", maxWidth: "95vw" }}>
-            <h2 style={{ marginBottom: "4px" }}>Editar asociaciones</h2>
-            <p style={{ color: "#64748b", marginBottom: "20px" }}>
-              <strong>{editandoAsociacion.Estudiante_Nombre_Completo}</strong>
-            </p>
-
-            <form onSubmit={(e) => guardarAsociacion(e)} className="cambiar-pwd-form">
-              <div className="campo-pwd">
-                <label>Apoderado asociado</label>
-                <select
-                  className="usuarios-select"
-                  value={nuevoApoderadoId}
-                  onChange={(e) => {
-                    setNuevoApoderadoId(e.target.value);
-                    setMsgExitoAsociacion("");
-                  }}
-                  style={{ width: "100%" }}
-                >
-                  <option value="">Ninguno (eliminar asociación)</option>
-                  {apoderadosOpciones
-                    .filter((a) => a.Usuario_Estado_Cuenta)
-                    .map((a) => (
-                      <option key={a.Usuario_Id} value={a.Usuario_Id}>{a.Usuario_Nombre_Completo}</option>
-                    ))}
-                </select>
-              </div>
-
-              {msgExitoAsociacion && (
-                <div className="msg-exito">
-                  {msgExitoAsociacion}
-                </div>
-              )}
-              {msgErrorAsociacion && <div className="msg-error-form">{msgErrorAsociacion}</div>}
-
-              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                <button type="submit" className="btn-primario" disabled={guardandoAsociacion}>
-                  {guardandoAsociacion ? "Guardando..." : "Guardar cambios"}
-                </button>
-                <button
-                  type="button"
-                  className="btn-desactivar"
-                  onClick={cerrarEdicionAsociacion}
-                  disabled={guardandoAsociacion}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ApoderadosEstudianteModal
+          estudiante={editandoAsociacion}
+          apoderados={apoderadosOpciones}
+          onClose={() => setEditandoAsociacion(null)}
+          onGuardado={alGuardarAsociacion}
+        />
       )}
     </div>
   );

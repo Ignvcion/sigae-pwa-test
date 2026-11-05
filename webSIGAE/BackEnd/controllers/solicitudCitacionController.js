@@ -13,6 +13,7 @@ const {
   buscarClaseEnTramo,
 } = require('../utils/disponibilidadDocente');
 const { obtenerBloques } = require('./horarioAtencionController');
+const { condicionApoderadoAsociado, rolApoderadoSQL } = require('../utils/apoderadosEstudiante');
 const {
   ESTADO_PENDIENTE,
   ESTADO_CANCELADA,
@@ -59,14 +60,12 @@ async function buscarEstudianteAsociado(conn, apoderadoId, estudianteId) {
   if (!Number.isInteger(id) || id <= 0) return null;
   const [filas] = await conn.query(
     `SELECT e.Estudiante_Id, e.Estudiante_Nombre_Completo, e.Curso_Id, c.Curso_Nombre,
-            IF(e.Apoderado_Usuario_Id = ?, 'Titular', 'Suplente') AS Rol_Apoderado
+            ${rolApoderadoSQL('e')} AS Rol_Apoderado
        FROM estudiante e
        LEFT JOIN curso c ON c.Curso_Id = e.Curso_Id
       WHERE e.Estudiante_Id = ?
         AND e.Estudiante_Fecha_Eliminacion IS NULL
-        AND (e.Apoderado_Usuario_Id = ?
-             OR EXISTS (SELECT 1 FROM apoderado_suplente s
-                         WHERE s.Estudiante_Id = e.Estudiante_Id AND s.Suplente_Usuario_Id = ?))`,
+        AND ${condicionApoderadoAsociado('e')}`,
     [apoderadoId, id, apoderadoId, apoderadoId]
   );
   return filas[0] || null;
@@ -111,12 +110,11 @@ const getEstudiantesSolicitud = async (req, res) => {
   try {
     const [filas] = await pool.query(
       `SELECT e.Estudiante_Id, e.Estudiante_Nombre_Completo, e.Curso_Id, c.Curso_Nombre,
-              IF(e.Apoderado_Usuario_Id = ?, 'Titular', 'Suplente') AS Rol_Apoderado
+              ${rolApoderadoSQL('e')} AS Rol_Apoderado
          FROM estudiante e
          LEFT JOIN curso c ON c.Curso_Id = e.Curso_Id
         WHERE e.Estudiante_Fecha_Eliminacion IS NULL
-          AND (e.Apoderado_Usuario_Id = ?
-               OR e.Estudiante_Id IN (SELECT s.Estudiante_Id FROM apoderado_suplente s WHERE s.Suplente_Usuario_Id = ?))
+          AND ${condicionApoderadoAsociado('e')}
         ORDER BY e.Estudiante_Nombre_Completo`,
       [apoderadoId, apoderadoId, apoderadoId]
     );
