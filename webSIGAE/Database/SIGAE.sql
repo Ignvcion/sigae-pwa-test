@@ -60,7 +60,7 @@ CREATE TABLE `apoderado_suplente` (
   `Estudiante_Id` int unsigned NOT NULL,
   `Suplente_Usuario_Id` int unsigned NOT NULL,
   PRIMARY KEY (`Apoderado_Suplente_Id`),
-  UNIQUE KEY `Apoderado_Suplente_Estudiante_Usuario_UNIQUE` (`Estudiante_Id`,`Suplente_Usuario_Id`),
+  UNIQUE KEY `Apoderado_Suplente_Estudiante_UNIQUE` (`Estudiante_Id`),
   KEY `fk_Apoderado_Suplente_Usuario_idx` (`Suplente_Usuario_Id`),
   CONSTRAINT `fk_Apoderado_Suplente_Estudiante` FOREIGN KEY (`Estudiante_Id`) REFERENCES `estudiante` (`Estudiante_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_Apoderado_Suplente_Usuario` FOREIGN KEY (`Suplente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
@@ -285,7 +285,7 @@ CREATE TABLE `evaluacion` (
   `Evaluacion_Id` int unsigned NOT NULL AUTO_INCREMENT,
   `Evaluacion_Fecha` date NOT NULL,
   `Evaluacion_Tipo` varchar(50) NOT NULL,
-  `Evaluacion_Contenidos` text,
+  `Evaluacion_Contenidos` text NOT NULL,
   `Curso_Id` int unsigned NOT NULL,
   `Asignatura_Id` int unsigned NOT NULL,
   `Docente_Usuario_Id` int unsigned NOT NULL,
