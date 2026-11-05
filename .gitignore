@@ -64,5 +64,22 @@ tmp/
 .DS_Store
 Thumbs.db
 
+# ── Restos de herramientas de desarrollo ─────────────────────
+# Visual Studio / dotnet generan estos archivos al abrir el proyecto como
+# si fuera .NET. SIGAE es Node: no deben llegar al servidor.
+appsettings*.json
+**/Properties/launchSettings.json
+bin/
+obj/
+*.csproj.user
+# Un "npm install <paquete>" corrido por error en la raíz del repo crea
+# estos archivos. Solo se ignoran en la RAÍZ: los package.json y
+# package-lock.json de BackEnd y FrontEnd sí se versionan.
+/package.json
+/package-lock.json
+# Archivos vacíos que deja una redirección de shell mal escrita
+# (p. ej. "... > userRoles.Es_Docente,").
+userRoles.*
+
 # ── Otros ────────────────────────────────────────────────────
 rutas_completas.txt

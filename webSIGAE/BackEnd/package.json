@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "migrate-passwords": "node scripts/hashPasswords.js",
+    "migrate-passwords": "node hashPasswords.js",
     "test": "jest --runInBand"
   },
   "dependencies": {
