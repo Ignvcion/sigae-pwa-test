@@ -1,7 +1,7 @@
 -- ============================================================================
 -- SIGAE — schema_base.sql: SOLO ESTRUCTURA (sin datos)
 -- Generado desde SIGAE.sql con sed (ver README, "Para quien modifique el esquema").
--- No contiene INSERT, DROP TABLE, LOCK TABLES ni AUTO_INCREMENT de prueba.
+-- Sin datos: se quitaron las inserciones, los borrados y bloqueos de tablas y los contadores de prueba.
 -- Es el único archivo de base de datos que se carga en producción (RDS).
 -- Si una tabla ya existe, CREATE TABLE falla: no sobrescribe datos.
 -- ============================================================================
