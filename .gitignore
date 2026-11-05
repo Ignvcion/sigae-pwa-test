@@ -489,3 +489,4 @@ backups/
 # Variables de entorno locales (la plantilla es webSIGAE/BackEnd/.env.example)
 .env
 .env.bak
+rutas_completas.txt
