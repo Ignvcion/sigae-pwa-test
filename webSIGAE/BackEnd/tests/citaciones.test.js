@@ -152,13 +152,14 @@ describe('Pruebas Unitarias - CU74–CU79: Módulo de Citaciones', () => {
     };
     pool.query
       .mockResolvedValueOnce([[{ Estudiante_Id: 222222222, Apoderado_Usuario_Id: 4 }]])
-      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]) // sin otra citación en el tramo
+      .mockResolvedValueOnce([[]]) // C-11: sin clases del docente en el tramo
       .mockResolvedValueOnce([{ insertId: 50 }])
       .mockResolvedValueOnce([[filaCitacion({ Citacion_Modalidad: 'Online' })]]);
 
     await citacionController.crearCitacion(req, res);
 
-    const insert = pool.query.mock.calls[2];
+    const insert = pool.query.mock.calls[3];
     expect(insert[0]).toContain('INSERT INTO citacion');
     expect(insert[1]).toEqual([
       '10:00 - 10:30', FECHA, 'Rendimiento académico', 'Pendiente de confirmación', 'Online', 222222222, 4, 3,
@@ -181,6 +182,7 @@ describe('Pruebas Unitarias - CU74–CU79: Módulo de Citaciones', () => {
     pool.query
       .mockResolvedValueOnce([[{ Estudiante_Id: 222222226, Apoderado_Usuario_Id: 8 }]])
       .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([{ insertId: 60 }])
       .mockResolvedValueOnce([[filaCitacion({ Citacion_Id: 60, Docente_Usuario_Id: 2 })]]);
 
@@ -189,8 +191,38 @@ describe('Pruebas Unitarias - CU74–CU79: Módulo de Citaciones', () => {
     // Sin restricción por cursos para el administrador
     expect(pool.query.mock.calls[0][0]).not.toContain('horario_asignatura');
     // Docente_Usuario_Id (último valor del INSERT) = el administrador
-    expect(pool.query.mock.calls[2][1].at(-1)).toBe(2);
+    expect(pool.query.mock.calls[3][1].at(-1)).toBe(2);
     expect(res.status).toHaveBeenCalledWith(201);
+  });
+
+  test('C-11: no se crea una citación que coincide con una clase del docente', async () => {
+    req.user = { id: 3, roles: ['Docente'] };
+    req.body = {
+      Estudiante_Id: 222222222,
+      Citacion_Fecha: FECHA,
+      Citacion_Tramo_Horario: '09:30 - 10:00',
+      Citacion_Motivo: 'Rendimiento académico',
+      Citacion_Modalidad: 'Presencial',
+    };
+    pool.query
+      .mockResolvedValueOnce([[{ Estudiante_Id: 222222222, Apoderado_Usuario_Id: 4 }]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{
+        id: 222222, curso: '1ero Básico A', asignatura: 'Matemática', horaInicio: '09:15:00', horaFin: '10:00:00',
+      }]]);
+
+    await citacionController.crearCitacion(req, res);
+
+    // La consulta de clases filtra por docente, día de la fecha y superposición con el tramo
+    const [sql, params] = pool.query.mock.calls[2];
+    expect(sql).toContain('FROM horario_asignatura');
+    expect(params[0]).toBe(3);
+    expect(params.slice(2)).toEqual(['10:00', '09:30']);
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json.mock.calls[0][0].mensaje).toBe(
+      'El tramo seleccionado coincide con una clase del docente: 1ero Básico A — Matemática (09:15–10:00)'
+    );
+    expect(pool.query).toHaveBeenCalledTimes(3); // no hubo INSERT
   });
 
   test('CU74: un Apoderado no puede crear citaciones', async () => {
@@ -243,6 +275,30 @@ describe('Pruebas Unitarias - CU74–CU79: Módulo de Citaciones', () => {
 
     expect(res.status).toHaveBeenCalledWith(403);
     expect(pool.getConnection).not.toHaveBeenCalled();
+  });
+
+  test('CU89/CU75: una solicitud del apoderado la confirma el docente', async () => {
+    req.user = { id: 3, roles: ['Docente'] };
+    req.query.rol = 'Docente';
+    pool.query.mockResolvedValueOnce([[filaCitacion({ Citacion_Solicitante_Rol: 'Apoderado' })]]);
+
+    await citacionController.getCitacionesPendientes(req, res);
+
+    expect(res.json).toHaveBeenCalledWith([
+      expect.objectContaining({ Citacion_Id: 50, Requiere_Confirmacion_De: 'Docente', Puede_Confirmar: true }),
+    ]);
+  });
+
+  test('CU89/CU77: si el docente reprograma una solicitud del apoderado, confirma el apoderado', async () => {
+    req.user = { id: 4, roles: ['Apoderado'] };
+    req.query.rol = 'Apoderado';
+    pool.query.mockResolvedValueOnce([[filaCitacion({ Citacion_Solicitante_Rol: 'Apoderado', Ultimo_Reprogramador_Id: 3 })]]);
+
+    await citacionController.getCitacionesPendientes(req, res);
+
+    expect(res.json).toHaveBeenCalledWith([
+      expect.objectContaining({ Requiere_Confirmacion_De: 'Apoderado', Puede_Confirmar: true }),
+    ]);
   });
 
   test('CU75: el Administrador no puede confirmar en nombre del apoderado', async () => {
@@ -308,6 +364,23 @@ describe('Pruebas Unitarias - CU74–CU79: Módulo de Citaciones', () => {
 
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith({ mensaje: 'Los nuevos datos generan conflicto de disponibilidad horaria' });
+  });
+
+  test('C-11: no se reprograma a un tramo que coincide con una clase del docente', async () => {
+    req.user = { id: 4, roles: ['Apoderado'] };
+    req.params.id = '50';
+    req.body = { Citacion_Fecha: FECHA, Citacion_Tramo_Horario: '11:00 - 11:30' };
+    pool.query
+      .mockResolvedValueOnce([[filaCitacion()]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ id: 1, curso: '1ero Básico B', asignatura: 'Lenguaje', horaInicio: '11:00:00', horaFin: '11:45:00' }]]);
+
+    await citacionController.reprogramarCitacion(req, res);
+
+    // Se valida contra el horario del docente citado, no contra quien reprograma
+    expect(pool.query.mock.calls[2][1][0]).toBe(3);
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(pool.getConnection).not.toHaveBeenCalled();
   });
 
   test('CU77 Excepción 1: una citación cancelada no está disponible para edición', async () => {
