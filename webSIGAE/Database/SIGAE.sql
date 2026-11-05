@@ -48,6 +48,36 @@ INSERT INTO `afecta` VALUES (111111111,'Suspendido',11111111,1111111),(111111112
 UNLOCK TABLES;
 
 --
+-- Table structure for table `apoderado_suplente`
+-- Incremento 4, RF57: suplentes del estudiante (el titular es estudiante.Apoderado_Usuario_Id)
+--
+
+DROP TABLE IF EXISTS `apoderado_suplente`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `apoderado_suplente` (
+  `Apoderado_Suplente_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Estudiante_Id` int unsigned NOT NULL,
+  `Suplente_Usuario_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Apoderado_Suplente_Id`),
+  UNIQUE KEY `Apoderado_Suplente_Estudiante_Usuario_UNIQUE` (`Estudiante_Id`,`Suplente_Usuario_Id`),
+  KEY `fk_Apoderado_Suplente_Usuario_idx` (`Suplente_Usuario_Id`),
+  CONSTRAINT `fk_Apoderado_Suplente_Estudiante` FOREIGN KEY (`Estudiante_Id`) REFERENCES `estudiante` (`Estudiante_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Apoderado_Suplente_Usuario` FOREIGN KEY (`Suplente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `apoderado_suplente`
+--
+
+LOCK TABLES `apoderado_suplente` WRITE;
+/*!40000 ALTER TABLE `apoderado_suplente` DISABLE KEYS */;
+INSERT INTO `apoderado_suplente` VALUES (1,222222222,8);
+/*!40000 ALTER TABLE `apoderado_suplente` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `asignatura`
 --
 
@@ -123,6 +153,7 @@ CREATE TABLE `citacion` (
   `Estudiante_Id` int unsigned NOT NULL,
   `Apoderado_Usuario_Id` int unsigned NOT NULL,
   `Docente_Usuario_Id` int unsigned NOT NULL,
+  `Citacion_Solicitante_Rol` varchar(50) NOT NULL DEFAULT 'Docente',
   PRIMARY KEY (`Citacion_Id`),
   KEY `fk_Citacion_Estudiante_idx` (`Estudiante_Id`),
   KEY `fk_Citacion_Usuario_idx` (`Apoderado_Usuario_Id`),
@@ -139,7 +170,7 @@ CREATE TABLE `citacion` (
 
 LOCK TABLES `citacion` WRITE;
 /*!40000 ALTER TABLE `citacion` DISABLE KEYS */;
-INSERT INTO `citacion` VALUES (33,'17:00 - 17:30','2026-06-20','Bullying',NULL,NULL,'Pendiente de confirmación',NULL,'Presencial',222222222,4,3),(34,'15:00 - 15:30','2026-06-25','Rendimiento académico',NULL,NULL,'Pendiente de confirmación',NULL,'Presencial',222222223,4,3),(35,'16:00 - 16:30','2026-06-27','Inasistencias reiteradas','2026-06-20',NULL,'Confirmada',NULL,'Online',222222224,8,5),(36,'14:00 - 14:30','2026-05-15','Problemas de conducta',NULL,NULL,'Cancelada','El apoderado no pudo asistir por motivos laborales','Presencial',222222225,9,6);
+INSERT INTO `citacion` VALUES (33,'17:00 - 17:30','2026-06-20','Bullying',NULL,NULL,'Pendiente de confirmación',NULL,'Presencial',222222222,4,3,'Docente'),(34,'15:00 - 15:30','2026-06-25','Rendimiento académico',NULL,NULL,'Pendiente de confirmación',NULL,'Presencial',222222223,4,3,'Docente'),(35,'16:00 - 16:30','2026-06-27','Inasistencias reiteradas','2026-06-20',NULL,'Confirmada',NULL,'Online',222222224,8,5,'Docente'),(36,'14:00 - 14:30','2026-05-15','Problemas de conducta',NULL,NULL,'Cancelada','El apoderado no pudo asistir por motivos laborales','Presencial',222222225,9,6,'Docente');
 /*!40000 ALTER TABLE `citacion` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -156,6 +187,7 @@ CREATE TABLE `conversacion` (
   `Conversacion_Estado` tinyint(1) NOT NULL,
   `Docente_Usuario_Id` int unsigned NOT NULL,
   `Apoderado_Usuario_Id` int unsigned NOT NULL,
+  `Conversacion_Habilitada_Hasta` datetime DEFAULT NULL,
   PRIMARY KEY (`Conversacion_Id`),
   KEY `fk Conversacion_Usuario_idx` (`Docente_Usuario_Id`),
   KEY `fk Conversacion_Apoderado_idx` (`Apoderado_Usuario_Id`),
@@ -170,7 +202,7 @@ CREATE TABLE `conversacion` (
 
 LOCK TABLES `conversacion` WRITE;
 /*!40000 ALTER TABLE `conversacion` DISABLE KEYS */;
-INSERT INTO `conversacion` VALUES (1111,'2026-04-11',0,3,4),(1112,'2026-04-15',1,5,4),(1113,'2026-05-01',1,3,8);
+INSERT INTO `conversacion` VALUES (1111,'2026-04-11',0,3,4,NULL),(1112,'2026-04-15',1,5,4,NULL),(1113,'2026-05-01',1,3,8,NULL);
 /*!40000 ALTER TABLE `conversacion` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -239,6 +271,42 @@ LOCK TABLES `estudiante` WRITE;
 /*!40000 ALTER TABLE `estudiante` DISABLE KEYS */;
 INSERT INTO `estudiante` VALUES (222222222,'Diego Martin Perez Castro','268283655','Regular',222,4,NULL,NULL,NULL,NULL,NULL),(222222223,'Valentina Paz Ramos González','212345678-9','Regular',222,4,NULL,NULL,NULL,NULL,NULL),(222222224,'Matías Alejandro Vera López','223456789-0','Regular',223,8,NULL,NULL,NULL,NULL,NULL),(222222225,'Isabella Fernanda Campos Silva','234567890-1','Regular',223,9,NULL,NULL,NULL,NULL,NULL),(222222226,'Sebastián Andrés Torres Díaz','245678901-2','Regular',224,8,NULL,NULL,NULL,NULL,NULL),(222222227,'Catalina Ignacia Morales Vega','256789012-3','Irregular',225,10,NULL,NULL,NULL,NULL,NULL);
 /*!40000 ALTER TABLE `estudiante` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `evaluacion`
+-- Incremento 4, RF58 y RF59: calendario de evaluaciones
+--
+
+DROP TABLE IF EXISTS `evaluacion`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `evaluacion` (
+  `Evaluacion_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Evaluacion_Fecha` date NOT NULL,
+  `Evaluacion_Tipo` varchar(50) NOT NULL,
+  `Evaluacion_Contenidos` text,
+  `Curso_Id` int unsigned NOT NULL,
+  `Asignatura_Id` int unsigned NOT NULL,
+  `Docente_Usuario_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Evaluacion_Id`),
+  KEY `Evaluacion_Curso_Fecha_idx` (`Curso_Id`,`Evaluacion_Fecha`),
+  KEY `fk_Evaluacion_Asignatura_idx` (`Asignatura_Id`),
+  KEY `fk_Evaluacion_Docente_Usuario_idx` (`Docente_Usuario_Id`),
+  CONSTRAINT `fk_Evaluacion_Asignatura` FOREIGN KEY (`Asignatura_Id`) REFERENCES `asignatura` (`Asignatura_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Evaluacion_Curso` FOREIGN KEY (`Curso_Id`) REFERENCES `curso` (`Curso_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Evaluacion_Docente_Usuario` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `evaluacion`
+--
+
+LOCK TABLES `evaluacion` WRITE;
+/*!40000 ALTER TABLE `evaluacion` DISABLE KEYS */;
+INSERT INTO `evaluacion` VALUES (1,'2026-11-20','Prueba','Unidad 3: fracciones y números decimales',222,2222,3),(2,'2026-11-24','Control','Comprensión lectora: texto narrativo',222,2223,5);
+/*!40000 ALTER TABLE `evaluacion` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -347,6 +415,37 @@ LOCK TABLES `horario_asignatura` WRITE;
 /*!40000 ALTER TABLE `horario_asignatura` DISABLE KEYS */;
 INSERT INTO `horario_asignatura` VALUES (222222,'Lunes','Activo',222,3,11111111,2222),(222223,'Martes','Activo',222,5,11111112,2223),(222224,'Miércoles','Activo',223,3,11111111,2222),(222225,'Jueves','Activo',223,5,11111113,2223),(222226,'Viernes','Activo',224,6,11111114,2222),(222227,'Lunes','Suspendido',225,10,11111112,2224);
 /*!40000 ALTER TABLE `horario_asignatura` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `horario_atencion`
+-- Incremento 4, RF55: horario de atención de apoderados del docente
+--
+
+DROP TABLE IF EXISTS `horario_atencion`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `horario_atencion` (
+  `Horario_Atencion_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Horario_Atencion_Dia_Semana` varchar(20) NOT NULL,
+  `Horario_Atencion_Hora_Inicio` time NOT NULL,
+  `Horario_Atencion_Hora_Fin` time NOT NULL,
+  `Docente_Usuario_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Horario_Atencion_Id`),
+  UNIQUE KEY `Horario_Atencion_Docente_Dia_Inicio_UNIQUE` (`Docente_Usuario_Id`,`Horario_Atencion_Dia_Semana`,`Horario_Atencion_Hora_Inicio`),
+  CONSTRAINT `fk_Horario_Atencion_Docente_Usuario` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `chk_Horario_Atencion_Horas` CHECK (`Horario_Atencion_Hora_Inicio` < `Horario_Atencion_Hora_Fin`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `horario_atencion`
+--
+
+LOCK TABLES `horario_atencion` WRITE;
+/*!40000 ALTER TABLE `horario_atencion` DISABLE KEYS */;
+INSERT INTO `horario_atencion` VALUES (1,'Martes','14:00:00','16:00:00',3),(2,'Jueves','15:00:00','17:00:00',3);
+/*!40000 ALTER TABLE `horario_atencion` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -614,6 +713,7 @@ CREATE TABLE `usuario` (
   `Usuario_Direccion_Depto` varchar(20) DEFAULT NULL,
   `Usuario_Direccion_Comuna` varchar(60) DEFAULT NULL,
   `Apoderado_Correo_Natural` varchar(100) DEFAULT NULL,
+  `Docente_Recepcion_Mensajes` tinyint(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`Usuario_Id`),
   UNIQUE KEY `Usuario_RUT_UNIQUE` (`Usuario_RUT`),
   UNIQUE KEY `Apoderado_Correo_Natural_UNIQUE` (`Apoderado_Correo_Natural`),
@@ -628,7 +728,7 @@ CREATE TABLE `usuario` (
 
 LOCK TABLES `usuario` WRITE;
 /*!40000 ALTER TABLE `usuario` DISABLE KEYS */;
-INSERT INTO `usuario` VALUES (1,'5682711-0','961900000','Esperanza Penelope Gonzales Farias',1,'1234',NULL,0,NULL,NULL,NULL,1,'Super Admin','es.gonzales@jacquescousteau.edu',0,NULL,NULL,NULL,NULL,NULL),(2,'9343727-6','979746782','Carlos Vicente Gonzales Muñoz',1,'ilovemilf',NULL,0,NULL,NULL,NULL,1,'Administrador Normal','ca.gonzales@jacquescousteau.edu',0,NULL,NULL,NULL,NULL,NULL),(3,'3483606-k','946789765','María Claudia Morales Rojas',1,'Gato123',NULL,1,38,'Matemáticas','ma.morales@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL),(4,'5738925-7','944706559','Pedro Humberto Fernandez Soto',1,'4532',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Avenida Concha y Toro','134',NULL,'Puente Alto','pedrofernandez453@gmail.com'),(5,'3890710-7','912345678','Ana Lucía Torres Vega',1,'Hamster#23',NULL,1,32,'Lenguaje','an.torres@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL),(6,'7135657-4','923456789','Roberto Andrés Silva Pinto',1,'Cotorra-15',NULL,1,40,'Historia','ro.silva@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL),(7,'2258000-0','934567890','Carmen Gloria Díaz Muñoz',1,'Perrito@7',NULL,1,36,'Ciencias','ca.diaz@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL),(8,'8636451-4','945678901','Luis Eduardo Ramos Fuentes',1,'Conejo#42',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Calle Los Pinos','456',NULL,'Santiago','luisramos@gmail.com'),(9,'9230041-2','956789012','Sandra Patricia Vera Molina',1,'Tortuga-99',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Pasaje Las Rosas','789',NULL,'Maipú','sandravera@gmail.com'),(10,'5158743-k','967890123','Jorge Ignacio Campos Reyes',1,'Pinguino@5',NULL,1,38,'Inglés','jo.campos@jacquescousteau.edu',0,NULL,NULL,1,'Avenida Principal','321',NULL,'Las Condes','jorge.campos@gmail.com');
+INSERT INTO `usuario` VALUES (1,'5682711-0','961900000','Esperanza Penelope Gonzales Farias',1,'1234',NULL,0,NULL,NULL,NULL,1,'Super Admin','es.gonzales@jacquescousteau.edu',0,NULL,NULL,NULL,NULL,NULL,1),(2,'9343727-6','979746782','Carlos Vicente Gonzales Muñoz',1,'ilovemilf',NULL,0,NULL,NULL,NULL,1,'Administrador Normal','ca.gonzales@jacquescousteau.edu',0,NULL,NULL,NULL,NULL,NULL,1),(3,'3483606-k','946789765','María Claudia Morales Rojas',1,'Gato123',NULL,1,38,'Matemáticas','ma.morales@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1),(4,'5738925-7','944706559','Pedro Humberto Fernandez Soto',1,'4532',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Avenida Concha y Toro','134',NULL,'Puente Alto','pedrofernandez453@gmail.com',1),(5,'3890710-7','912345678','Ana Lucía Torres Vega',1,'Hamster#23',NULL,1,32,'Lenguaje','an.torres@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1),(6,'7135657-4','923456789','Roberto Andrés Silva Pinto',1,'Cotorra-15',NULL,1,40,'Historia','ro.silva@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1),(7,'2258000-0','934567890','Carmen Gloria Díaz Muñoz',1,'Perrito@7',NULL,1,36,'Ciencias','ca.diaz@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1),(8,'8636451-4','945678901','Luis Eduardo Ramos Fuentes',1,'Conejo#42',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Calle Los Pinos','456',NULL,'Santiago','luisramos@gmail.com',1),(9,'9230041-2','956789012','Sandra Patricia Vera Molina',1,'Tortuga-99',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Pasaje Las Rosas','789',NULL,'Maipú','sandravera@gmail.com',1),(10,'5158743-k','967890123','Jorge Ignacio Campos Reyes',1,'Pinguino@5',NULL,1,38,'Inglés','jo.campos@jacquescousteau.edu',0,NULL,NULL,1,'Avenida Principal','321',NULL,'Las Condes','jorge.campos@gmail.com',1);
 /*!40000 ALTER TABLE `usuario` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
