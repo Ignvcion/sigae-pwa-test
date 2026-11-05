@@ -49,7 +49,7 @@ UNLOCK TABLES;
 
 --
 -- Table structure for table `apoderado_suplente`
--- Incremento 4, RF57: suplentes del estudiante (el titular es estudiante.Apoderado_Usuario_Id)
+-- Incremento 4, RF57: suplentes del estudiante, hasta 4 (el titular es estudiante.Apoderado_Usuario_Id)
 --
 
 DROP TABLE IF EXISTS `apoderado_suplente`;
@@ -60,7 +60,7 @@ CREATE TABLE `apoderado_suplente` (
   `Estudiante_Id` int unsigned NOT NULL,
   `Suplente_Usuario_Id` int unsigned NOT NULL,
   PRIMARY KEY (`Apoderado_Suplente_Id`),
-  UNIQUE KEY `Apoderado_Suplente_Estudiante_UNIQUE` (`Estudiante_Id`),
+  UNIQUE KEY `Apoderado_Suplente_Estudiante_Usuario_UNIQUE` (`Estudiante_Id`,`Suplente_Usuario_Id`),
   KEY `fk_Apoderado_Suplente_Usuario_idx` (`Suplente_Usuario_Id`),
   CONSTRAINT `fk_Apoderado_Suplente_Estudiante` FOREIGN KEY (`Estudiante_Id`) REFERENCES `estudiante` (`Estudiante_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_Apoderado_Suplente_Usuario` FOREIGN KEY (`Suplente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
@@ -218,10 +218,13 @@ CREATE TABLE `curso` (
   `Curso_Seccion` varchar(10) NOT NULL,
   `Curso_Nombre` varchar(100) NOT NULL,
   `Nivel_Educativo_Id` int unsigned NOT NULL,
+  `Curso_Profesor_Jefe_Usuario_Id` int unsigned DEFAULT NULL,
   PRIMARY KEY (`Curso_Id`),
   UNIQUE KEY `Curso_Nombre_UNIQUE` (`Curso_Nombre`),
   KEY `fk_Curso_Nivel_Educativo_idx` (`Nivel_Educativo_Id`),
-  CONSTRAINT `fk_Curso_Nivel_Educativo` FOREIGN KEY (`Nivel_Educativo_Id`) REFERENCES `nivel_educativo` (`Nivel_Educativo_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
+  KEY `fk_Curso_Profesor_Jefe_Usuario_idx` (`Curso_Profesor_Jefe_Usuario_Id`),
+  CONSTRAINT `fk_Curso_Nivel_Educativo` FOREIGN KEY (`Nivel_Educativo_Id`) REFERENCES `nivel_educativo` (`Nivel_Educativo_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Curso_Profesor_Jefe_Usuario` FOREIGN KEY (`Curso_Profesor_Jefe_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=227 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -231,7 +234,7 @@ CREATE TABLE `curso` (
 
 LOCK TABLES `curso` WRITE;
 /*!40000 ALTER TABLE `curso` DISABLE KEYS */;
-INSERT INTO `curso` VALUES (222,'A','1ero Básico A',24),(223,'B','1ero Básico B',24),(224,'A','2do Básico A',25),(225,'A','1ero Medio A',32),(226,'A','2do Medio A',33);
+INSERT INTO `curso` VALUES (222,'A','1ero Básico A',24,3),(223,'B','1ero Básico B',24,5),(224,'A','2do Básico A',25,NULL),(225,'A','1ero Medio A',32,NULL),(226,'A','2do Medio A',33,NULL);
 /*!40000 ALTER TABLE `curso` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -536,6 +539,42 @@ INSERT INTO `nivel_educativo` VALUES (24,'1ero Básico'),(32,'1ero Medio'),(25,'
 UNLOCK TABLES;
 
 --
+-- Table structure for table `notificacion`
+-- Incremento 4, RF62 (reserva): notificaciones en la plataforma
+--
+
+DROP TABLE IF EXISTS `notificacion`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `notificacion` (
+  `Notificacion_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Notificacion_Tipo` varchar(50) NOT NULL,
+  `Notificacion_Fecha_Hora` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Notificacion_Leida` tinyint(1) NOT NULL DEFAULT 0,
+  `Usuario_Id` int unsigned NOT NULL,
+  `Mensaje_Id` int unsigned DEFAULT NULL,
+  `Citacion_Id` int unsigned DEFAULT NULL,
+  PRIMARY KEY (`Notificacion_Id`),
+  KEY `Notificacion_Usuario_Leida_idx` (`Usuario_Id`,`Notificacion_Leida`),
+  KEY `fk_Notificacion_Mensaje_idx` (`Mensaje_Id`),
+  KEY `fk_Notificacion_Citacion_idx` (`Citacion_Id`),
+  CONSTRAINT `fk_Notificacion_Citacion` FOREIGN KEY (`Citacion_Id`) REFERENCES `citacion` (`Citacion_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Notificacion_Mensaje` FOREIGN KEY (`Mensaje_Id`) REFERENCES `mensaje` (`Mensaje_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Notificacion_Usuario` FOREIGN KEY (`Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `notificacion`
+--
+
+LOCK TABLES `notificacion` WRITE;
+/*!40000 ALTER TABLE `notificacion` DISABLE KEYS */;
+INSERT INTO `notificacion` VALUES (1,'Mensaje nuevo','2026-11-05 09:15:00',0,3,11111,NULL),(2,'Cambio de estado de citación','2026-11-05 09:20:00',0,8,NULL,35);
+/*!40000 ALTER TABLE `notificacion` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `parametro_institucional`
 --
 
@@ -622,6 +661,43 @@ LOCK TABLES `sesion` WRITE;
 /*!40000 ALTER TABLE `sesion` DISABLE KEYS */;
 INSERT INTO `sesion` VALUES (11,'Token001','2026-05-24 08:00:00','2026-05-24 10:00:00','192.168.1.10',0,'Computador','2026-05-24 10:00:00',1),(12,'Token002','2026-05-25 08:00:00','2026-05-25 10:00:00','192.168.1.11',1,'Celular','2026-05-25 10:00:00',3),(13,'Token003','2026-05-25 09:00:00','2026-05-25 11:00:00','192.168.1.12',0,'Computador','2026-05-25 11:00:00',4),(14,'Token004','2026-05-26 08:30:00',NULL,'192.168.1.13',1,'Tablet','2026-05-26 10:30:00',5);
 /*!40000 ALTER TABLE `sesion` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `situacion_final`
+-- Incremento 4, RF61 (por confirmar): situación final de los estudiantes
+--
+
+DROP TABLE IF EXISTS `situacion_final`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `situacion_final` (
+  `Situacion_Final_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Situacion_Final_Periodo_Lectivo` varchar(50) NOT NULL,
+  `Situacion_Final_Valor` varchar(20) NOT NULL,
+  `Situacion_Final_Estado` varchar(20) NOT NULL DEFAULT 'Borrador',
+  `Situacion_Final_Fecha_Registro` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Estudiante_Id` int unsigned NOT NULL,
+  `Curso_Id` int unsigned NOT NULL,
+  `Usuario_Responsable_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Situacion_Final_Id`),
+  UNIQUE KEY `Situacion_Final_Estudiante_Periodo_UNIQUE` (`Estudiante_Id`,`Situacion_Final_Periodo_Lectivo`),
+  KEY `Situacion_Final_Curso_Periodo_idx` (`Curso_Id`,`Situacion_Final_Periodo_Lectivo`),
+  KEY `fk_Situacion_Final_Usuario_Responsable_idx` (`Usuario_Responsable_Id`),
+  CONSTRAINT `fk_Situacion_Final_Curso` FOREIGN KEY (`Curso_Id`) REFERENCES `curso` (`Curso_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Situacion_Final_Estudiante` FOREIGN KEY (`Estudiante_Id`) REFERENCES `estudiante` (`Estudiante_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Situacion_Final_Usuario_Responsable` FOREIGN KEY (`Usuario_Responsable_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `situacion_final`
+--
+
+LOCK TABLES `situacion_final` WRITE;
+/*!40000 ALTER TABLE `situacion_final` DISABLE KEYS */;
+INSERT INTO `situacion_final` VALUES (1,'2026','Promovido','Borrador','2026-11-05 10:00:00',222222222,222,3),(2,'2026','Repitente','Borrador','2026-11-05 10:00:00',222222223,222,3);
+/*!40000 ALTER TABLE `situacion_final` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
