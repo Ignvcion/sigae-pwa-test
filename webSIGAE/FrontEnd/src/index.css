@@ -2467,6 +2467,15 @@ body.bloques-panel-open .main-content {
   background: #f8fafc;
 }
 .atencion-confirmacion { border-color: #fcd34d; background: #fffbeb; }
+.atencion-tabla { width: 100%; }
+.atencion-tabla th:last-child,
+.atencion-tabla td:last-child { text-align: right; }
+.atencion-tabla td:last-child .acciones-grupo { justify-content: flex-end; }
+@media (max-width: 640px) {
+  .cit-tabla-wrap .atencion-tabla th,
+  .cit-tabla-wrap .atencion-tabla td { padding: 10px 6px; }
+  .atencion-tabla td:last-child .acciones-grupo { flex-direction: column; align-items: flex-end; gap: 6px; }
+}
 .atencion-form-titulo { font-size: 0.95rem; margin: 0 0 12px; color: #1e293b; }
 .cit-form-fila.atencion-form-fila { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 640px) {

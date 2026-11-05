@@ -147,12 +147,11 @@ function HorarioAtencionPanel({ bloques, cargando, error, onCambio }) {
         <p className="empty-state-text cit-panel-vacio">Aún no registras bloques de atención de apoderados.</p>
       ) : (
         <div className="cit-tabla-wrap">
-          <table className="tabla-usuarios">
+          <table className="tabla-usuarios atencion-tabla">
             <thead>
               <tr>
                 <th>Día</th>
-                <th>Inicio</th>
-                <th>Término</th>
+                <th>Horario</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -160,8 +159,7 @@ function HorarioAtencionPanel({ bloques, cargando, error, onCambio }) {
               {bloques.map((b) => (
                 <tr key={b.Horario_Atencion_Id}>
                   <td>{b.Horario_Atencion_Dia_Semana}</td>
-                  <td>{b.Horario_Atencion_Hora_Inicio}</td>
-                  <td>{b.Horario_Atencion_Hora_Fin}</td>
+                  <td className="cit-celda-nowrap">{b.Horario_Atencion_Hora_Inicio} – {b.Horario_Atencion_Hora_Fin}</td>
                   <td>
                     <div className="acciones-grupo">
                       <button type="button" className="btn-roles" onClick={() => abrir(b)} disabled={guardando}>
