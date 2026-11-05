@@ -656,3 +656,83 @@ export async function getNivelesEducativos() {
   const res = await fetch(`${BASE_URL}/cursos/niveles`, { headers: authHeaders() });
   return handleResponse(res);
 }
+
+// ── HORARIO DE ATENCIÓN DE APODERADOS (RF55 / CU87, CU88) ────────
+
+// Bloques de atención del docente autenticado
+export async function getMiHorarioAtencion() {
+  const res = await fetch(`${BASE_URL}/horario-atencion`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// CU87: registrar bloque { dia, horaInicio, horaFin }
+export async function crearBloqueAtencion(bloque) {
+  const res = await fetch(`${BASE_URL}/horario-atencion`, {
+    method : 'POST',
+    headers: authHeaders(),
+    body   : JSON.stringify(bloque),
+  });
+  return handleResponse(res);
+}
+
+// CU88: modificar bloque. Si tiene citaciones a futuro el backend responde 409 con
+// requiereConfirmacion; se reintenta con confirmar = true.
+export async function actualizarBloqueAtencion(id, bloque, confirmar = false) {
+  const res = await fetch(`${BASE_URL}/horario-atencion/${id}`, {
+    method : 'PUT',
+    headers: authHeaders(),
+    body   : JSON.stringify({ ...bloque, confirmar }),
+  });
+  return handleResponse(res);
+}
+
+// CU88: eliminar bloque (misma confirmación que al modificar)
+export async function eliminarBloqueAtencion(id, confirmar = false) {
+  const res = await fetch(`${BASE_URL}/horario-atencion/${id}${confirmar ? '?confirmar=true' : ''}`, {
+    method : 'DELETE',
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+// ── SOLICITUD DE CITACIÓN DEL APODERADO (RF56 / CU89) ────────
+
+// Estudiantes del apoderado (como titular o suplente)
+export async function getEstudiantesSolicitud() {
+  const res = await fetch(`${BASE_URL}/citaciones/solicitud/estudiantes`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// Docentes que imparten clases al estudiante
+export async function getDocentesSolicitud(estudianteId) {
+  const res = await fetch(`${BASE_URL}/citaciones/solicitud/estudiante/${estudianteId}/docentes`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+// Tramos libres dentro del horario de atención del docente en las próximas semanas
+export async function getDisponibilidadSolicitud(estudianteId, docenteId) {
+  const params = new URLSearchParams({ estudianteId, docenteId });
+  const res = await fetch(`${BASE_URL}/citaciones/solicitud/disponibilidad?${params}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+// CU89: registrar la solicitud (queda pendiente hasta que el docente la confirme)
+export async function solicitarCitacion({ estudianteId, docenteId, fecha, tramo, motivo, modalidad }) {
+  const res = await fetch(`${BASE_URL}/citaciones/solicitud`, {
+    method : 'POST',
+    headers: authHeaders(),
+    body   : JSON.stringify({
+      Estudiante_Id          : Number(estudianteId),
+      Docente_Usuario_Id     : Number(docenteId),
+      Citacion_Fecha         : fecha,
+      Citacion_Tramo_Horario : tramo,
+      Citacion_Motivo        : motivo.trim(),
+      Citacion_Modalidad     : modalidad,
+    }),
+  });
+  return handleResponse(res);
+}

@@ -10,6 +10,12 @@ const {
   reprogramarCitacion,
   getHistorialCitaciones,
 } = require('../controllers/citacionController');
+const {
+  getEstudiantesSolicitud,
+  getDocentesSolicitud,
+  getDisponibilidadSolicitud,
+  solicitarCitacion,
+} = require('../controllers/solicitudCitacionController');
 
 const router = express.Router();
 
@@ -21,6 +27,11 @@ router.use(verifyToken);
 router.get('/', getCitaciones);
 // CU75: solicitudes pendientes de confirmación del usuario — debe estar ANTES de /:id
 router.get('/pendientes', getCitacionesPendientes);
+// CU89 (RF56): solicitud de citación por parte del apoderado — rutas fijas ANTES de /:id
+router.get('/solicitud/estudiantes', getEstudiantesSolicitud);
+router.get('/solicitud/estudiante/:estudianteId/docentes', getDocentesSolicitud);
+router.get('/solicitud/disponibilidad', getDisponibilidadSolicitud);
+router.post('/solicitud', solicitarCitacion);
 // CU79: historial completo de citaciones de un estudiante (también Admin/Super Admin)
 router.get('/estudiante/:estudianteId/historial', getHistorialCitaciones);
 // CU76 / CU77: detalle de una citación

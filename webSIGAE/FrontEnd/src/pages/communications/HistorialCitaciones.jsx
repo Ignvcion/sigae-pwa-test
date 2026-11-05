@@ -255,7 +255,10 @@ function HistorialCitaciones() {
                         <tr key={c.Citacion_Id}>
                           <td className="cit-celda-nowrap">{formatearFecha(c.Citacion_Fecha, { corta: true })}</td>
                           <td className="cit-celda-nowrap">{c.Citacion_Tramo_Horario}</td>
-                          <td>{c.Docente_Nombre || <span className="dato-sin-registrar">—</span>}</td>
+                          <td>
+                            {c.Docente_Nombre || <span className="dato-sin-registrar">—</span>}
+                            {c.Citacion_Solicitante_Rol === "Apoderado" && <div className="cit-sub">Solicitada por el apoderado</div>}
+                          </td>
                           <td className="cit-celda-texto">{c.Citacion_Motivo}</td>
                           <td>{c.Citacion_Modalidad}</td>
                           <td><EstadoCitacionBadge citacion={c} /></td>
@@ -305,7 +308,7 @@ function HistorialCitaciones() {
               <dd>{seleccionada.Citacion_Modalidad}</dd>
               <dt>Estudiante</dt>
               <dd>{seleccionada.Estudiante_Nombre_Completo || estudianteActual?.Estudiante_Nombre_Completo || "—"}</dd>
-              <dt>Citado por</dt>
+              <dt>{seleccionada.Citacion_Solicitante_Rol === "Apoderado" ? "Docente (solicitada por el apoderado)" : "Citado por"}</dt>
               <dd>{seleccionada.Docente_Nombre || "—"}</dd>
               <dt>Apoderado</dt>
               <dd>{seleccionada.Apoderado_Nombre || "—"}</dd>

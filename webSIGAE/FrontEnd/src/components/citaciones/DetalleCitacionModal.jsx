@@ -186,9 +186,9 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
                 {citacion.Estudiante_Nombre_Completo || "—"}
                 {citacion.Curso_Nombre ? ` (${citacion.Curso_Nombre})` : ""}
               </dd>
-              <dt>Citado por</dt>
+              <dt>{citacion.Citacion_Solicitante_Rol === "Apoderado" ? "Docente" : "Citado por"}</dt>
               <dd>{citacion.Docente_Nombre || <span className="dato-sin-registrar">Sin información</span>}</dd>
-              <dt>Apoderado</dt>
+              <dt>{citacion.Citacion_Solicitante_Rol === "Apoderado" ? "Solicitada por (apoderado)" : "Apoderado"}</dt>
               <dd>{citacion.Apoderado_Nombre || <span className="dato-sin-registrar">Sin información</span>}</dd>
               <dt>Motivo</dt>
               <dd className="cit-texto">{citacion.Citacion_Motivo}</dd>
