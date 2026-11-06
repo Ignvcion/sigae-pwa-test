@@ -257,6 +257,14 @@ function MainLayout() {
                       <Link to="/registrar-estudiante">
                         Registrar Estudiante
                       </Link>
+
+                      <Link to="/situacion-final">
+                        Situación Final y Promoción
+                      </Link>
+
+                      <Link to="/cierre-periodo">
+                        Cierre de Período
+                      </Link>
                     </div>
                   )}
                 </div>
@@ -291,6 +299,11 @@ function MainLayout() {
 
                 <Link to="/mi-horario">
                   Mi Horario
+                </Link>
+
+                {/* RF61: el profesor jefe registra la situación final de sus cursos */}
+                <Link to="/situacion-final">
+                  Situación Final
                 </Link>
 
                 <Link to="/citaciones">

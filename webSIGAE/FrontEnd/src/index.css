@@ -2544,3 +2544,15 @@ body.bloques-panel-open .main-content {
 .contacto-rol-suplente { background: #f1f5f9; color: #475569; }
 .contacto-datos { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.84rem; margin-top: 2px; }
 .contacto-datos a { color: #2563eb; overflow-wrap: anywhere; }
+
+/* Botones deshabilitados (p. ej. "Iniciar nuevo período" mientras no se cumplen las condiciones) */
+.btn-primary:disabled,
+.btn-volver:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Selector de archivo dentro de tarjetas: no debe salirse en pantallas angostas */
+.form-card input[type="file"] {
+  max-width: 100%;
+}

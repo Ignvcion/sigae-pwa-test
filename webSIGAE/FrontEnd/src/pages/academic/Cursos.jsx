@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import PanelJefaturaCurso from "../../components/cursos/PanelJefaturaCurso";
+import { getEstadoPeriodo } from "../../services/promocion";
 
 function ModalAsignarAsignaturas({ curso, token, onClose, onExito }) {
   const [disponibles, setDisponibles] = useState([]);
@@ -140,7 +142,7 @@ function ModalAsignarAsignaturas({ curso, token, onClose, onExito }) {
   );
 }
 
-function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver }) {
+function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatura }) {
   const [asignadas, setAsignadas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -178,7 +180,9 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver }) {
       <div className="page-header">
         <div>
           <button className="btn-volver" onClick={onVolver}>← Volver a cursos</button>
-          <h2 style={{ marginTop: "0.5rem" }}>Asignaturas del curso: {curso.Curso_Nombre}</h2>
+          <h2 style={{ marginTop: "0.5rem" }}>
+            {curso.Curso_Nombre} <span className="curso-seccion-badge">{curso.Curso_Periodo_Lectivo}</span>
+          </h2>
         </div>
         {esAdmin && (
           <button className="btn-primary" onClick={() => { setError(""); setMostrarModal(true); }}>
@@ -187,6 +191,10 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver }) {
         )}
       </div>
 
+      {/* RF60: profesor jefe y estudiantes del curso (CU95, CU96, CU97) */}
+      <PanelJefaturaCurso curso={curso} esAdmin={esAdmin} onCambio={onCambioJefatura} />
+
+      <h3>Asignaturas del curso</h3>
       {exito && <p className="msg-exito">{exito}</p>}
       {error && <p className="msg-error">{error}</p>}
 
@@ -247,6 +255,8 @@ function Cursos() {
   const [cargando, setCargando] = useState(true);
   const [cursoSeleccionado, setCursoSeleccionado] = useState(null);
   const [vistaLista, setVistaLista] = useState(false);
+  const [periodos, setPeriodos] = useState(null); // { vigente, siguiente }
+  const [periodo, setPeriodo] = useState("");
 
   const token = localStorage.getItem("token");
 
@@ -256,8 +266,11 @@ function Cursos() {
         fetch("/api/cursos", { headers: { Authorization: `Bearer ${token}` } }),
         fetch("/api/cursos/niveles", { headers: { Authorization: `Bearer ${token}` } }),
       ]);
-      setCursos(await resCursos.json());
+      const lista = await resCursos.json();
+      setCursos(lista);
       setNiveles(await resNiveles.json());
+      // Si hay un curso abierto, se refresca (p. ej. tras cambiar el profesor jefe)
+      setCursoSeleccionado((actual) => (actual ? lista.find((c) => c.Curso_Id === actual.Curso_Id) || null : actual));
     } catch {
       setError("Error al cargar los datos");
     } finally {
@@ -269,9 +282,16 @@ function Cursos() {
     cargarDatos();
   }, []);
 
+  // Durante el cierre se pueden crear cursos del período siguiente
+  useEffect(() => {
+    if (!esAdmin) return;
+    getEstadoPeriodo().then((d) => d && setPeriodos(d.periodos)).catch(() => {});
+  }, [esAdmin]);
+
   const resetForm = () => {
     setNivelId("");
     setSeccion("");
+    setPeriodo("");
     setError("");
   };
 
@@ -297,7 +317,7 @@ function Cursos() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ nivel_educativo_id: nivelId, seccion }),
+      body: JSON.stringify({ nivel_educativo_id: nivelId, seccion, ...(periodo && { periodo }) }),
     });
 
     const data = await res.json();
@@ -313,8 +333,9 @@ function Cursos() {
     cargarDatos();
   };
 
+  // Agrupados por período y nivel (durante el cierre conviven dos períodos)
   const cursosAgrupados = cursos.reduce((acc, curso) => {
-    const nivel = curso.Nivel_Educativo_Nombre;
+    const nivel = `${curso.Nivel_Educativo_Nombre} · ${curso.Curso_Periodo_Lectivo}`;
     if (!acc[nivel]) acc[nivel] = [];
     acc[nivel].push(curso);
     return acc;
@@ -330,6 +351,7 @@ function Cursos() {
           token={token}
           esAdmin={esAdmin}
           onVolver={() => setCursoSeleccionado(null)}
+          onCambioJefatura={cargarDatos}
         />
       </div>
     );
@@ -388,6 +410,16 @@ function Cursos() {
               ))}
             </select>
 
+            {periodos?.siguiente && (
+              <>
+                <label style={{ marginTop: "1rem" }}>Período</label>
+                <select value={periodo} onChange={(e) => setPeriodo(e.target.value)}>
+                  <option value="">{periodos.vigente} (vigente)</option>
+                  <option value={periodos.siguiente}>{periodos.siguiente} (en preparación)</option>
+                </select>
+              </>
+            )}
+
             <label style={{ marginTop: "1rem" }}>Sección (letra A-Z)</label>
             <input
               type="text"
@@ -418,6 +450,8 @@ function Cursos() {
                 <th>Curso</th>
                 <th>Nivel Educativo</th>
                 <th>Sección</th>
+                <th>Período</th>
+                <th>Profesor jefe</th>
                 <th>Asignaturas activas</th>
                 <th></th>
               </tr>
@@ -432,10 +466,12 @@ function Cursos() {
                   <td className="tabla-curso-nombre">{c.Curso_Nombre}</td>
                   <td>{c.Nivel_Educativo_Nombre}</td>
                   <td>{c.Curso_Seccion}</td>
+                  <td>{c.Curso_Periodo_Lectivo}</td>
+                  <td>{c.Profesor_Jefe_Nombre || "—"}</td>
                   <td>
                     <span className="badge-asig-count">{c.Total_Asignaturas_Activas ?? 0}</span>
                   </td>
-                  <td><span className="curso-link">Ver asignaturas →</span></td>
+                  <td><span className="curso-link">Ver curso →</span></td>
                 </tr>
               ))}
             </tbody>
@@ -452,7 +488,7 @@ function Cursos() {
                   key={c.Curso_Id}
                   className="curso-card curso-card-clickable"
                   onClick={() => setCursoSeleccionado(c)}
-                  title="Ver asignaturas del curso"
+                  title="Ver el curso"
                 >
                   <div className="curso-card-header">
                     <span className="curso-nombre">{c.Curso_Nombre}</span>
@@ -464,12 +500,16 @@ function Cursos() {
                       <span className="curso-info-valor">{c.Nivel_Educativo_Nombre}</span>
                     </div>
                     <div className="curso-info-item">
+                      <span className="curso-info-label">Profesor jefe</span>
+                      <span className="curso-info-valor">{c.Profesor_Jefe_Nombre || "—"}</span>
+                    </div>
+                    <div className="curso-info-item">
                       <span className="curso-info-label">Asignaturas activas</span>
                       <span className="curso-info-valor curso-asig-count">{c.Total_Asignaturas_Activas ?? 0}</span>
                     </div>
                   </div>
                   <div className="curso-card-footer">
-                    <span className="curso-link">Ver asignaturas →</span>
+                    <span className="curso-link">Ver curso →</span>
                   </div>
                 </div>
               ))}
