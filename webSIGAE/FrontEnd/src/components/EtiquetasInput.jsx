@@ -63,6 +63,9 @@ function EtiquetasInput({
     setTexto("");
     setActivo(0);
     setAviso("");
+    // Se cierra la lista para no tapar lo que sigue (p. ej. el botón Guardar);
+    // vuelve a abrirse al escribir o al hacer clic en el campo
+    setAbierto(false);
   };
 
   const quitar = (nombre) => {
@@ -96,7 +99,7 @@ function EtiquetasInput({
     <div className="etiquetas">
       <div
         className={`etiquetas-campo${invalido ? " etiquetas-campo--invalido" : ""}`}
-        onClick={() => inputRef.current?.focus()}
+        onClick={() => { inputRef.current?.focus(); setAbierto(true); }}
       >
         {valores.map((v) => (
           <span key={v} className="etiqueta-chip">

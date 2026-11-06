@@ -265,6 +265,16 @@ export async function getEspecialidades() {
   return handleResponse(res);
 }
 
+// Reemplaza las especialidades (etiquetas) de un docente. Las nuevas se crean en el catálogo.
+export async function actualizarEspecialidadesDocente(usuarioId, especialidades) {
+  const res = await fetch(`${BASE_URL}/usuarios/${usuarioId}`, {
+    method : 'PUT',
+    headers: authHeaders(),
+    body   : JSON.stringify({ Docente_Especialidades: especialidades }),
+  });
+  return handleResponse(res);
+}
+
 // ── CU107: disponibilidad laboral semanal del docente (solo administrador) ──
 export async function getOpcionesDisponibilidad() {
   const res = await fetch(`${BASE_URL}/usuarios/disponibilidad/opciones`, { headers: authHeaders() });

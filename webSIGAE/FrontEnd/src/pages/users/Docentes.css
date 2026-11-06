@@ -1,0 +1,135 @@
+/* CU30/CU31: filtros del listado de docentes por especialidad (etiquetas) */
+.filtro-especialidades {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: -8px 0 18px;
+}
+
+.filtro-especialidades-titulo {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 4px;
+}
+
+.filtro-especialidades-nota {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+button.filtro-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #1e3a8a;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+button.filtro-chip:hover {
+  border-color: #818cf8;
+}
+
+button.filtro-chip--activa {
+  background: #1e40af;
+  border-color: #1e40af;
+  color: #fff;
+}
+
+button.filtro-chip:focus-visible,
+button.btn-mini:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.filtro-chip-cuenta {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(30, 58, 138, 0.12);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+button.filtro-chip--activa .filtro-chip-cuenta {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+button.filtro-chip--tabla {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.docentes-conteo {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.docentes-tabla-wrap {
+  overflow-x: auto;
+}
+
+.docentes-celda-especialidades {
+  min-width: 220px;
+}
+
+.docentes-etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.docentes-edicion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 260px;
+}
+
+.docentes-edicion-acciones {
+  display: flex;
+  gap: 6px;
+}
+
+button.btn-mini {
+  padding: 4px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #334155;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+button.btn-mini:hover {
+  background: #f1f5f9;
+}
+
+button.btn-mini--primario {
+  background: #1e40af;
+  border-color: #1e40af;
+  color: #fff;
+}
+
+button.btn-mini--primario:hover {
+  background: #1e3a8a;
+}
+
+button.btn-mini--icono {
+  padding: 2px 8px;
+  border-style: dashed;
+  color: #64748b;
+}

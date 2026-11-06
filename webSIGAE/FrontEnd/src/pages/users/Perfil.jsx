@@ -731,12 +731,8 @@ function Perfil() {
           </div>
         )}
 
-        {puedeEditar && (
-          <div className="perfil-card perfil-card--ancha">
-            <h2>Editar Datos</h2>
-            <FormEditarUsuario datos={datos} onGuardado={recargarDatos} />
-          </div>
-        )}
+        {/* Edición por el administrador, en bloques separados (cada uno se guarda por su cuenta) */}
+        {puedeEditar && <FormEditarUsuario datos={datos} onGuardado={recargarDatos} />}
       </div>
 
       {/* CU41: Detalle de estudiante desde la lista de asociados — modal de solo lectura */}
