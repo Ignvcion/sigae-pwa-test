@@ -1,17 +1,27 @@
 const pool = require('../config/db');
+const { cursoNoArchivado, obtenerPeriodos } = require('../utils/periodos');
 
 // GET /api/cursos
+// Cursos del período vigente y, durante el cierre, del período siguiente. Los
+// cursos de períodos antiguos (solo egresados, en práctica y retirados) no se listan.
 const getCursos = async (req, res) => {
   try {
     const [rows] = await pool.execute(`
       SELECT c.Curso_Id, c.Curso_Seccion, c.Curso_Nombre,
-             c.Nivel_Educativo_Id, n.Nivel_Educativo_Nombre,
+             c.Nivel_Educativo_Id, n.Nivel_Educativo_Nombre, n.Nivel_Educativo_Orden,
+             c.Curso_Periodo_Lectivo,
+             c.Curso_Profesor_Jefe_Usuario_Id,
+             pj.Usuario_Nombre_Completo AS Profesor_Jefe_Nombre,
              COUNT(ta.Asignatura_Id) AS Total_Asignaturas_Activas
       FROM curso c
       JOIN nivel_educativo n ON c.Nivel_Educativo_Id = n.Nivel_Educativo_Id
+      LEFT JOIN usuario pj ON pj.Usuario_Id = c.Curso_Profesor_Jefe_Usuario_Id
       LEFT JOIN tieneasig ta ON c.Curso_Id = ta.Curso_Id AND ta.Estado_Asignacion = 'Activa'
-      GROUP BY c.Curso_Id, c.Curso_Seccion, c.Curso_Nombre, c.Nivel_Educativo_Id, n.Nivel_Educativo_Nombre
-      ORDER BY n.Nivel_Educativo_Id, c.Curso_Seccion
+      WHERE ${cursoNoArchivado('c')}
+      GROUP BY c.Curso_Id, c.Curso_Seccion, c.Curso_Nombre, c.Nivel_Educativo_Id, n.Nivel_Educativo_Nombre,
+               n.Nivel_Educativo_Orden, c.Curso_Periodo_Lectivo, c.Curso_Profesor_Jefe_Usuario_Id,
+               pj.Usuario_Nombre_Completo
+      ORDER BY c.Curso_Periodo_Lectivo, n.Nivel_Educativo_Orden, c.Curso_Seccion
     `);
     res.json(rows);
   } catch (error) {
@@ -24,7 +34,7 @@ const getCursos = async (req, res) => {
 const getNiveles = async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      'SELECT * FROM nivel_educativo ORDER BY Nivel_Educativo_Id'
+      'SELECT * FROM nivel_educativo ORDER BY Nivel_Educativo_Orden'
     );
     res.json(rows);
   } catch (error) {
@@ -34,6 +44,8 @@ const getNiveles = async (req, res) => {
 };
 
 // POST /api/cursos
+// Body: { nivel_educativo_id, seccion, periodo? }. El período por defecto es el
+// vigente; durante el cierre también se puede crear en el período siguiente.
 const crearCurso = async (req, res) => {
   const { nivel_educativo_id, seccion } = req.body;
 
@@ -47,6 +59,16 @@ const crearCurso = async (req, res) => {
   }
 
   try {
+    const { vigente, siguiente } = await obtenerPeriodos(pool);
+    const periodo = req.body.periodo ? String(req.body.periodo) : vigente;
+    if (periodo !== vigente && periodo !== siguiente) {
+      return res.status(400).json({
+        error: siguiente
+          ? `El curso debe ser del período vigente (${vigente}) o del siguiente (${siguiente})`
+          : `El curso debe ser del período vigente (${vigente})`,
+      });
+    }
+
     // Verificar que el nivel existe
     const [niveles] = await pool.execute(
       'SELECT Nivel_Educativo_Nombre FROM nivel_educativo WHERE Nivel_Educativo_Id = ?',
@@ -59,21 +81,21 @@ const crearCurso = async (req, res) => {
     const nombreNivel = niveles[0].Nivel_Educativo_Nombre;
     const nombreCurso = `${nombreNivel} ${seccionUpper}`;
 
-    // Verificar que no exista el mismo curso
+    // Verificar que no exista el mismo curso en ese período
     const [existe] = await pool.execute(
-      'SELECT Curso_Id FROM curso WHERE Curso_Nombre = ?',
-      [nombreCurso]
+      'SELECT Curso_Id FROM curso WHERE Curso_Nombre = ? AND Curso_Periodo_Lectivo = ?',
+      [nombreCurso, periodo]
     );
     if (existe.length > 0) {
-      return res.status(409).json({ error: `El curso "${nombreCurso}" ya existe` });
+      return res.status(409).json({ error: `El curso "${nombreCurso}" ya existe en el período ${periodo}` });
     }
 
     await pool.execute(
-      'INSERT INTO curso (Curso_Seccion, Curso_Nombre, Nivel_Educativo_Id) VALUES (?, ?, ?)',
-      [seccionUpper, nombreCurso, nivel_educativo_id]
+      'INSERT INTO curso (Curso_Seccion, Curso_Nombre, Nivel_Educativo_Id, Curso_Periodo_Lectivo) VALUES (?, ?, ?, ?)',
+      [seccionUpper, nombreCurso, nivel_educativo_id, periodo]
     );
 
-    res.status(201).json({ mensaje: `Curso "${nombreCurso}" registrado correctamente` });
+    res.status(201).json({ mensaje: `Curso "${nombreCurso}" (${periodo}) registrado correctamente` });
   } catch (error) {
     console.error('Error al crear curso:', error);
     res.status(500).json({ error: 'Error interno del servidor' });

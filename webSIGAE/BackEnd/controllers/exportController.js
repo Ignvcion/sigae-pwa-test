@@ -3,6 +3,7 @@
 // CU 62 — Exportando horario por curso
 
 const pool = require('../config/db');
+const { enPeriodoVigente } = require('../utils/periodos');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 const puppeteer = require('puppeteer');
@@ -39,7 +40,7 @@ async function fetchMaestro() {
     JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
     JOIN asignatura     a  ON a.Asignatura_Id      = ha.Asignatura_Id
     LEFT JOIN usuario   u  ON u.Usuario_Id         = ha.Usuario_Id
-    WHERE ha.Horario_Asignatura_Estado = 'Activo'
+    WHERE ha.Horario_Asignatura_Estado = 'Activo' AND ${enPeriodoVigente('ha')}
     ORDER BY FIELD(ha.Horario_Asignatura_Dia_Semana,'Lunes','Martes','Miércoles','Jueves','Viernes'),
              bh.Bloque_Horario_Hora_Inicio, c.Curso_Nombre
   `);
@@ -65,7 +66,7 @@ async function fetchPorDocente(usuarioId) {
      JOIN curso          c  ON c.Curso_Id          = ha.Curso_Id
      JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
      JOIN asignatura     a  ON a.Asignatura_Id      = ha.Asignatura_Id
-     WHERE ha.Usuario_Id = ? AND ha.Horario_Asignatura_Estado = 'Activo'
+     WHERE ha.Usuario_Id = ? AND ha.Horario_Asignatura_Estado = 'Activo' AND ${enPeriodoVigente('ha')}
      ORDER BY FIELD(ha.Horario_Asignatura_Dia_Semana,'Lunes','Martes','Miércoles','Jueves','Viernes'),
               bh.Bloque_Horario_Hora_Inicio`,
     [usuarioId]

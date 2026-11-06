@@ -1,6 +1,7 @@
 // Módulo de mensajería interna docente-apoderado (CU73 / RF47).
 const pool = require('../config/db');
 const { claseVigente } = require('../utils/clasesEliminadas');
+const { enPeriodoVigente } = require('../utils/periodos');
 
 const ROLES_MENSAJERIA = ['Docente', 'Apoderado'];
 
@@ -578,6 +579,7 @@ const obtenerDetalleContacto = async (req, res) => {
         ON cu.Curso_Id = ha.Curso_Id
       WHERE ha.Usuario_Id = ?
         AND ${claseVigente('ha')}
+        AND ${enPeriodoVigente('ha')}
         AND ha.Curso_Id IN (
           SELECT Curso_Id
           FROM estudiante

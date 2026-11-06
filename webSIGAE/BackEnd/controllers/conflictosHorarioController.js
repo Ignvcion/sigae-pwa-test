@@ -7,6 +7,7 @@
 // ?bloque=ID (o "bloque" en el body) esas clases se tratan como pendientes
 // hasta que el administrador las resuelva y elimine el bloque.
 const pool = require('../config/db');
+const { mismoPeriodoQueCurso } = require('../utils/periodos');
 const { condicionDesajustado, motivoDesajuste } = require('../utils/bloquesDesajustados');
 const { claseVigente, purgarClasesEliminadas } = require('../utils/clasesEliminadas');
 
@@ -219,8 +220,9 @@ const migrarClase = async (req, res) => {
             AND ha.Horario_Asignatura_Estado = 'Activo'
             AND ha.Horario_Asignatura_Id <> ?
             AND bh.Bloque_Horario_Hora_Inicio < ? AND bh.Bloque_Horario_Hora_Fin > ?
+            AND ${mismoPeriodoQueCurso('ha')}
           LIMIT 1`,
-        [clase.Usuario_Id, clase.Dia, horarioId, destino.Bloque_Horario_Hora_Fin, destino.Bloque_Horario_Hora_Inicio]
+        [clase.Usuario_Id, clase.Dia, horarioId, destino.Bloque_Horario_Hora_Fin, destino.Bloque_Horario_Hora_Inicio, clase.Curso_Id]
       );
       if (choqueDocente) {
         await conn.rollback();

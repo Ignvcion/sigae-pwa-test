@@ -107,8 +107,10 @@ describe('Pruebas Unitarias - CU67, CU68, CU69: Consultas y filtros de horario',
     await horarioController.getBloquesLibres(req, res);
 
     const [sql, params] = pool.execute.mock.calls[1];
-    expect(sql).toContain('(Curso_Id = ? OR Usuario_Id = ?)');
-    expect(params).toEqual(['222', '3']);
+    // El docente ocupa el bloque solo con clases del mismo período que el curso consultado
+    expect(sql).toContain('(Curso_Id = ? OR (Usuario_Id = ? AND');
+    expect(sql).toContain('Curso_Periodo_Lectivo');
+    expect(params).toEqual(['222', '3', '222']);
   });
 
   test('CU67 Excepción 1: sin bloques libres responde con mensaje informativo', async () => {

@@ -5,6 +5,7 @@
 // queda "Pendiente de confirmación" hasta que el docente la acepta (CU75).
 const pool = require('../config/db');
 const { claseVigente } = require('../utils/clasesEliminadas');
+const { enPeriodoVigente } = require('../utils/periodos');
 const {
   aMinutos,
   parsearTramo,
@@ -179,7 +180,7 @@ async function calcularDisponibilidad(conn, { docenteId, apoderadoId, bloques, d
             bh.Bloque_Horario_Hora_Inicio AS horaInicio, bh.Bloque_Horario_Hora_Fin AS horaFin
        FROM horario_asignatura ha
        JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
-      WHERE ha.Usuario_Id = ? AND ${claseVigente('ha')}`,
+      WHERE ha.Usuario_Id = ? AND ${claseVigente('ha')} AND ${enPeriodoVigente('ha')}`,
     [docenteId]
   );
   const [ocupadas] = await conn.query(

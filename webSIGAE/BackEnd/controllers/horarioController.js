@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const { condicionDesajustado, motivoDesajuste } = require('../utils/bloquesDesajustados');
 const { ESTADO_ELIMINADO, claseVigente } = require('../utils/clasesEliminadas');
+const { mismoPeriodoQueCurso, enPeriodoVigente, cursoNoArchivado } = require('../utils/periodos');
 const { esApoderadoDelEstudiante } = require('../utils/apoderadosEstudiante');
 
 // ── GET /api/horarios?curso_id=X  (admin ve todo, docente solo el suyo) ──
@@ -56,7 +57,8 @@ const getHorarios = async (req, res) => {
     }
 
     if (esDocente) {
-      query += ' AND ha.Usuario_Id = ?';
+      // El docente ve su horario del período vigente (durante el cierre no se mezcla con el siguiente)
+      query += ` AND ha.Usuario_Id = ? AND ${enPeriodoVigente('ha')}`;
       params.push(userId);
     }
 
@@ -83,10 +85,11 @@ const getHorarios = async (req, res) => {
 const getCursos = async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      `SELECT c.Curso_Id, c.Curso_Nombre, ne.Nivel_Educativo_Nombre
+      `SELECT c.Curso_Id, c.Curso_Nombre, ne.Nivel_Educativo_Nombre, c.Curso_Periodo_Lectivo
        FROM curso c
        JOIN nivel_educativo ne ON ne.Nivel_Educativo_Id = c.Nivel_Educativo_Id
-       ORDER BY ne.Nivel_Educativo_Nombre, c.Curso_Seccion`
+       WHERE ${cursoNoArchivado('c')}
+       ORDER BY c.Curso_Periodo_Lectivo, ne.Nivel_Educativo_Orden, c.Curso_Seccion`
     );
     res.json(rows);
   } catch (error) {
@@ -435,8 +438,8 @@ const createHorario = async (req, res) => {
       const [conflictoDocente] = await pool.execute(
         `SELECT Horario_Asignatura_Id FROM horario_asignatura ha
          WHERE ha.Usuario_Id = ? AND ha.Bloque_Horario_Id = ? AND ha.Horario_Asignatura_Dia_Semana = ?
-           AND ${claseVigente('ha')}`,
-        [Usuario_Id, Bloque_Horario_Id, Horario_Asignatura_Dia_Semana]
+           AND ${claseVigente('ha')} AND ${mismoPeriodoQueCurso('ha')}`,
+        [Usuario_Id, Bloque_Horario_Id, Horario_Asignatura_Dia_Semana, Curso_Id]
       );
       if (conflictoDocente.length > 0) {
         return res.status(409).json({ error: 'El docente ya tiene una clase asignada en ese día y bloque horario' });
@@ -458,8 +461,9 @@ const createHorario = async (req, res) => {
            ), 0) AS horas_actuales
            FROM horario_asignatura ha
            JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
-           WHERE ha.Usuario_Id = ? AND ha.Horario_Asignatura_Estado = 'Activo'`,
-          [Usuario_Id]
+           WHERE ha.Usuario_Id = ? AND ha.Horario_Asignatura_Estado = 'Activo'
+             AND ${mismoPeriodoQueCurso('ha')}`,
+          [Usuario_Id, Curso_Id]
         );
         const horasActuales = Number(cargaRow.horas_actuales);
         const duracion      = Number(bloqueDur?.duracion || 0);
@@ -500,9 +504,9 @@ const createHorario = async (req, res) => {
         const [conflictoDocenteFinal] = await conn.execute(
           `SELECT Horario_Asignatura_Id FROM horario_asignatura ha
            WHERE ha.Usuario_Id = ? AND ha.Bloque_Horario_Id = ? AND ha.Horario_Asignatura_Dia_Semana = ?
-             AND ${claseVigente('ha')}
+             AND ${claseVigente('ha')} AND ${mismoPeriodoQueCurso('ha')}
            FOR UPDATE`,
-          [Usuario_Id, Bloque_Horario_Id, Horario_Asignatura_Dia_Semana]
+          [Usuario_Id, Bloque_Horario_Id, Horario_Asignatura_Dia_Semana, Curso_Id]
         );
         if (conflictoDocenteFinal.length > 0) {
           await conn.rollback();
@@ -692,8 +696,8 @@ const updateHorario = async (req, res) => {
       const [conflictoDocente] = await pool.execute(
         `SELECT Horario_Asignatura_Id FROM horario_asignatura ha
          WHERE ha.Usuario_Id = ? AND ha.Bloque_Horario_Id = ? AND ha.Horario_Asignatura_Dia_Semana = ?
-           AND ${claseVigente('ha')} AND ha.Horario_Asignatura_Id != ?`,
-        [Usuario_Id, Bloque_Horario_Id, Horario_Asignatura_Dia_Semana, id]
+           AND ${claseVigente('ha')} AND ha.Horario_Asignatura_Id != ? AND ${mismoPeriodoQueCurso('ha')}`,
+        [Usuario_Id, Bloque_Horario_Id, Horario_Asignatura_Dia_Semana, id, Curso_Id]
       );
       if (conflictoDocente.length > 0) {
         return res.status(409).json({ error: 'El docente ya tiene una clase asignada en ese día y bloque horario' });
@@ -716,8 +720,8 @@ const updateHorario = async (req, res) => {
            FROM horario_asignatura ha
            JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
            WHERE ha.Usuario_Id = ? AND ha.Horario_Asignatura_Estado = 'Activo'
-             AND ha.Horario_Asignatura_Id != ?`,
-          [Usuario_Id, id]
+             AND ha.Horario_Asignatura_Id != ? AND ${mismoPeriodoQueCurso('ha')}`,
+          [Usuario_Id, id, Curso_Id]
         );
         const horasActuales = Number(cargaRow.horas_actuales);
         const duracion      = Number(bloqueDur?.duracion || 0);
@@ -868,9 +872,9 @@ const restaurarHorario = async (req, res) => {
       const [ocupadoDocente] = await conn.execute(
         `SELECT Horario_Asignatura_Id FROM horario_asignatura ha
          WHERE ha.Usuario_Id = ? AND ha.Bloque_Horario_Id = ? AND ha.Horario_Asignatura_Dia_Semana = ?
-           AND ${claseVigente('ha')}
+           AND ${claseVigente('ha')} AND ${mismoPeriodoQueCurso('ha')}
          FOR UPDATE`,
-        [clase.Usuario_Id, clase.Bloque_Horario_Id, clase.dia]
+        [clase.Usuario_Id, clase.Bloque_Horario_Id, clase.dia, clase.Curso_Id]
       );
       if (ocupadoDocente.length > 0) {
         await conn.rollback();
@@ -936,10 +940,11 @@ const restaurarHorario = async (req, res) => {
 const getResumenCursos = async (req, res) => {
   try {
     const [cursosBase] = await pool.execute(`
-      SELECT c.Curso_Id, c.Curso_Nombre, ne.Nivel_Educativo_Nombre
+      SELECT c.Curso_Id, c.Curso_Nombre, ne.Nivel_Educativo_Nombre, c.Curso_Periodo_Lectivo
       FROM curso c
       JOIN nivel_educativo ne ON ne.Nivel_Educativo_Id = c.Nivel_Educativo_Id
-      ORDER BY ne.Nivel_Educativo_Nombre, c.Curso_Nombre
+      WHERE ${cursoNoArchivado('c')}
+      ORDER BY c.Curso_Periodo_Lectivo, ne.Nivel_Educativo_Orden, c.Curso_Nombre
     `);
     if (cursosBase.length === 0) return res.json([]);
 
@@ -981,6 +986,7 @@ const getResumenCursos = async (req, res) => {
       Curso_Id              : c.Curso_Id,
       Curso_Nombre          : c.Curso_Nombre,
       Nivel_Educativo_Nombre: c.Nivel_Educativo_Nombre,
+      Curso_Periodo_Lectivo : c.Curso_Periodo_Lectivo,
       total_horas_requeridas : reqMap[c.Curso_Id]  ?? 0,
       total_horas_programadas: progMap[c.Curso_Id] ?? 0,
     }));
@@ -1035,7 +1041,7 @@ const getAsignacionesDocente = async (req, res) => {
       JOIN nivel_educativo ne ON ne.Nivel_Educativo_Id = c.Nivel_Educativo_Id
       JOIN asignatura     a  ON a.Asignatura_Id      = ha.Asignatura_Id
       JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
-      WHERE ha.Usuario_Id = ? AND ${claseVigente('ha')}
+      WHERE ha.Usuario_Id = ? AND ${claseVigente('ha')} AND ${enPeriodoVigente('ha')}
       ORDER BY c.Curso_Nombre, a.Asignatura_Nombre`,
       [docenteId]
     );
@@ -1124,7 +1130,7 @@ const getHorarioDocente = async (req, res) => {
       JOIN curso          c  ON c.Curso_Id          = ha.Curso_Id
       JOIN asignatura     a  ON a.Asignatura_Id      = ha.Asignatura_Id
       JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
-      WHERE ha.Usuario_Id = ? AND ${claseVigente('ha')}
+      WHERE ha.Usuario_Id = ? AND ${claseVigente('ha')} AND ${enPeriodoVigente('ha')}
       ORDER BY FIELD(ha.Horario_Asignatura_Dia_Semana, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'),
                bh.Bloque_Horario_Hora_Inicio`,
       [docenteId]
@@ -1305,7 +1311,7 @@ const filtrarHorarios = async (req, res) => {
       query += ` AND ${claseVigente('ha')}`;
     }
     if (docente_id) {
-      query += ' AND ha.Usuario_Id = ?';
+      query += ` AND ha.Usuario_Id = ? AND ${enPeriodoVigente('ha')}`;
       params.push(docente_id);
     }
     if (curso_id) {
@@ -1435,8 +1441,15 @@ const getBloquesLibres = async (req, res) => {
       ocupadosParams.push(curso_id);
     }
     if (docente_id) {
-      condiciones.push('Usuario_Id = ?');
-      ocupadosParams.push(docente_id);
+      // Durante el cierre, el docente puede tener clases en dos períodos: cuentan solo las del
+      // período del curso consultado (o, sin curso, las del período vigente).
+      if (curso_id) {
+        condiciones.push(`(Usuario_Id = ? AND ${mismoPeriodoQueCurso('horario_asignatura')})`);
+        ocupadosParams.push(docente_id, curso_id);
+      } else {
+        condiciones.push(`(Usuario_Id = ? AND ${enPeriodoVigente('horario_asignatura')})`);
+        ocupadosParams.push(docente_id);
+      }
     }
     if (condiciones.length > 0) {
       ocupadosQuery += ` AND (${condiciones.join(' OR ')})`;
@@ -1663,6 +1676,7 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
             ha.Horario_Asignatura_Estado     AS estado,
             ha.Curso_Id,
             c.Curso_Nombre                   AS curso,
+            c.Curso_Periodo_Lectivo          AS periodo,
             ha.Bloque_Horario_Id,
             bh.Bloque_Horario_Hora_Inicio    AS hora_inicio,
             bh.Bloque_Horario_Hora_Fin       AS hora_fin,
@@ -1727,6 +1741,7 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
     estado:            r.estado,
     Curso_Id:          r.Curso_Id,
     curso:             r.curso,
+    periodo:           r.periodo,
     dia:               cambiaDia ? cambios.Horario_Asignatura_Dia_Semana : r.dia,
     Bloque_Horario_Id: cambiaBloque ? nuevoBloque.Bloque_Horario_Id : r.Bloque_Horario_Id,
     hora_inicio:       cambiaBloque ? nuevoBloque.Bloque_Horario_Hora_Inicio : r.hora_inicio,
@@ -1754,6 +1769,7 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
             ha.Horario_Asignatura_Estado     AS estado,
             ha.Curso_Id,
             c.Curso_Nombre                   AS curso,
+            c.Curso_Periodo_Lectivo          AS periodo,
             ha.Bloque_Horario_Id,
             ha.Asignatura_Id,
             ha.Usuario_Id,
@@ -1788,9 +1804,11 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
     const vistos = new Map();
     for (const p of propuestas) {
       if (!p.Usuario_Id) continue;
-      const clave = `${p.Usuario_Id}|${p.Bloque_Horario_Id}|${p.dia}`;
+      const clave = `${p.Usuario_Id}|${p.Bloque_Horario_Id}|${p.dia}|${p.periodo}`;
+      // Solo choca con clases del mismo período (durante el cierre conviven dos)
       const choque = otros.find(
         (o) => o.Usuario_Id === p.Usuario_Id && o.Bloque_Horario_Id === p.Bloque_Horario_Id && o.dia === p.dia
+          && (o.periodo === undefined || o.periodo === p.periodo)
       );
       if (choque) {
         conflictos.push(`${p.docente} ya tiene clase en ${choque.curso} el ${etiqueta(p)}`);

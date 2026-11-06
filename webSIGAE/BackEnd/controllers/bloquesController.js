@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { anioActual } = require('../utils/periodos');
 const { condicionDesajustado, motivoDesajuste } = require('../utils/bloquesDesajustados');
 const { claseVigente, purgarClasesEliminadas } = require('../utils/clasesEliminadas');
 
@@ -66,10 +67,10 @@ const updateParametros = async (req, res) => {
         `INSERT INTO parametro_institucional
          (Parametro_Institucional_Inicio_Jornada, Parametro_Institucional_Fin_Jornada,
           Parametro_Institucional_Duracion_Bloque, Parametro_Institucional_Duracion_Recreo,
-          Parametro_Institucional_Bloques_Maximos_Diarios)
-         VALUES (?, ?, ?, ?, ?)`,
+          Parametro_Institucional_Bloques_Maximos_Diarios, Parametro_Institucional_Periodo_Vigente)
+         VALUES (?, ?, ?, ?, ?, ?)`,
         [Parametro_Institucional_Inicio_Jornada, Parametro_Institucional_Fin_Jornada,
-         durBloque, durRecreo, maxBloques]
+         durBloque, durRecreo, maxBloques, anioActual()]
       );
     } else {
       await pool.execute(
