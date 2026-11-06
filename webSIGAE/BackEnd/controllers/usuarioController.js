@@ -3,6 +3,7 @@ const db = require('../config/db');
 const bcrypt = require('bcrypt');
 const path = require('path');
 const fs = require('fs');
+const { UPLOAD_DIR } = require('../middleware/uploadFotoPerfil');
 const {
   validarCorreoInstitucional,
   validarTelefonoChileno,
@@ -180,8 +181,9 @@ const actualizarFotografiaPerfil = async (req, res) => {
     await db.query('UPDATE usuario SET Usuario_Foto_Perfil = ? WHERE Usuario_Id = ?', [rutaFoto, userId]);
 
     // Elimina la fotografía anterior del disco para no acumular archivos huérfanos
-    if (fotoAnterior && fotoAnterior !== rutaFoto) {
-      const rutaAbsolutaAnterior = path.join(__dirname, '..', fotoAnterior);
+    // (solo si es una ruta /uploads/perfiles/<archivo>; nunca se borra fuera de esa carpeta).
+    if (fotoAnterior && fotoAnterior !== rutaFoto && fotoAnterior.startsWith('/uploads/perfiles/')) {
+      const rutaAbsolutaAnterior = path.join(UPLOAD_DIR, path.basename(fotoAnterior));
       fs.unlink(rutaAbsolutaAnterior, () => {});
     }
 

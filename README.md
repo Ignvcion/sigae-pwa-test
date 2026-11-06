@@ -1,6 +1,6 @@
 # SIGAE — Sistema de Gestión Académica y Escolar
 
-> ⚠️ Proyecto en desarrollo activo. No apto para producción.
+> 🚦 En **marcha blanca**: corre en producción con datos reales de un grupo acotado de cursos. Antes de desplegar, lee [Deploy](#-deploy).
 
 ## ¿Qué es SIGAE?
 
@@ -103,7 +103,7 @@ web-dev-SIGAE/
 └── webSIGAE/
     ├── BackEnd/       # API Node.js + Express
     ├── FrontEnd/      # App Vite + React
-    └── Database/      # SIGAE.sql (único dump de la base de datos)
+    └── Database/      # SIGAE.sql (desarrollo); schema_base.sql y catalogos_base.sql (producción)
 ```
 
 ### 📚 Documentación
@@ -114,7 +114,8 @@ Toda la documentación, salvo este README, está en `docs/`. No agregues archivo
 | --- | --- |
 | [`docs/api-citaciones.md`](docs/api-citaciones.md) | Contrato entre frontend y backend del módulo de citaciones (CU74–CU79): endpoints, formato de respuestas y permisos. |
 | [`docs/navegacion-sidebar.md`](docs/navegacion-sidebar.md) | Cómo funciona el sidebar (`MainLayout.jsx`), reglas para agregar enlaces y pendientes conocidos. |
-| [`docs/tabla-historial.md`](docs/tabla-historial.md) | Estado de la tabla de auditoría `historial` y qué hacer al llegar a la fase alfa. |
+| [`docs/tabla-historial.md`](docs/tabla-historial.md) | Estado de la tabla de auditoría `historial` y cómo se escriben sus valores. |
+| [`docs/decisiones-rf60-rf61-periodos.txt`](docs/decisiones-rf60-rf61-periodos.txt) | Acuerdos del Incremento 4 que van más allá del mockup: profesor jefe, situación final, promoción, períodos lectivos y limpieza de datos. |
 
 ---
 
@@ -126,6 +127,8 @@ El backend lee su configuración de `webSIGAE/BackEnd/.env`. Ese archivo **no se
 - **No hace falta editarlo**, tampoco en Windows: el setup crea en tu base de datos el usuario `sigae` que usa la plantilla.
 - **Si agregas una variable nueva** al backend, agrégala también en `.env.example` con un valor de ejemplo, para que le llegue al resto del equipo. Nunca pongas claves reales en la plantilla.
 
+- **En producción** el `.env` se escribe a mano en el servidor con valores reales (ver [Deploy](#-deploy)). Con `NODE_ENV=production` el backend **no arranca** si falta una variable obligatoria: la plantilla marca cuáles son.
+
 Si necesitas crearlo sin correr el setup, copia la plantilla:
 
 ```bash
@@ -136,7 +139,9 @@ cp webSIGAE/BackEnd/.env.example webSIGAE/BackEnd/.env
 
 ## 🗄️ Base de datos
 
-> 📌 **Hay un solo archivo de base de datos: `webSIGAE/Database/SIGAE.sql`.** No existen migraciones ni scripts aparte. Ese archivo siempre trae el esquema más reciente **y** los usuarios de prueba.
+> 📌 **En desarrollo se usa un solo archivo: `webSIGAE/Database/SIGAE.sql`.** Trae el esquema más reciente **y** los usuarios de prueba.
+>
+> 🛑 **`SIGAE.sql`, `setup.sh`, `win_setup.sh` y `hashPasswords.js` nunca se ejecutan contra la base de producción (RDS).** `SIGAE.sql` hace `DROP TABLE` de todas las tablas y carga usuarios de prueba con contraseñas en texto plano: correrlo allí **borra los datos reales**. Producción usa `webSIGAE/Database/schema_base.sql` (solo estructura, sin datos) y solo una vez, al crear la base. `setup.sh`, `win_setup.sh` y `hashPasswords.js` se niegan a correr en un equipo con el archivo `/etc/sigae-production`.
 
 Importar `SIGAE.sql` borra y vuelve a crear todas las tablas de `sigae` (crea la base si no existe). Por eso sirve tanto para instalar desde cero como para **ponerse al día**: si tu base es antigua (por ejemplo, te falta una columna o el backend tira `Unknown column ...`), basta con volver a importarlo.
 
@@ -196,10 +201,109 @@ Para restaurarlo, impórtalo igual que `SIGAE.sql` pero con `~/respaldo_sigae.sq
 
 ### Para quien modifique el esquema
 
-Cualquier cambio de tablas o columnas se hace **directamente en `SIGAE.sql`** (manteniendo los usuarios de prueba). No agregues archivos de migración aparte: el equipo trabaja con un solo archivo.
+Cualquier cambio de tablas o columnas se hace **en `SIGAE.sql`** (manteniendo los usuarios de prueba). Después, **en el mismo commit**:
+
+1. Regenera `schema_base.sql` desde la raíz del repo (es el mismo `sed` con el que se creó: quita `INSERT`, `LOCK/UNLOCK TABLES`, `DROP TABLE`, `ALTER TABLE ... KEYS`, la cabecera de encriptación y los `AUTO_INCREMENT` de prueba, y conserva la cabecera de 7 líneas del archivo):
+
+   ```bash
+   { sed -n '1,7p' webSIGAE/Database/schema_base.sql; sed -E -e 's/\r$//' -e '/^INSERT INTO /d' -e '/^LOCK TABLES /d' -e '/^UNLOCK TABLES;/d' -e '/^DROP TABLE IF EXISTS /d' -e '/^\/\*!40000 ALTER TABLE `[^`]+` (DISABLE|ENABLE) KEYS \*\/;$/d' -e '/^-- Dumping data for table /d' -e "s| /\*!80016 DEFAULT ENCRYPTION='N' \*/||" -e 's/ AUTO_INCREMENT=[0-9]+//' webSIGAE/Database/SIGAE.sql; } > webSIGAE/Database/schema_base.sql.nuevo && mv webSIGAE/Database/schema_base.sql.nuevo webSIGAE/Database/schema_base.sql
+   ```
+
+2. Verifica que no quedaron datos (debe imprimir `0`) y que el número de tablas coincide:
+
+   ```bash
+   grep -ciE 'insert into|drop table' webSIGAE/Database/schema_base.sql
+   ```
+
+   ```bash
+   grep -c '^CREATE TABLE' webSIGAE/Database/SIGAE.sql webSIGAE/Database/schema_base.sql
+   ```
+
+3. **Avisa a quien administra producción.** Desde la marcha blanca la RDS tiene datos reales: `schema_base.sql` sirve para crear una base **nueva**, no para actualizar una existente (falla al encontrar tablas que ya existen, justamente para no pisar datos). Un cambio de esquema en producción se aplica a mano con un `ALTER TABLE` revisado, después de sacar un snapshot de la RDS. La estrategia formal de migraciones se define después del período de servicio técnico.
+
+No agregues archivos de migración aparte mientras tanto.
 
 ---
 
 ## 📦 Deploy
 
-> Sección pendiente. El proyecto aún no tiene un flujo de deploy definido.
+Producción durante la marcha blanca:
+
+| Pieza | Dónde |
+| --- | --- |
+| Backend (Node + Express) | EC2 Debian 13 (t3.small), con **pm2** (`webSIGAE/BackEnd/ecosystem.config.js`) |
+| Frontend (`dist/` de Vite) | Lo sirve **Nginx** en la misma EC2; se compila en Codespaces |
+| Proxy y HTTPS | **Nginx** + certbot: `/` → `dist/`, `/api` y `/uploads` → `127.0.0.1:3000` |
+| Base de datos | **Amazon RDS (MariaDB)**, sin acceso público, solo desde la EC2 |
+| Fotos de perfil | `/var/sigae/uploads` en la EC2 (fuera del repo) |
+
+> 🛑 En el servidor **nunca** se corren `SIGAE.sql`, `setup.sh`, `win_setup.sh` ni `hashPasswords.js`. Marca el servidor para que se nieguen a correr: `sudo touch /etc/sigae-production`.
+
+### 1. Código en el servidor
+
+El servidor solo recibe el backend y el esquema (sparse-checkout de lista blanca): `webSIGAE/BackEnd/`, `webSIGAE/Database/schema_base.sql` y `webSIGAE/Database/catalogos_base.sql`, **excluyendo** `SIGAE.sql`, `BackEnd/tests/`, `BackEnd/scripts/` y `BackEnd/hashPasswords.js`. Usa la misma versión mayor de Node que el codespace (`node --version`).
+
+Instala las dependencias sin las de desarrollo y sin el Chromium de Puppeteer (se usa el del sistema, `apt install chromium`):
+
+```bash
+cd webSIGAE/BackEnd && PUPPETEER_SKIP_DOWNLOAD=true npm ci --omit=dev
+```
+
+### 2. Base de datos (RDS)
+
+- MariaDB de la **misma versión mayor** que la de desarrollo, sin acceso público y con un grupo de seguridad que solo acepte el puerto 3306 desde la EC2.
+- Carga el esquema **una sola vez**, con el usuario administrador de la RDS: `mariadb -h <endpoint> -u <admin> -p < webSIGAE/Database/schema_base.sql`.
+- Crea un usuario para la app con permisos acotados (la app no necesita DDL):
+  `GRANT SELECT, INSERT, UPDATE, DELETE ON sigae.* TO 'sigae_app'@'%';` (restringe el host a la subred de la EC2 si puedes).
+- Después del esquema, carga **una vez** los niveles educativos con su orden (sin ellos no funciona la promoción): `mariadb -h <endpoint> -u <admin> -p < webSIGAE/Database/catalogos_base.sql`. Es idempotente (`INSERT IGNORE`).
+- El resto parte vacío: parámetros institucionales y bloques, asignaturas, planes, cursos y horarios se cargan desde la aplicación. Al guardar los parámetros institucionales queda fijado el período vigente (el año actual).
+- El primer administrador real se crea con un script puntual (contraseña hasheada con bcrypt); **no** con `hashPasswords.js`.
+
+### 3. `.env` de producción
+
+En `webSIGAE/BackEnd/.env`, con `chmod 600` y como dueño el usuario que corre pm2. Usa `.env.example` como lista de variables, pero **ningún valor de desarrollo**. Mínimo:
+
+| Variable | Valor en producción |
+| --- | --- |
+| `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Endpoint de la RDS, `sigae_app` y su contraseña, `sigae` |
+| `DB_SSL` | `true` (TLS verificado con la CA de Amazon RDS) |
+| `JWT_SECRET` | 32+ caracteres aleatorios: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
+| `FRONTEND_URL` | `https://tu-dominio` (enlaces de recuperación y CORS) |
+| `CORS_ORIGINS` | Opcional; por defecto, `FRONTEND_URL` |
+| `UPLOADS_DIR` | `/var/sigae/uploads` (créala con permisos para el usuario de pm2) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | Correo para recuperar contraseñas. AWS bloquea el puerto 25 en EC2: usa 587 o 465 |
+
+`NODE_ENV=production` y `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` los fija `ecosystem.config.js`. Si falta algo, el backend no arranca y `pm2 logs sigae-api` dice qué variable falta (nunca muestra valores). En producción los logs tapan RUT, correos y tokens.
+
+### 4. Arrancar con pm2
+
+```bash
+cd webSIGAE/BackEnd && pm2 start ecosystem.config.js
+```
+
+```bash
+pm2 save && pm2 startup
+```
+
+El backend escucha solo en `127.0.0.1:3000`; únicamente Nginx llega a él.
+
+### 5. Nginx
+
+- `root` apuntando al `dist/` del frontend, con `try_files $uri /index.html` (rutas de React).
+- `location /api/` y `location /uploads/` → `proxy_pass http://127.0.0.1:3000;`, con `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` y `proxy_set_header X-Forwarded-Proto $scheme;`. El backend confía en **un** proxy (`trust proxy 1`): el rate limiter de login usa la IP real y el redireccionamiento a HTTPS usa `X-Forwarded-Proto`.
+- `client_max_body_size 6m;` (las fotos de perfil pesan hasta 5 MB).
+- HTTPS con certbot; abiertos solo el 80 y el 443 (el 22, cerrado y accesible por Tailscale).
+
+### 6. Respaldos
+
+- La RDS: snapshots automáticos (y uno manual antes de cualquier cambio de esquema).
+- **`/var/sigae/uploads` no la cubren los snapshots de la RDS**: respáldala aparte.
+- Al cambiar de período (Gestión Académica › Cierre de Período), el super administrador descarga un Excel con todo lo que se va a eliminar (cursos de dos períodos atrás, sus egresados y retirados con su historial, y apoderados sin estudiantes) y lo sube a la cuenta de Google Drive de respaldos. Tiene datos personales de menores: no se guarda en equipos personales.
+
+### Actualizar el backend
+
+```bash
+git pull && cd webSIGAE/BackEnd && PUPPETEER_SKIP_DOWNLOAD=true npm ci --omit=dev && pm2 restart sigae-api
+```
+
+Si el `git pull` trae cambios en `SIGAE.sql`/`schema_base.sql`, **no** reimportes nada: sigue el paso 3 de [Para quien modifique el esquema](#para-quien-modifique-el-esquema).

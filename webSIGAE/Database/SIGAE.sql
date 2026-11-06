@@ -208,6 +208,8 @@ UNLOCK TABLES;
 
 --
 -- Table structure for table `curso`
+-- Incremento 4, RF61: cada curso pertenece a un período lectivo (Curso_Periodo_Lectivo);
+-- el nombre es único dentro de cada período (puede haber un "2do Básico A" en 2026 y otro en 2027)
 --
 
 DROP TABLE IF EXISTS `curso`;
@@ -219,8 +221,10 @@ CREATE TABLE `curso` (
   `Curso_Nombre` varchar(100) NOT NULL,
   `Nivel_Educativo_Id` int unsigned NOT NULL,
   `Curso_Profesor_Jefe_Usuario_Id` int unsigned DEFAULT NULL,
+  `Curso_Periodo_Lectivo` varchar(10) NOT NULL,
   PRIMARY KEY (`Curso_Id`),
-  UNIQUE KEY `Curso_Nombre_UNIQUE` (`Curso_Nombre`),
+  UNIQUE KEY `Curso_Nombre_Periodo_UNIQUE` (`Curso_Nombre`,`Curso_Periodo_Lectivo`),
+  KEY `Curso_Periodo_Lectivo_idx` (`Curso_Periodo_Lectivo`),
   KEY `fk_Curso_Nivel_Educativo_idx` (`Nivel_Educativo_Id`),
   KEY `fk_Curso_Profesor_Jefe_Usuario_idx` (`Curso_Profesor_Jefe_Usuario_Id`),
   CONSTRAINT `fk_Curso_Nivel_Educativo` FOREIGN KEY (`Nivel_Educativo_Id`) REFERENCES `nivel_educativo` (`Nivel_Educativo_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -234,7 +238,7 @@ CREATE TABLE `curso` (
 
 LOCK TABLES `curso` WRITE;
 /*!40000 ALTER TABLE `curso` DISABLE KEYS */;
-INSERT INTO `curso` VALUES (222,'A','1ero Básico A',24,3),(223,'B','1ero Básico B',24,5),(224,'A','2do Básico A',25,NULL),(225,'A','1ero Medio A',32,NULL),(226,'A','2do Medio A',33,NULL);
+INSERT INTO `curso` VALUES (222,'A','1ero Básico A',24,3,'2026'),(223,'B','1ero Básico B',24,5,'2026'),(224,'A','2do Básico A',25,NULL,'2026'),(225,'A','1ero Medio A',32,NULL,'2026'),(226,'A','2do Medio A',33,NULL,'2026');
 /*!40000 ALTER TABLE `curso` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -515,6 +519,7 @@ UNLOCK TABLES;
 
 --
 -- Table structure for table `nivel_educativo`
+-- Incremento 4, RF61: Nivel_Educativo_Orden define el nivel siguiente (Pre-Kinder = 1 ... 4to Medio = 14)
 --
 
 DROP TABLE IF EXISTS `nivel_educativo`;
@@ -523,8 +528,10 @@ DROP TABLE IF EXISTS `nivel_educativo`;
 CREATE TABLE `nivel_educativo` (
   `Nivel_Educativo_Id` int unsigned NOT NULL AUTO_INCREMENT,
   `Nivel_Educativo_Nombre` varchar(100) NOT NULL,
+  `Nivel_Educativo_Orden` int unsigned NOT NULL,
   PRIMARY KEY (`Nivel_Educativo_Id`),
-  UNIQUE KEY `Nivel_Educativo_Nombre_UNIQUE` (`Nivel_Educativo_Nombre`)
+  UNIQUE KEY `Nivel_Educativo_Nombre_UNIQUE` (`Nivel_Educativo_Nombre`),
+  UNIQUE KEY `Nivel_Educativo_Orden_UNIQUE` (`Nivel_Educativo_Orden`)
 ) ENGINE=InnoDB AUTO_INCREMENT=110 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -534,7 +541,7 @@ CREATE TABLE `nivel_educativo` (
 
 LOCK TABLES `nivel_educativo` WRITE;
 /*!40000 ALTER TABLE `nivel_educativo` DISABLE KEYS */;
-INSERT INTO `nivel_educativo` VALUES (24,'1ero Básico'),(32,'1ero Medio'),(25,'2do Básico'),(33,'2do Medio'),(26,'3ero Básico'),(34,'3ero Medio'),(27,'4to Básico'),(35,'4to Medio'),(28,'5to Básico'),(29,'6to Básico'),(30,'7mo Básico'),(31,'8vo Básico'),(23,'Kinder'),(22,'Pre-Kinder');
+INSERT INTO `nivel_educativo` VALUES (24,'1ero Básico',3),(32,'1ero Medio',11),(25,'2do Básico',4),(33,'2do Medio',12),(26,'3ero Básico',5),(34,'3ero Medio',13),(27,'4to Básico',6),(35,'4to Medio',14),(28,'5to Básico',7),(29,'6to Básico',8),(30,'7mo Básico',9),(31,'8vo Básico',10),(23,'Kinder',2),(22,'Pre-Kinder',1);
 /*!40000 ALTER TABLE `nivel_educativo` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -576,6 +583,8 @@ UNLOCK TABLES;
 
 --
 -- Table structure for table `parametro_institucional`
+-- Incremento 4, RF61: Periodo_Vigente es el año escolar en curso; Periodo_Siguiente se llena
+-- con "Iniciar cierre" y vuelve a NULL con "Iniciar nuevo período"
 --
 
 DROP TABLE IF EXISTS `parametro_institucional`;
@@ -588,6 +597,8 @@ CREATE TABLE `parametro_institucional` (
   `Parametro_Institucional_Fin_Jornada` time NOT NULL,
   `Parametro_Institucional_Bloques_Maximos_Diarios` int NOT NULL,
   `Parametro_Institucional_Duracion_Recreo` int NOT NULL,
+  `Parametro_Institucional_Periodo_Vigente` varchar(10) DEFAULT NULL,
+  `Parametro_Institucional_Periodo_Siguiente` varchar(10) DEFAULT NULL,
   PRIMARY KEY (`Parametro_Institucional_Id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=111114 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -598,7 +609,7 @@ CREATE TABLE `parametro_institucional` (
 
 LOCK TABLES `parametro_institucional` WRITE;
 /*!40000 ALTER TABLE `parametro_institucional` DISABLE KEYS */;
-INSERT INTO `parametro_institucional` VALUES (111111,45,'08:30:00','16:30:00',8,15);
+INSERT INTO `parametro_institucional` VALUES (111111,45,'08:30:00','16:30:00',8,15,'2026',NULL);
 /*!40000 ALTER TABLE `parametro_institucional` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -763,6 +774,8 @@ UNLOCK TABLES;
 
 --
 -- Table structure for table `usuario`
+-- Incremento 4, RF61: Apoderado_Sin_Asociaciones_Desde marca el período en que un apoderado quedó
+-- sin estudiantes (inactivo); se elimina en el siguiente cambio de período si sigue así
 --
 
 DROP TABLE IF EXISTS `usuario`;
@@ -790,6 +803,7 @@ CREATE TABLE `usuario` (
   `Usuario_Direccion_Comuna` varchar(60) DEFAULT NULL,
   `Apoderado_Correo_Natural` varchar(100) DEFAULT NULL,
   `Docente_Recepcion_Mensajes` tinyint(1) NOT NULL DEFAULT 1,
+  `Apoderado_Sin_Asociaciones_Desde` varchar(10) DEFAULT NULL,
   PRIMARY KEY (`Usuario_Id`),
   UNIQUE KEY `Usuario_RUT_UNIQUE` (`Usuario_RUT`),
   UNIQUE KEY `Apoderado_Correo_Natural_UNIQUE` (`Apoderado_Correo_Natural`),
@@ -804,7 +818,7 @@ CREATE TABLE `usuario` (
 
 LOCK TABLES `usuario` WRITE;
 /*!40000 ALTER TABLE `usuario` DISABLE KEYS */;
-INSERT INTO `usuario` VALUES (1,'5682711-0','961900000','Esperanza Penelope Gonzales Farias',1,'1234',NULL,0,NULL,NULL,NULL,1,'Super Admin','es.gonzales@jacquescousteau.edu',0,NULL,NULL,NULL,NULL,NULL,1),(2,'9343727-6','979746782','Carlos Vicente Gonzales Muñoz',1,'ilovemilf',NULL,0,NULL,NULL,NULL,1,'Administrador Normal','ca.gonzales@jacquescousteau.edu',0,NULL,NULL,NULL,NULL,NULL,1),(3,'3483606-k','946789765','María Claudia Morales Rojas',1,'Gato123',NULL,1,38,'Matemáticas','ma.morales@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1),(4,'5738925-7','944706559','Pedro Humberto Fernandez Soto',1,'4532',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Avenida Concha y Toro','134',NULL,'Puente Alto','pedrofernandez453@gmail.com',1),(5,'3890710-7','912345678','Ana Lucía Torres Vega',1,'Hamster#23',NULL,1,32,'Lenguaje','an.torres@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1),(6,'7135657-4','923456789','Roberto Andrés Silva Pinto',1,'Cotorra-15',NULL,1,40,'Historia','ro.silva@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1),(7,'2258000-0','934567890','Carmen Gloria Díaz Muñoz',1,'Perrito@7',NULL,1,36,'Ciencias','ca.diaz@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1),(8,'8636451-4','945678901','Luis Eduardo Ramos Fuentes',1,'Conejo#42',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Calle Los Pinos','456',NULL,'Santiago','luisramos@gmail.com',1),(9,'9230041-2','956789012','Sandra Patricia Vera Molina',1,'Tortuga-99',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Pasaje Las Rosas','789',NULL,'Maipú','sandravera@gmail.com',1),(10,'5158743-k','967890123','Jorge Ignacio Campos Reyes',1,'Pinguino@5',NULL,1,38,'Inglés','jo.campos@jacquescousteau.edu',0,NULL,NULL,1,'Avenida Principal','321',NULL,'Las Condes','jorge.campos@gmail.com',1);
+INSERT INTO `usuario` VALUES (1,'5682711-0','961900000','Esperanza Penelope Gonzales Farias',1,'1234',NULL,0,NULL,NULL,NULL,1,'Super Admin','es.gonzales@jacquescousteau.edu',0,NULL,NULL,NULL,NULL,NULL,1,NULL),(2,'9343727-6','979746782','Carlos Vicente Gonzales Muñoz',1,'ilovemilf',NULL,0,NULL,NULL,NULL,1,'Administrador Normal','ca.gonzales@jacquescousteau.edu',0,NULL,NULL,NULL,NULL,NULL,1,NULL),(3,'3483606-k','946789765','María Claudia Morales Rojas',1,'Gato123',NULL,1,38,'Matemáticas','ma.morales@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL),(4,'5738925-7','944706559','Pedro Humberto Fernandez Soto',1,'4532',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Avenida Concha y Toro','134',NULL,'Puente Alto','pedrofernandez453@gmail.com',1,NULL),(5,'3890710-7','912345678','Ana Lucía Torres Vega',1,'Hamster#23',NULL,1,32,'Lenguaje','an.torres@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL),(6,'7135657-4','923456789','Roberto Andrés Silva Pinto',1,'Cotorra-15',NULL,1,40,'Historia','ro.silva@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL),(7,'2258000-0','934567890','Carmen Gloria Díaz Muñoz',1,'Perrito@7',NULL,1,36,'Ciencias','ca.diaz@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL),(8,'8636451-4','945678901','Luis Eduardo Ramos Fuentes',1,'Conejo#42',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Calle Los Pinos','456',NULL,'Santiago','luisramos@gmail.com',1,NULL),(9,'9230041-2','956789012','Sandra Patricia Vera Molina',1,'Tortuga-99',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Pasaje Las Rosas','789',NULL,'Maipú','sandravera@gmail.com',1,NULL),(10,'5158743-k','967890123','Jorge Ignacio Campos Reyes',1,'Pinguino@5',NULL,1,38,'Inglés','jo.campos@jacquescousteau.edu',0,NULL,NULL,1,'Avenida Principal','321',NULL,'Las Condes','jorge.campos@gmail.com',1,NULL);
 /*!40000 ALTER TABLE `usuario` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

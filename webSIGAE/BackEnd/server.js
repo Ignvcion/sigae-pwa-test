@@ -1,16 +1,28 @@
 // server.js
-require('dotenv').config();
+const { esProduccion, UPLOADS_DIR, origenesCors, validarEntornoProduccion } = require('./config/env');
+const { instalarLogsSeguros } = require('./utils/logger');
+
+// Producción: logs sin RUT, nombres ni notas (ver utils/logger.js) y arranque
+// abortado si falta una variable obligatoria del .env (ver config/env.js).
+if (esProduccion) instalarLogsSeguros();
+validarEntornoProduccion();
+
 const express = require('express');
 const cors    = require('cors');
 const helmet  = require('helmet');
-const path    = require('path');
 
 const app = express();
 
+// CORS_ORIGINS (o FRONTEND_URL): orígenes permitidos, separados por coma.
+// En producción Nginx sirve el FrontEnd y /api en el mismo dominio, así que
+// basta con el dominio público (https://...).
 const corsOptions = {
-  origin     : process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin     : origenesCors(),
   credentials: true,
 };
+
+// Detrás de Nginx: confiar en UN proxy para que req.ip (rate limiter de login
+// y recuperación) y req.secure salgan de X-Forwarded-For / X-Forwarded-Proto.
 app.set('trust proxy', 1);
 
 // RNF01: HTTPS obligatorio + cabeceras de seguridad (HSTS incluido).
@@ -33,8 +45,9 @@ if (process.env.NODE_ENV === 'production') {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// CU20: archivos subidos (fotografías de perfil)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// CU20: archivos subidos (fotografías de perfil). Misma carpeta que usa
+// middleware/uploadFotoPerfil.js (UPLOADS_DIR; por defecto BackEnd/uploads).
+app.use('/uploads', express.static(UPLOADS_DIR, { dotfiles: 'deny', index: false }));
 
 // ── RUTAS ────────────────────────────────────────────
 const authRoutes        = require('./routes/authRoutes');
@@ -47,6 +60,7 @@ const dashboardRoutes   = require('./routes/dashboardRoutes');
 const planRoutes        = require('./routes/planRoutes');
 const citacionRoutes    = require('./routes/citacionRoutes');
 const mensajeRoutes = require('./routes/mensajeRoutes');
+const promocionRoutes   = require('./routes/promocionRoutes');
 const horarioAtencionRoutes = require('./routes/horarioAtencionRoutes');
 
 app.use('/api/auth',        authRoutes);
@@ -59,6 +73,7 @@ app.use('/api/dashboard',   dashboardRoutes);
 app.use('/api/planes',      planRoutes);
 app.use('/api/citaciones',  citacionRoutes);
 app.use('/api/mensajes', mensajeRoutes);
+app.use('/api/promocion',   promocionRoutes);
 app.use('/api/horario-atencion', horarioAtencionRoutes);
 
 // 404
@@ -66,13 +81,21 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Ruta no encontrada' });
 });
 
-// Error global
+// Error global. Nunca devuelve el stack ni mensajes de SQL: en producción solo
+// un mensaje genérico; en desarrollo se agrega "detalle" para depurar.
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Error interno del servidor' });
+  const status = Number.isInteger(err.status || err.statusCode) ? (err.status || err.statusCode) : 500;
+  const codigo = status >= 400 && status < 600 ? status : 500;
+  if (codigo >= 500) console.error(err);
+  const cuerpo = { error: codigo >= 500 ? 'Error interno del servidor' : 'Solicitud inválida' };
+  if (!esProduccion) cuerpo.detalle = err.message;
+  res.status(codigo).json(cuerpo);
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
+// HOST: en producción 127.0.0.1, para que solo Nginx llegue a la API.
+const HOST = process.env.HOST || (esProduccion ? '127.0.0.1' : undefined);
+app.listen(PORT, HOST, () => {
+  console.log(`Servidor corriendo en ${HOST || '*'}:${PORT}`);
 });

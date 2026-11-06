@@ -104,10 +104,28 @@ describe('Pruebas Unitarias - CU40: Estudiantes Asociados a un Apoderado', () =>
 describe('Pruebas Unitarias - CU39: Editar Asociaciones de un Estudiante', () => {
   let req;
   let res;
+  let conn;
+
+  const insertsHistorial = () =>
+    conn.query.mock.calls.filter(([sql]) => /INSERT INTO historial/.test(sql));
 
   beforeEach(() => {
     jest.clearAllMocks();
-    req = { params: {}, body: {} };
+    conn = {
+      // UPDATE e INSERT historial; la consulta de RUT y nombre devuelve los apoderados 4 y 7
+      query: jest.fn(async (sql) => (/FROM usuario WHERE Usuario_Id IN/.test(sql)
+        ? [[
+          { Usuario_Id: 4, Usuario_RUT: '14.444.444-4', Usuario_Nombre_Completo: 'Pedro Fernandez' },
+          { Usuario_Id: 7, Usuario_RUT: '17.777.777-k', Usuario_Nombre_Completo: 'Ana Torres' },
+        ]]
+        : [{ affectedRows: 1 }])),
+      beginTransaction: jest.fn().mockResolvedValue(),
+      commit: jest.fn().mockResolvedValue(),
+      rollback: jest.fn().mockResolvedValue(),
+      release: jest.fn(),
+    };
+    db.getConnection = jest.fn().mockResolvedValue(conn);
+    req = { params: {}, body: {}, user: { id: 1 } };
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn().mockReturnThis(),
@@ -120,12 +138,33 @@ describe('Pruebas Unitarias - CU39: Editar Asociaciones de un Estudiante', () =>
 
     db.query
       .mockResolvedValueOnce([[{ Estudiante_Id: 1, Apoderado_Usuario_Id: 4 }]])
-      .mockResolvedValueOnce([[{ Usuario_Id: 7, Usuario_Estado_Cuenta: 1 }]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce([[{ Usuario_Id: 7, Usuario_Estado_Cuenta: 1 }]]);
 
     await estudianteController.editarAsociaciones(req, res);
 
     expect(res.json).toHaveBeenCalledWith({ mensaje: 'Asociaciones actualizadas correctamente' });
+    // Registra trazabilidad: de apoderado 4 a apoderado 7, hecho por el usuario 1
+    const inserts = insertsHistorial();
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0][1]).toEqual(['14444444 (Pedro Fernandez)', expect.stringContaining('CU39'), 'Apoderado_Usuario_Id', '17777777 (Ana Torres)', 4, 1, null, null, 1]);
+    expect(conn.commit).toHaveBeenCalled();
+    expect(conn.release).toHaveBeenCalled();
+  });
+
+  test('Si la asociación cambió entre la lectura y el UPDATE, responde 409 sin registrar historial', async () => {
+    req.params.estudianteId = 1;
+    req.body = { apoderadoId: 7 };
+
+    db.query
+      .mockResolvedValueOnce([[{ Estudiante_Id: 1, Apoderado_Usuario_Id: 4 }]])
+      .mockResolvedValueOnce([[{ Usuario_Id: 7, Usuario_Estado_Cuenta: 1 }]]);
+    conn.query.mockResolvedValueOnce([{ affectedRows: 0 }]);
+
+    await estudianteController.editarAsociaciones(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(conn.rollback).toHaveBeenCalled();
+    expect(insertsHistorial()).toHaveLength(0);
   });
 
   test('CU39 - Excepción "Elimina última asociación": pide confirmación adicional sin ejecutar el UPDATE', async () => {
@@ -137,6 +176,7 @@ describe('Pruebas Unitarias - CU39: Editar Asociaciones de un Estudiante', () =>
     await estudianteController.editarAsociaciones(req, res);
 
     expect(db.query).toHaveBeenCalledTimes(1);
+    expect(db.getConnection).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({ requiereConfirmacion: true })
@@ -147,13 +187,14 @@ describe('Pruebas Unitarias - CU39: Editar Asociaciones de un Estudiante', () =>
     req.params.estudianteId = 1;
     req.body = { apoderadoId: null, confirmarEliminacion: true };
 
-    db.query
-      .mockResolvedValueOnce([[{ Estudiante_Id: 1, Apoderado_Usuario_Id: 4 }]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    db.query.mockResolvedValueOnce([[{ Estudiante_Id: 1, Apoderado_Usuario_Id: 4 }]]);
 
     await estudianteController.editarAsociaciones(req, res);
 
     expect(res.json).toHaveBeenCalledWith({ mensaje: 'Asociaciones actualizadas correctamente' });
+    const inserts = insertsHistorial();
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0][1].slice(0, 4)).toEqual(['14444444 (Pedro Fernandez)', expect.stringContaining('eliminación'), 'Apoderado_Usuario_Id', '—']);
   });
 
   test('Retorna 404 si la ficha de estudiante no existe', async () => {

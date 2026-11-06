@@ -2,8 +2,12 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { UPLOADS_DIR } = require('../config/env');
 
-const UPLOAD_DIR = path.join(__dirname, '..', 'uploads', 'perfiles');
+// UPLOADS_DIR viene del .env (producción: /var/sigae/uploads, fuera del repo).
+// Sin la variable se usa webSIGAE/BackEnd/uploads, como en desarrollo.
+// server.js sirve esta misma carpeta en /uploads.
+const UPLOAD_DIR = path.join(UPLOADS_DIR, 'perfiles');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const TIPOS_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp'];
@@ -29,3 +33,4 @@ const uploadFotoPerfil = multer({
 }).single('foto');
 
 module.exports = uploadFotoPerfil;
+module.exports.UPLOAD_DIR = UPLOAD_DIR;

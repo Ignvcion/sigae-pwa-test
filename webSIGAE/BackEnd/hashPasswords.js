@@ -1,3 +1,12 @@
+// SOLO DESARROLLO: hashea las contraseñas en texto plano que trae SIGAE.sql.
+// No se usa en producción (el primer administrador real se crea con un script
+// puntual); en un servidor marcado con /etc/sigae-production se niega a correr.
+const fs = require('fs');
+if (fs.existsSync('/etc/sigae-production')) {
+  console.error('❌ Este equipo está marcado como PRODUCCIÓN (/etc/sigae-production). hashPasswords.js es solo para desarrollo.');
+  process.exit(1);
+}
+
 const path = require('path');
 const bcrypt = require('bcrypt');
 const mysql = require('mysql2/promise');

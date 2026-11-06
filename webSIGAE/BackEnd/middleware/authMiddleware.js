@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const { hashToken } = require('../utils/sesion');
 
 const verifyToken = async (req, res, next) => {
 
@@ -15,6 +16,9 @@ const verifyToken = async (req, res, next) => {
     });
   }
 
+  // En `sesion` se guarda el hash del token, no el token (utils/sesion.js)
+  const tokenHash = hashToken(token);
+
   try {
 
     const decoded = jwt.verify(
@@ -25,7 +29,7 @@ const verifyToken = async (req, res, next) => {
     // Verificar que la sesión siga activa en BD (cubre cuentas desactivadas y logouts)
     const [rows] = await pool.execute(
       `SELECT Sesion_Estado, Sesion_Fecha_Expiracion FROM sesion WHERE Sesion_Token_Acceso = ? LIMIT 1`,
-      [token]
+      [tokenHash]
     );
 
     if (rows.length === 0 || rows[0].Sesion_Estado === 0) {
@@ -41,7 +45,7 @@ const verifyToken = async (req, res, next) => {
     if (rows[0].Sesion_Fecha_Expiracion && new Date(rows[0].Sesion_Fecha_Expiracion) < new Date()) {
       await pool.execute(
         `UPDATE sesion SET Sesion_Estado = 0 WHERE Sesion_Token_Acceso = ? AND Sesion_Estado = 1`,
-        [token]
+        [tokenHash]
       );
       return res.status(401).json({
         error: 'Sesión expirada por inactividad',
@@ -52,7 +56,7 @@ const verifyToken = async (req, res, next) => {
     const nuevaExpiracion = new Date(Date.now() + 30 * 60 * 1000);
     await pool.execute(
       `UPDATE sesion SET Sesion_Fecha_Expiracion = ? WHERE Sesion_Token_Acceso = ?`,
-      [nuevaExpiracion, token]
+      [nuevaExpiracion, tokenHash]
     );
 
     req.user = decoded;
@@ -70,7 +74,7 @@ const verifyToken = async (req, res, next) => {
           `UPDATE sesion
            SET Sesion_Estado = 0, Sesion_Fecha_Expiracion = NOW()
            WHERE Sesion_Token_Acceso = ? AND Sesion_Estado = 1`,
-          [token]
+          [tokenHash]
         );
       } catch (_) { /* no bloquear la respuesta si falla la BD */ }
 

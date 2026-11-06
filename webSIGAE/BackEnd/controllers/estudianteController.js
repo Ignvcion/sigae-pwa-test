@@ -3,8 +3,9 @@
 // no tiene login. Es solo una ficha con información académica.
 
 const db = require('../config/db');
+const { registrarHistorial, refPersona, buscarPersonas } = require('../utils/historial');
 const { claseVigente } = require('../utils/clasesEliminadas');
-const { condicionApoderadoAsociado, rolApoderadoSQL } = require('../utils/apoderadosEstudiante');
+const { condicionApoderadoAsociado, rolApoderadoSQL, puedeAsociarse, reactivarApoderados } = require('../utils/apoderadosEstudiante');
 const {
   validarRut,
   validarNombreCompleto,
@@ -430,7 +431,7 @@ const asignarApoderado = async (req, res) => {
   const conn = await db.getConnection();
   try {
     const [apoderado] = await conn.query(
-      `SELECT Usuario_Id, Usuario_Nombre_Completo, Es_Apoderado, Usuario_Estado_Cuenta
+      `SELECT Usuario_Id, Usuario_Nombre_Completo, Es_Apoderado, Usuario_Estado_Cuenta, Apoderado_Sin_Asociaciones_Desde
        FROM usuario WHERE Usuario_Id = ?`,
       [apoderadoId]
     );
@@ -439,7 +440,8 @@ const asignarApoderado = async (req, res) => {
       return res.status(404).json({ mensaje: 'Apoderado no encontrado' });
     if (!apoderado[0].Es_Apoderado)
       return res.status(400).json({ mensaje: 'El usuario seleccionado no tiene rol de apoderado' });
-    if (!apoderado[0].Usuario_Estado_Cuenta)
+    // Inactivo por haber quedado sin estudiantes: se puede asociar y se reactiva
+    if (!puedeAsociarse(apoderado[0]))
       return res.status(400).json({ mensaje: 'El apoderado seleccionado está inactivo' });
 
     await conn.beginTransaction();
@@ -476,6 +478,7 @@ const asignarApoderado = async (req, res) => {
       asignados.push(estudiante[0].Estudiante_Nombre_Completo);
     }
 
+    if (asignados.length > 0) await reactivarApoderados(conn, [apoderado[0]]);
     await conn.commit();
     res.json({
       mensaje      : 'Proceso completado',
@@ -513,11 +516,12 @@ const verificarRut = async (req, res) => {
 // ==========================================
 const eliminarTodasAsociacionesApoderado = async (req, res) => {
   const { apoderadoId } = req.params;
+  let conn;
 
   try {
     // 1. Validar existencia y estado del apoderado
     const [apoderado] = await db.query(
-      'SELECT Usuario_Id, Usuario_Nombre_Completo, Usuario_Estado_Cuenta, Es_Apoderado FROM usuario WHERE Usuario_Id = ?',
+      'SELECT Usuario_Id, Usuario_RUT, Usuario_Nombre_Completo, Usuario_Estado_Cuenta, Es_Apoderado FROM usuario WHERE Usuario_Id = ?',
       [apoderadoId]
     );
 
@@ -529,40 +533,77 @@ const eliminarTodasAsociacionesApoderado = async (req, res) => {
       return res.status(400).json({ mensaje: 'La cuenta del apoderado está inactiva' });
     }
 
-    // 2. Excepción 1: Verificar que tenga asociaciones activas (como titular o suplente, RF57)
-    const [asociados] = await db.query(
-      `SELECT Estudiante_Id FROM estudiante WHERE Apoderado_Usuario_Id = ?
-       UNION
-       SELECT Estudiante_Id FROM apoderado_suplente WHERE Suplente_Usuario_Id = ?`,
-      [apoderadoId, apoderadoId]
+    // 2-4 en una transacción: el cambio y su registro en historial van juntos.
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    // 2. Excepción 1: Verificar que tenga asociaciones activas, como titular o como
+    // suplente (RF57). Las filas quedan bloqueadas hasta el commit.
+    const [comoTitular] = await conn.query(
+      'SELECT Estudiante_Id FROM estudiante WHERE Apoderado_Usuario_Id = ? FOR UPDATE',
+      [apoderadoId]
+    );
+    const [comoSuplente] = await conn.query(
+      'SELECT Estudiante_Id FROM apoderado_suplente WHERE Suplente_Usuario_Id = ? FOR UPDATE',
+      [apoderadoId]
     );
 
-    if (asociados.length === 0) {
+    if (comoTitular.length === 0 && comoSuplente.length === 0) {
+      await conn.rollback();
       return res.status(400).json({
         mensaje: 'No existen asociaciones disponibles para eliminar',
       });
     }
 
     // 3. Desvincular todas las relaciones (eliminación lógica de la relación)
-    const [resultado] = await db.query(
+    const [resultado] = await conn.query(
       'UPDATE estudiante SET Apoderado_Usuario_Id = NULL WHERE Apoderado_Usuario_Id = ?',
       [apoderadoId]
     );
 
     // RF57: también deja de ser suplente de cualquier estudiante
-    const resultadoSuplente = await db.query(
+    const [resultadoSuplente] = await conn.query(
       'DELETE FROM apoderado_suplente WHERE Suplente_Usuario_Id = ?',
       [apoderadoId]
     );
-    const suplenciasEliminadas = resultadoSuplente?.[0]?.affectedRows || 0;
+    const suplenciasEliminadas = resultadoSuplente?.affectedRows || 0;
+
+    // 4. Registra trazabilidad: una fila por estudiante desvinculado
+    for (const { Estudiante_Id } of comoTitular) {
+      await registrarHistorial(conn, {
+        atributo: 'Apoderado_Usuario_Id',
+        anterior: refPersona(apoderado[0]),
+        nuevo: null,
+        descripcion: 'CU9: eliminación de todas las asociaciones del apoderado',
+        usuarioId: Number(apoderadoId),
+        estudianteId: Estudiante_Id,
+        responsableId: req.user.id,
+      });
+    }
+    for (const { Estudiante_Id } of comoSuplente) {
+      await registrarHistorial(conn, {
+        atributo: 'apoderado_suplente',
+        anterior: refPersona(apoderado[0]),
+        nuevo: null,
+        descripcion: 'CU9: eliminación de todas las asociaciones del apoderado (suplencia)',
+        usuarioId: Number(apoderadoId),
+        estudianteId: Estudiante_Id,
+        responsableId: req.user.id,
+      });
+    }
+
+    await conn.commit();
 
     return res.json({
       mensaje: 'Todas las asociaciones activas fueron eliminadas exitosamente',
       eliminadas: resultado.affectedRows + suplenciasEliminadas,
     });
   } catch (error) {
+    if (conn) await conn.rollback().catch(() => {});
     console.error(error);
     return res.status(500).json({ mensaje: 'Error al eliminar las asociaciones del apoderado' });
+  } finally {
+    if (conn) conn.release();
   }
 };
 
@@ -571,6 +612,7 @@ const eliminarTodasAsociacionesApoderado = async (req, res) => {
 // ==========================================
 const eliminarAsociacionEspecifica = async (req, res) => {
   const { estudianteId } = req.params;
+  let conn;
 
   try {
     const [estudiante] = await db.query(
@@ -589,18 +631,48 @@ const eliminarAsociacionEspecifica = async (req, res) => {
       });
     }
 
-    await db.query(
-      'UPDATE estudiante SET Apoderado_Usuario_Id = NULL WHERE Estudiante_Id = ?',
-      [estudianteId]
+    const apoderadoAnterior = estudiante[0].Apoderado_Usuario_Id;
+
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    // Solo si sigue asociado al mismo apoderado que se leyó (evita pisar un cambio concurrente)
+    const [resultado] = await conn.query(
+      'UPDATE estudiante SET Apoderado_Usuario_Id = NULL WHERE Estudiante_Id = ? AND Apoderado_Usuario_Id = ?',
+      [estudianteId, apoderadoAnterior]
     );
+
+    if (resultado.affectedRows === 0) {
+      await conn.rollback();
+      return res.status(400).json({
+        mensaje: 'No fue posible completar la eliminación',
+      });
+    }
+
+    // Registra trazabilidad
+    const personasCU10 = await buscarPersonas(conn, [apoderadoAnterior]);
+    await registrarHistorial(conn, {
+      atributo: 'Apoderado_Usuario_Id',
+      anterior: refPersona(personasCU10.get(Number(apoderadoAnterior))),
+      nuevo: null,
+      descripcion: 'CU10: eliminación de la asociación apoderado-estudiante',
+      usuarioId: apoderadoAnterior,
+      estudianteId: estudiante[0].Estudiante_Id,
+      responsableId: req.user.id,
+    });
+
+    await conn.commit();
 
     return res.json({
       mensaje: 'Asociación específica eliminada exitosamente',
       estudiante: estudiante[0].Estudiante_Nombre_Completo,
     });
   } catch (error) {
+    if (conn) await conn.rollback().catch(() => {});
     console.error(error);
     return res.status(500).json({ mensaje: 'Error al eliminar la asociación específica' });
+  } finally {
+    if (conn) conn.release();
   }
 };
 
@@ -676,6 +748,8 @@ const editarAsociaciones = async (req, res) => {
 
   // Normaliza a Number o null para comparar de forma confiable contra el valor almacenado
   const apoderadoId = apoderadoIdBody === null ? null : Number(apoderadoIdBody);
+  let conn;
+  let nuevoApoderado = null;
 
   try {
     const [estudiante] = await db.query(
@@ -707,33 +781,64 @@ const editarAsociaciones = async (req, res) => {
     // Si se asigna un nuevo apoderado (no se está eliminando), validar que exista y esté activo
     if (apoderadoId !== null) {
       const [apoderado] = await db.query(
-        'SELECT Usuario_Id, Usuario_Estado_Cuenta FROM usuario WHERE Usuario_Id = ? AND Es_Apoderado = 1',
+        'SELECT Usuario_Id, Usuario_Estado_Cuenta, Apoderado_Sin_Asociaciones_Desde FROM usuario WHERE Usuario_Id = ? AND Es_Apoderado = 1',
         [apoderadoId]
       );
       if (apoderado.length === 0) {
         return res.status(404).json({ mensaje: 'Apoderado no encontrado' });
       }
-      if (!apoderado[0].Usuario_Estado_Cuenta) {
+      nuevoApoderado = apoderado[0];
+      // Inactivo por haber quedado sin estudiantes: se puede asociar y se reactiva
+      if (!puedeAsociarse(apoderado[0])) {
         return res.status(400).json({ mensaje: 'El apoderado seleccionado está inactivo' });
       }
     }
 
-    await db.query(
-      'UPDATE estudiante SET Apoderado_Usuario_Id = ? WHERE Estudiante_Id = ?',
-      [apoderadoId, estudianteId]
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    // Solo si el apoderado sigue siendo el que se leyó (<=> compara también NULL)
+    const [resultado] = await conn.query(
+      'UPDATE estudiante SET Apoderado_Usuario_Id = ? WHERE Estudiante_Id = ? AND Apoderado_Usuario_Id <=> ?',
+      [apoderadoId, estudianteId, apoderadoActual]
     );
+    if (resultado.affectedRows === 0) {
+      await conn.rollback();
+      return res.status(409).json({ mensaje: 'La asociación cambió mientras se editaba. Recargue e intente nuevamente.' });
+    }
+
     // RF57: si el nuevo titular era suplente del estudiante, deja de serlo
     if (apoderadoId !== null) {
-      await db.query(
+      await conn.query(
         'DELETE FROM apoderado_suplente WHERE Estudiante_Id = ? AND Suplente_Usuario_Id = ?',
         [estudianteId, apoderadoId]
       );
+      if (nuevoApoderado) await reactivarApoderados(conn, [nuevoApoderado]);
     }
+
+    // Registra trazabilidad
+    const personasCU39 = await buscarPersonas(conn, [apoderadoActual, apoderadoId]);
+    await registrarHistorial(conn, {
+      atributo: 'Apoderado_Usuario_Id',
+      anterior: apoderadoActual === null ? null : refPersona(personasCU39.get(Number(apoderadoActual))),
+      nuevo: apoderadoId === null ? null : refPersona(personasCU39.get(Number(apoderadoId))),
+      descripcion: apoderadoId === null
+        ? 'CU39: eliminación de la asociación del estudiante'
+        : 'CU39: reasignación del apoderado del estudiante',
+      usuarioId: apoderadoActual ?? apoderadoId,
+      estudianteId: estudiante[0].Estudiante_Id,
+      responsableId: req.user.id,
+    });
+
+    await conn.commit();
 
     return res.json({ mensaje: 'Asociaciones actualizadas correctamente' });
   } catch (error) {
+    if (conn) await conn.rollback().catch(() => {});
     console.error(error);
     return res.status(500).json({ mensaje: 'Error al actualizar las asociaciones del estudiante' });
+  } finally {
+    if (conn) conn.release();
   }
 };
 

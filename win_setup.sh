@@ -15,6 +15,15 @@
 #
 # Te pedirá la contraseña de root de MySQL. Para no escribirla:
 #   DB_ROOT_PASSWORD=tu_clave bash win_setup.sh
+# Seguro: este script es SOLO para desarrollo (importa SIGAE.sql, que trae
+# DROP TABLE, contraseñas en texto plano y datos de prueba). El servidor de
+# producción se marca con el archivo /etc/sigae-production.
+if [ -e /etc/sigae-production ]; then
+  echo "❌ Este equipo está marcado como PRODUCCIÓN (/etc/sigae-production)." >&2
+  echo "   win_setup.sh es solo para desarrollo y nunca debe correr contra la RDS. No se ejecutó nada." >&2
+  exit 1
+fi
+
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 

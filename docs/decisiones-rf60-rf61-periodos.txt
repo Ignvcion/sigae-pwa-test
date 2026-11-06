@@ -1,0 +1,308 @@
+SIGAE - Incremento 4
+Decisiones que van más allá del mockup del Documento 0 (o lo corrigen)
+RF57, RF60, RF61, períodos lectivos y puesta en marcha
+Fecha: 2026-11-06
+Fuentes: guía de reunión con la directora (4-nov), mockup del Documento 0
+del Incremento 4 con sus comentarios, y las respuestas del equipo y el PO
+en esta sesión.
+
+Cada punto indica:
+  [DECIDIDO]       lo definió el equipo o el PO.
+  [INTERPRETACIÓN] lo deduje de una respuesta; si no es así, avisar antes
+                   de que llegue a producción.
+  [CORRIGE MOCKUP] contradice o completa el texto actual del mockup.
+
+
+======================================================================
+1. INFRAESTRUCTURA
+======================================================================
+
+1.1 [DECIDIDO] La marcha blanca va en AWS: EC2 (Debian 13, Nginx + pm2)
+    y la base de datos en Amazon RDS (MariaDB). La "prueba en Azure" de
+    la reunión quedó descartada.
+
+1.2 [DECIDIDO] Todos los cambios de esquema se escriben directamente en
+    SIGAE.sql (sin archivos de migración aparte), incluidos los del
+    Incremento 4 de los compañeros. schema_base.sql se regenera desde
+    SIGAE.sql con el sed documentado en el README.
+
+1.3 [DECIDIDO] Estos cambios de esquema deben estar listos ANTES de cargar
+    schema_base.sql en la RDS. Después, cada cambio es un ALTER TABLE a
+    mano sobre datos reales.
+
+1.4 [INTERPRETACIÓN] La RDS arranca vacía y nadie puede crear niveles
+    desde la aplicación, pero sin ellos (y su orden) la promoción no
+    funciona. Por eso hay un archivo aparte, catalogos_base.sql, con los
+    14 niveles educativos y su orden, sin datos de prueba. Se carga una
+    vez después de schema_base.sql (INSERT IGNORE: correrlo de nuevo no
+    duplica nada). Debe entrar en el sparse-checkout del servidor.
+
+
+======================================================================
+2. RF57 - APODERADO TITULAR Y SUPLENTES
+======================================================================
+
+2.1 [DECIDIDO] Un único titular y hasta 4 suplentes (5 adultos en total).
+    Ya implementado en el PR #111 (titular en estudiante.Apoderado_Usuario_Id,
+    suplentes en apoderado_suplente).
+
+2.2 [CORRIGE MOCKUP] CU90, CU91 y la fila UR 1.26 siguen diciendo "el
+    suplente" (uno solo). Hay que alinearlos con RF57: hasta cuatro.
+
+
+======================================================================
+3. RF60 - PROFESOR JEFE
+======================================================================
+
+3.1 [DECIDIDO] Cada curso tiene un único profesor jefe. Un docente puede
+    ser jefe de hasta 2 cursos. El tope lo valida el backend.
+    [INTERPRETACIÓN] El tope se cuenta POR PERÍODO: durante el cierre, un
+    docente puede ser jefe de 2 cursos del período vigente y de 2 del
+    período siguiente.
+
+3.2 [CORRIGE MOCKUP] CU95, Excepción 2, dice que la regla de cursos por
+    docente "queda por definir". Ya está definida: máximo 2. La fila
+    UR 2.22 tampoco lo menciona.
+
+3.3 [DECIDIDO] El profesor jefe se hereda: los docentes acompañan a su
+    curso a medida que avanza de nivel. Al promover 1°A 2026, el curso
+    2°A 2027 recibe al profesor jefe de 1°A 2026.
+    [INTERPRETACIÓN] La herencia se aplica solo si el curso de destino no
+    tiene jefe todavía y si no pasa el tope de 2 del docente en el período
+    nuevo. Si lo pasa, no se hereda y el sistema lo informa para que el
+    administrador lo asigne a mano.
+
+3.4 [DECIDIDO] Asignan, reemplazan y retiran la jefatura el administrador
+    y el super administrador (CU95, CU96). Cada cambio queda en el
+    historial.
+
+
+======================================================================
+4. RF61 - SITUACIÓN FINAL Y PROMOCIÓN
+======================================================================
+
+4.1 [DECIDIDO] [CORRIGE MOCKUP] Se descarta la "promoción institucional en
+    una sola operación" para todos los cursos (CU100). El flujo es:
+      a) listado de estudiantes del curso;
+      b) registrar la situación final de cada estudiante: la registran el
+         profesor jefe del curso, el administrador o el super administrador;
+      c) aplicar la promoción: la hacen el administrador o el super
+         administrador, curso a curso o caso por caso (estudiantes
+         individuales).
+    Motivo: los 4° medio terminan el 13-nov y el resto de los cursos el
+    14-dic.
+
+4.2 [DECIDIDO] Valores de la situación final:
+      - De Pre-Kinder a 3° medio: Promovido, Repitente, Retirado.
+      - 4° medio: Egresado, En práctica, Repitente, Retirado.
+    "En práctica" es el técnico que continúa en su práctica profesional
+    (la "opción de si continúa" de la reunión). "Retirado" cubre al que se
+    va a mitad de año o deja de estudiar.
+    [INTERPRETACIÓN] "4° medio" es el último nivel según el orden de
+    niveles (ver 5.2).
+
+4.3 [INTERPRETACIÓN] Cada situación final pasa por tres estados:
+      - Borrador: guardada sin confirmar; CU98, Excepción 1, permite
+        guardar aunque falten estudiantes.
+      - Registrado: confirmada y lista para aplicar.
+      - Aplicado: la promoción ya se ejecutó. No se puede modificar
+        (CU98, Excepción 2).
+    Al confirmar, si ningún estudiante queda sin situación, también se
+    registran los borradores guardados antes. Si falta alguno, todo queda
+    en borrador y el sistema lista a los faltantes.
+
+4.4 [DECIDIDO] Qué pasa al aplicar la promoción:
+      - Promovido: pasa al curso del nivel siguiente, misma sección,
+        período siguiente (1°A 2026 -> 2°A 2027).
+      - Repitente: pasa al curso del MISMO nivel, misma sección, período
+        siguiente (1°A 2026 -> 1°A 2027). No se queda en el curso antiguo,
+        porque ese curso se borra más adelante.
+      - Egresado, En práctica, Retirado: se quedan en el curso del período
+        antiguo y cambia su estado académico. Se eliminan del sistema al
+        segundo cambio de período (ver 6).
+    Si el curso de destino no existe, el sistema ofrece crearlo (CU100,
+    Excepción 2): el administrador confirma y se crea vacío, con el
+    profesor jefe heredado (3.3).
+    [INTERPRETACIÓN] La promoción solo puede aplicarse con el cierre
+    iniciado (ver 5.3), porque los cursos de destino son del período
+    siguiente. Excepción: "Retirado" no necesita curso de destino y puede
+    aplicarse en cualquier momento del año.
+
+4.5 [DECIDIDO] Lo natural es que los del A sigan en el A. Los cambios de
+    sección se hacen en el sistema, cambiando el curso del estudiante en
+    su ficha. En 2° medio se define si el estudiante va al técnico; la
+    modalidad técnico-profesional se implementará de otra forma más
+    adelante. Por ahora 2° medio promueve a la misma sección.
+
+4.6 [DECIDIDO] Carga por Excel (CU99): plantilla propia generada por el
+    sistema con las columnas RUT, Nombre y Situación (lista desplegable),
+    con los estudiantes del curso precargados. El formato de Lirmi no se
+    usa aquí; sirve solo para la carga inicial de datos del colegio.
+
+4.7 [CORRIGE MOCKUP] RF61 dice "profesor jefe y/o administradores", pero
+    la fila UR 2.23 dice que registra solo el profesor jefe. Hay que
+    unificarlos.
+
+
+======================================================================
+5. PERÍODOS LECTIVOS
+======================================================================
+
+5.1 [DECIDIDO] Cada curso pertenece a un período lectivo (por ejemplo
+    "2026"). Puede haber un "2do Básico A" en 2026 y otro en 2027: el
+    nombre del curso es único POR PERÍODO, no en toda la tabla.
+
+5.2 [DECIDIDO] Los niveles educativos tienen un orden explícito
+    (Pre-Kinder = 1 ... 4° Medio = 14). Con ese orden se calcula el nivel
+    siguiente; no se confía en el id.
+
+5.3 [DECIDIDO] El período vigente se guarda en parametro_institucional.
+    El cambio se hace con dos botones:
+      - "Iniciar cierre": solo el SUPER ADMINISTRADOR. Abre el período
+        siguiente: desde ahí se pueden aplicar promociones y armar los
+        cursos y horarios del año nuevo. El trabajo diario sigue en el
+        período vigente.
+      - "Iniciar nuevo período": se habilita solo cuando:
+          a) todos los estudiantes de los cursos del período vigente
+             tienen su situación final aplicada (todos los casos de
+             promoción resueltos), y
+          b) todos los cursos del período siguiente tienen su horario
+             creado.
+        Al ejecutarlo, el período siguiente pasa a ser el vigente.
+    [INTERPRETACIÓN] "Iniciar nuevo período" también lo acciona solo el
+    super administrador (no se dijo quién).
+    [INTERPRETACIÓN] "Horario creado" = las horas programadas del curso
+    cubren las horas semanales que exige su plan educativo, con la misma
+    regla de completitud que ya muestra el listado de horarios. Un curso
+    sin asignaturas no cuenta como creado.
+
+5.4 [DECIDIDO] Los cursos nuevos parten vacíos: sin asignaturas ni
+    horario. Solo heredan el profesor jefe (3.3).
+
+5.5 [INTERPRETACIÓN] Durante el cierre conviven dos períodos, porque las
+    clases de 2026 siguen hasta diciembre mientras se arma 2027. Por eso:
+      - Las validaciones de choque de horario (curso y docente) comparan
+        solo clases del mismo período. Si no, el horario 2027 de un
+        docente chocaría con su horario 2026.
+      - Lo del día a día (Mi horario, horario del docente y del estudiante,
+        exportaciones, disponibilidad para citaciones y horario de
+        atención) muestra solo el período vigente.
+      - La gestión de cursos y horarios del administrador muestra el
+        período vigente y el siguiente, identificados.
+      - Los cursos de períodos antiguos (ya cerrados) no aparecen en los
+        listados.
+
+
+======================================================================
+6. LIMPIEZA DE DATOS AL CAMBIAR DE PERÍODO
+======================================================================
+
+6.1 [DECIDIDO] Al iniciar un período nuevo se eliminan los cursos del
+    período de DOS cambios atrás, junto con los estudiantes que quedaron
+    en ellos (egresados, en práctica y retirados) y todo lo asociado:
+    historial, citaciones, situaciones finales, evaluaciones, horarios y
+    asignaturas de esos cursos.
+    Ejemplo: al iniciar 2028 se borran los cursos 2026 y sus egresados y
+    retirados. Al iniciar 2027 no se borra nada de 2026.
+
+6.2 [DECIDIDO] Antes de borrar, el sistema genera un respaldo descargable
+    (Excel) con todo lo que va a eliminar o desactivar. Ese respaldo se
+    sube a la cuenta de Google Drive destinada a respaldos. Sin confirmar
+    que se descargó, no se ejecuta el cambio de período.
+    El historial es un failsafe (estudiante eliminado por accidente o que
+    se reincorpora), no un archivo: SIGAE no es un sistema de archivo.
+    El respaldo tiene datos personales de menores: se descarga solo para
+    subirlo al Drive y no se deja en equipos personales.
+
+6.3 [DECIDIDO] Apoderados sin asociaciones (ni titular ni suplente de
+    ningún estudiante):
+      - Si además son docentes o administradores: se les quita solo el
+        rol de apoderado.
+        [INTERPRETACIÓN] El mensaje decía "se les borra el rol de docente";
+        entiendo que es el de APODERADO. Avisar si no es así.
+      - Si son solo apoderados: quedan INACTIVOS hasta una nueva asociación
+        (que los reactiva) o hasta su eliminación al siguiente cambio de
+        período, con sus conversaciones, mensajes, citaciones y sesiones.
+    [INTERPRETACIÓN] La revisión se hace en cada "Iniciar nuevo período",
+    no cada vez que se quita una asociación. Un apoderado que queda sin
+    estudiantes a mitad de año sigue activo hasta el próximo cambio de
+    período.
+    [INTERPRETACIÓN] Un egresado sigue siendo un estudiante asociado
+    hasta que se elimina (segundo cambio de período). Por eso su
+    apoderado queda inactivo en ese cambio y se elimina en el siguiente,
+    si para entonces no tiene otro estudiante.
+    [INTERPRETACIÓN] Solo se reactiva automáticamente al apoderado
+    inactivado por falta de asociaciones. Una cuenta que un administrador
+    desactivó a mano sigue rechazándose al asociarla.
+
+
+======================================================================
+7. HISTORIAL
+======================================================================
+
+7.1 [DECIDIDO] Las personas se identifican en el historial por su RUT
+    sin dígito verificador (todos los números antes del guion) y su
+    nombre, por ejemplo "12345678 (Ana Pérez)". El dígito verificador se
+    omite porque puede ser K. Para estudiantes extranjeros el número puede
+    cambiar, pero sigue siendo único.
+
+7.2 [INTERPRETACIÓN] Cuando no hay valor (por ejemplo, sin apoderado) se
+    escribe "—". Un solo helper (utils/historial.js) arma estas
+    referencias para todo el backend. Se aplica a CU9, CU10, CU39, CU90
+    (PR #111), RF60 y RF61.
+
+7.3 [INTERPRETACIÓN] La tabla historial no tiene columna de curso. Los
+    cambios de jefatura (RF60) se registran con Usuario_Id = docente, y el
+    curso y el período van en la descripción. La promoción (RF61) registra
+    por estudiante el cambio de curso y el cambio de estado académico.
+
+
+======================================================================
+8. OTROS ACUERDOS QUE NO SON DE ESTE TRABAJO
+======================================================================
+
+8.1 [DECIDIDO] RF58: por ahora solo los docentes registran evaluaciones,
+    sin topes por día.
+8.2 [DECIDIDO] Más adelante (pronto), fuera de este trabajo:
+      - jornada por curso (cursos sin jornada escolar completa o con
+        jornada distinta);
+      - preferencias del docente en el horario de atención;
+      - RF62, notificaciones: la tabla notificacion queda en el esquema
+        sin uso;
+      - modalidad técnico-profesional;
+      - importación de datos desde Lirmi.
+8.3 [CORRIGE MOCKUP] RF55 dice que el sistema "advierte" un choque con
+    una clase, pero CU87 dice "advierte y no lo registra". El PR #110
+    implementó el rechazo.
+
+
+======================================================================
+9. QUÉ SE IMPLEMENTÓ (rama produccion-marcha-blanca)
+======================================================================
+
+  1. Esquema en SIGAE.sql:
+       - nivel_educativo.Nivel_Educativo_Orden
+       - curso.Curso_Periodo_Lectivo; Curso_Nombre único por período
+       - parametro_institucional: período vigente y período siguiente
+       - usuario: período desde el que el apoderado quedó sin asociaciones
+     Más los datos de prueba ajustados y schema_base.sql regenerado.
+  2. Historial unificado (7) en los flujos existentes.
+  3. Separación por período de choques de horario y vistas del día a día
+     (5.5).
+  4. RF60 (backend + frontend): asignar, reemplazar y retirar jefatura,
+     tope de 2, ver estudiantes del curso (CU97).
+  5. RF61 (backend + frontend): registrar situación final (borrador y
+     registrado), plantilla Excel y carga, aplicar promoción curso a curso
+     o individual, creación de cursos de destino.
+  6. Períodos (backend + frontend): iniciar cierre, estado del cierre,
+     respaldo Excel, iniciar nuevo período con la limpieza (6).
+  7. Pruebas unitarias y prueba de punta a punta en MariaDB.
+
+  Dónde está:
+    - Reglas: BackEnd/utils/periodos.js, jefatura.js, situacionFinal.js,
+      limpiezaPeriodo.js, historial.js.
+    - API: /api/cursos/:id/profesor-jefe, /api/cursos/:id/estudiantes,
+      /api/cursos/mis-jefaturas, /api/promocion/cursos/:cursoId/...,
+      /api/promocion/periodos/...
+    - Pantallas: Cursos (detalle del curso), /situacion-final,
+      /cierre-periodo.

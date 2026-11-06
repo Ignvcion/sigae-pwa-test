@@ -3,6 +3,7 @@
 // CU 62 — Exportando horario por curso
 
 const pool = require('../config/db');
+const { enPeriodoVigente } = require('../utils/periodos');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 const puppeteer = require('puppeteer');
@@ -39,7 +40,7 @@ async function fetchMaestro() {
     JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
     JOIN asignatura     a  ON a.Asignatura_Id      = ha.Asignatura_Id
     LEFT JOIN usuario   u  ON u.Usuario_Id         = ha.Usuario_Id
-    WHERE ha.Horario_Asignatura_Estado = 'Activo'
+    WHERE ha.Horario_Asignatura_Estado = 'Activo' AND ${enPeriodoVigente('ha')}
     ORDER BY FIELD(ha.Horario_Asignatura_Dia_Semana,'Lunes','Martes','Miércoles','Jueves','Viernes'),
              bh.Bloque_Horario_Hora_Inicio, c.Curso_Nombre
   `);
@@ -65,7 +66,7 @@ async function fetchPorDocente(usuarioId) {
      JOIN curso          c  ON c.Curso_Id          = ha.Curso_Id
      JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
      JOIN asignatura     a  ON a.Asignatura_Id      = ha.Asignatura_Id
-     WHERE ha.Usuario_Id = ? AND ha.Horario_Asignatura_Estado = 'Activo'
+     WHERE ha.Usuario_Id = ? AND ha.Horario_Asignatura_Estado = 'Activo' AND ${enPeriodoVigente('ha')}
      ORDER BY FIELD(ha.Horario_Asignatura_Dia_Semana,'Lunes','Martes','Miércoles','Jueves','Viernes'),
               bh.Bloque_Horario_Hora_Inicio`,
     [usuarioId]
@@ -209,10 +210,22 @@ function renderCSV(res, { columnas, filas, filename }) {
   res.send('\uFEFF' + lineas.join('\r\n'));
 }
 
+// Los valores vienen de la BD (nombres de cursos, docentes, asignaturas...) y se
+// renderizan en Chromium dentro del servidor: siempre se escapan como texto para
+// que nadie pueda inyectar HTML (p. ej. un <img src> hacia la red interna).
+function escaparHTML(valor) {
+  return String(valor ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function buildHTML({ titulo, columnas, filas }) {
   const rowsHTML = filas.map((fila, i) => `
     <tr style="background:${i % 2 === 0 ? '#f8fafc' : '#ffffff'}">
-      ${columnas.map((c) => `<td style="padding:6px 10px;border:1px solid #e5e7eb;font-size:12px;color:#111827;">${c.value(fila) ?? ''}</td>`).join('')}
+      ${columnas.map((c) => `<td style="padding:6px 10px;border:1px solid #e5e7eb;font-size:12px;color:#111827;">${escaparHTML(c.value(fila))}</td>`).join('')}
     </tr>
   `).join('');
 
@@ -228,10 +241,10 @@ function buildHTML({ titulo, columnas, filas }) {
       </style>
       </head>
       <body>
-        <h1>${titulo}</h1>
+        <h1>${escaparHTML(titulo)}</h1>
         <div class="sub">Generado el ${new Date().toLocaleString('es-CL')}</div>
         <table>
-          <thead><tr>${columnas.map((c) => `<th>${c.label}</th>`).join('')}</tr></thead>
+          <thead><tr>${columnas.map((c) => `<th>${escaparHTML(c.label)}</th>`).join('')}</tr></thead>
           <tbody>${rowsHTML}</tbody>
         </table>
       </body>
@@ -241,10 +254,20 @@ function buildHTML({ titulo, columnas, filas }) {
 
 async function renderPNG(res, { titulo, columnas, filas, filename }) {
   const html = buildHTML({ titulo, columnas, filas });
-  const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+  // PUPPETEER_EXECUTABLE_PATH: Chromium del sistema (producción: /usr/bin/chromium,
+  // instalado con apt). Sin la variable, Puppeteer usa el navegador que descargó
+  // npm install, como en desarrollo.
+  const browser = await puppeteer.launch({
+    ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH }),
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    // El HTML es autocontenido: se bloquea cualquier petición de red de la página.
+    await page.setJavaScriptEnabled(false);
+    await page.setRequestInterception(true);
+    page.on('request', (r) => (r.url().startsWith('data:') ? r.continue() : r.abort()));
+    await page.setContent(html, { waitUntil: 'load' });
     await page.setViewport({ width: 1200, height: 800, deviceScaleFactor: 2 });
     const buffer = await page.screenshot({ fullPage: true, type: 'png' });
     res.setHeader('Content-Type', 'image/png');

@@ -3,6 +3,7 @@
 //
 // Las horas se manejan como texto "HH:MM" y se comparan en minutos.
 const { claseVigente } = require('./clasesEliminadas');
+const { enPeriodoVigente } = require('./periodos');
 
 // Días tal como se guardan en horario_asignatura y horario_atencion (lunes a viernes)
 const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
@@ -70,6 +71,7 @@ async function buscarChoquesConClases(conn, { docenteId, dia, inicio, fin }) {
       WHERE ha.Usuario_Id = ?
         AND ha.Horario_Asignatura_Dia_Semana = ?
         AND ${claseVigente('ha')}
+        AND ${enPeriodoVigente('ha')}
         AND bh.Bloque_Horario_Hora_Inicio < ?
         AND bh.Bloque_Horario_Hora_Fin > ?
       ORDER BY bh.Bloque_Horario_Hora_Inicio`,

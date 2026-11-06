@@ -2,6 +2,11 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const pool = require('../config/db');
 const { validarFortalezaContrasena } = require('../middleware/validation');
+const { esProduccion } = require('../config/env');
+const { correoConfigurado, enviarCorreoRecuperacion } = require('../utils/mailer');
+
+const MINUTOS_VALIDEZ_ENLACE = 30;
+const MSG_GENERICO = 'Si los datos son correctos, recibirás un enlace de recuperación.';
 
 
 function enmascararCorreo(email) {
@@ -93,7 +98,7 @@ const forgotPassword = async (req, res) => {
 
     // Respuesta genérica para no revelar si el RUT existe
     if (rows.length === 0 || !rows[0].Usuario_Estado_Cuenta) {
-      return res.json({ message: 'Si los datos son correctos, recibirás un enlace de recuperación.' });
+      return res.json({ message: MSG_GENERICO });
     }
 
     const user = rows[0];
@@ -106,7 +111,7 @@ const forgotPassword = async (req, res) => {
     ].filter(Boolean);
 
     if (correosDisponibles.length === 0) {
-      return res.json({ message: 'Si los datos son correctos, recibirás un enlace de recuperación.' });
+      return res.json({ message: MSG_GENERICO });
     }
 
     // Determinar el correo destino
@@ -137,7 +142,7 @@ const forgotPassword = async (req, res) => {
     // Generar token seguro — 30 minutos (CU 14)
     const token = crypto.randomBytes(32).toString('hex');
     const ahora = new Date();
-    const expiracion = new Date(ahora.getTime() + 30 * 60 * 1000);
+    const expiracion = new Date(ahora.getTime() + MINUTOS_VALIDEZ_ENLACE * 60 * 1000);
 
     await pool.execute(
       `INSERT INTO solicitud_recuperacion
@@ -147,30 +152,45 @@ const forgotPassword = async (req, res) => {
       [expiracion, token, ahora, user.Usuario_Id]
     );
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
     const resetLink = `${frontendUrl}/reset-password?token=${token}`;
 
-    // En desarrollo se imprime en consola; en producción reemplazar por nodemailer.
-    console.log('=== ENLACE DE RECUPERACIÓN ===');
-    console.log(`Usuario: ${user.Usuario_Nombre_Completo} → ${correoDestino}`);
-    console.log(`Link: ${resetLink}`);
-    console.log('==============================');
+    // El enlace (que contiene el token) nunca se registra en los logs ni se
+    // devuelve en la respuesta en producción: solo viaja por correo.
+    if (correoConfigurado()) {
+      try {
+        await enviarCorreoRecuperacion({
+          para: correoDestino,
+          nombre: user.Usuario_Nombre_Completo,
+          enlace: resetLink,
+          minutos: MINUTOS_VALIDEZ_ENLACE,
+        });
+      } catch (errorEnvio) {
+        console.error('Error en forgotPassword (envío de correo):', errorEnvio);
+        // El token no llegó a nadie: se invalida para que no quede vigente.
+        await pool.execute(
+          `UPDATE solicitud_recuperacion SET Solicitud_Recuperacion_Estado = 'Expirado'
+           WHERE Solicitud_Recuperacion_Token = ?`,
+          [token]
+        );
+        return res.status(503).json({
+          error: 'No fue posible enviar el correo de recuperación. Intente más tarde o contacte al administrador.',
+        });
+      }
+      return res.json({ message: MSG_GENERICO });
+    }
 
-    // await transporter.sendMail({
-    //   from: process.env.EMAIL_FROM,
-    //   to: correoDestino,
-    //   subject: 'Recuperación de contraseña - SIGAE',
-    //   html: `<p>Hola ${user.Usuario_Nombre_Completo},</p>
-    //          <p>Haz clic en el siguiente enlace para restablecer tu contraseña (válido por 30 minutos):</p>
-    //          <a href="${resetLink}">${resetLink}</a>`,
-    // });
+    if (esProduccion) {
+      // No debería ocurrir: server.js no arranca en producción sin SMTP_*.
+      return res.status(503).json({
+        error: 'La recuperación por correo no está disponible. Contacte al administrador.',
+      });
+    }
 
-    const esDev = process.env.NODE_ENV !== 'production';
-    res.json({
-      message: 'Si los datos son correctos, recibirás un enlace de recuperación.',
-      // Solo en desarrollo: devuelve el link para pruebas sin SMTP configurado
-      ...(esDev && { devResetLink: resetLink }),
-    });
+    // Solo desarrollo y sin SMTP configurado: el enlace se muestra en la consola
+    // y se devuelve en la respuesta para poder probar el flujo.
+    console.log(`[dev] Enlace de recuperación (SMTP no configurado): ${resetLink}`);
+    return res.json({ message: MSG_GENERICO, devResetLink: resetLink });
   } catch (error) {
     console.error('Error en forgotPassword:', error);
     res.status(500).json({ error: 'Error interno del servidor' });

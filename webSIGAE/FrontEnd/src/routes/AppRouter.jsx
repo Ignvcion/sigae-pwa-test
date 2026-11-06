@@ -50,6 +50,8 @@ import HorarioMaestro from "../pages/academic/HorarioMaestro";
 import ConsultaHorarios from "../pages/academic/ConsultaHorarios";
 import PlanEducativo from "../pages/academic/PlanEducativo";
 import Asignaturas from "../pages/academic/Asignaturas";
+import SituacionFinal from "../pages/academic/SituacionFinal";
+import CierrePeriodo from "../pages/academic/CierrePeriodo";
 
 /* COMMUNICATION */
 
@@ -157,6 +159,26 @@ function AppRouter() {
             element={
               <RoleRoute roles={["Docente", "Administrador"]}>
                 <MiHorario />
+              </RoleRoute>
+            }
+          />
+
+          {/* RF61: situación final (profesor jefe y administración) y promoción (administración) */}
+          <Route
+            path="/situacion-final"
+            element={
+              <RoleRoute roles={["Docente", "Administrador"]}>
+                <SituacionFinal />
+              </RoleRoute>
+            }
+          />
+
+          {/* Cambio de período: avance para la administración; acciones solo Super Admin */}
+          <Route
+            path="/cierre-periodo"
+            element={
+              <RoleRoute roles={["Administrador"]}>
+                <CierrePeriodo />
               </RoleRoute>
             }
           />

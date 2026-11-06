@@ -1,6 +1,8 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const pool = require('../config/db');
+const { hashToken } = require('../utils/sesion');
 
 const login = async (req, res) => {
   const { rut, password } = req.body;
@@ -55,7 +57,11 @@ const login = async (req, res) => {
     // RNF05: el JWT vive 30 min como techo máximo; la sesión real se
     // desliza en authMiddleware.verifyToken en cada request autenticado,
     // así que se cierra a los 30 min de INACTIVIDAD, no a los 30 min del login.
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30m' });
+    // jwtid aleatorio: sin él, dos logins del mismo usuario en el mismo segundo
+    // (p. ej. doble clic) firman el mismo token y el INSERT en `sesion` choca
+    // con el UNIQUE de Sesion_Token_Acceso (500). En `sesion` se guarda el hash
+    // del token, no el token (ver utils/sesion.js).
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30m', jwtid: crypto.randomUUID() });
     const expiracion = new Date(Date.now() + 30 * 60 * 1000);
 
     await pool.execute(
@@ -63,7 +69,7 @@ const login = async (req, res) => {
       (Sesion_Token_Acceso, Sesion_Fecha_Inicio, Sesion_Fecha_Expiracion,
       Sesion_Direccion_IP, Sesion_Dispositivo, Sesion_Token_Expiracion, Sesion_Estado, Usuario_Id)
       VALUES (?, NOW(), ?, ?, ?, ?, 1, ?)`,
-      [token, expiracion, ip, dispositivo, expiracion, user.Usuario_Id]
+      [hashToken(token), expiracion, ip, dispositivo, expiracion, user.Usuario_Id]
     );
 
     res.json({
@@ -98,7 +104,7 @@ const logout = async (req, res) => {
       `UPDATE sesion
        SET Sesion_Estado = 0, Sesion_Fecha_Expiracion = NOW()
        WHERE Sesion_Token_Acceso = ? AND Sesion_Estado = 1`,
-      [token]
+      [hashToken(token)]
     );
     res.json({ message: 'Sesión cerrada correctamente' });
   } catch (error) {
