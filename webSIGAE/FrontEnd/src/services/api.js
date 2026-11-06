@@ -120,7 +120,7 @@ export async function registrarAdmin({ nombre, rut, correo, telefono, password, 
 }
 
 // ── DOCENTE ──────────────────────────────────
-export async function registrarDocente({ nombre, rut, correo, telefono, password, especialidad, cargaHoraria, estado, calle, numero, depto, comuna }) {
+export async function registrarDocente({ nombre, rut, correo, telefono, password, especialidades, cargaHoraria, disponibilidad, estado, calle, numero, depto, comuna }) {
   const res = await fetch(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
@@ -131,8 +131,9 @@ export async function registrarDocente({ nombre, rut, correo, telefono, password
       Usuario_Contraseña           : password,
       Usuario_Estado_Cuenta        : estado === 'Activo' ? 1 : 0,
       Es_Docente                   : 1,
-      Docente_Especialidad         : especialidad,
-      Docente_Carga_Horaria_Maxima : parseInt(cargaHoraria, 10),
+      Docente_Especialidades       : especialidades,
+      Docente_Carga_Horaria_Maxima : parseInt(cargaHoraria, 10), // carga horaria semanal
+      Docente_Disponibilidad       : { bloques: disponibilidad || [] },
       Docente_Correo_Institucional : correo,
       ...columnasDireccionUsuario({ calle, numero, depto, comuna }),
       Es_Administrador             : 0,
@@ -246,14 +247,33 @@ export async function getUsuariosPorFiltro({ rol, estado } = {}) {
 
 // ── CU30 y CU31: Listado y filtros de docentes ──
 
-export async function getDocentes({ especialidad, estado } = {}) {
+export async function getDocentes({ especialidad, especialidadId, estado } = {}) {
   const params = new URLSearchParams();
   if (especialidad) params.set('especialidad', especialidad);
+  if (especialidadId) params.set('especialidadId', especialidadId);
   if (estado !== undefined && estado !== '') params.set('estado', estado);
   const query = params.toString();
   const res = await fetch(`${BASE_URL}/usuarios/docentes${query ? `?${query}` : ''}`, {
     headers: authHeaders(),
   });
+  return handleResponse(res);
+}
+
+// ── RF04: catálogo de especialidades (etiquetas) ──
+export async function getEspecialidades() {
+  const res = await fetch(`${BASE_URL}/especialidades`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// ── CU107: disponibilidad laboral semanal del docente (solo administrador) ──
+export async function getOpcionesDisponibilidad() {
+  const res = await fetch(`${BASE_URL}/usuarios/disponibilidad/opciones`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+export async function getDisponibilidadDocente(usuarioId, periodo) {
+  const query = periodo ? `?periodo=${encodeURIComponent(periodo)}` : '';
+  const res = await fetch(`${BASE_URL}/usuarios/${usuarioId}/disponibilidad${query}`, { headers: authHeaders() });
   return handleResponse(res);
 }
 

@@ -1,17 +1,20 @@
 import { useEffect, useState } from "react";
-import { getDocentes } from "../../services/api";
+import { getDocentes, getEspecialidades } from "../../services/api";
+import { EtiquetasLectura } from "../../components/EtiquetasInput";
 
 function Docentes() {
   const [docentes, setDocentes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [especialidad, setEspecialidad] = useState("");
+  const [especialidadId, setEspecialidadId] = useState("");
+  const [catalogo, setCatalogo] = useState([]);
   const [estado, setEstado] = useState("");
   const [orden, setOrden] = useState({ campo: "Usuario_Nombre_Completo", ascendente: true });
   const [mensajeInfo, setMensajeInfo] = useState("");
   const [errorCarga, setErrorCarga] = useState("");
 
   useEffect(() => {
-    cargarDocentes({ especialidad: "", estado: "" });
+    cargarDocentes({ especialidadId: "", estado: "" });
+    getEspecialidades().then((d) => setCatalogo(d || [])).catch(() => {});
   }, []);
 
   const cargarDocentes = async (filtros) => {
@@ -37,13 +40,13 @@ function Docentes() {
 
   const aplicarFiltros = (e) => {
     e.preventDefault();
-    cargarDocentes({ especialidad, estado });
+    cargarDocentes({ especialidadId, estado });
   };
 
   const limpiarFiltros = () => {
-    setEspecialidad("");
+    setEspecialidadId("");
     setEstado("");
-    cargarDocentes({ especialidad: "", estado: "" });
+    cargarDocentes({ especialidadId: "", estado: "" });
   };
 
   const alternarOrden = (campo) => {
@@ -86,13 +89,19 @@ function Docentes() {
       </div>
 
       <form className="usuarios-filtros" onSubmit={aplicarFiltros}>
-        <input
-          type="text"
-          className="usuarios-search"
-          placeholder="Buscar por especialidad..."
-          value={especialidad}
-          onChange={(e) => setEspecialidad(e.target.value)}
-        />
+        <select
+          className="usuarios-select"
+          value={especialidadId}
+          onChange={(e) => setEspecialidadId(e.target.value)}
+          aria-label="Filtrar por especialidad"
+        >
+          <option value="">Todas las especialidades</option>
+          {catalogo.map((e) => (
+            <option key={e.Especialidad_Id} value={e.Especialidad_Id}>
+              {e.Especialidad_Nombre} ({e.Total_Docentes})
+            </option>
+          ))}
+        </select>
         <select
           className="usuarios-select"
           value={estado}
@@ -132,7 +141,7 @@ function Docentes() {
               </th>
               <th>Correo institucional</th>
               <th>Teléfono</th>
-              <th>Carga horaria máxima</th>
+              <th>Carga horaria semanal</th>
               <th>Estado</th>
             </tr>
           </thead>
@@ -142,10 +151,14 @@ function Docentes() {
                 <td>{idx + 1}</td>
                 <td>{d.Usuario_Nombre_Completo}</td>
                 <td>{d.Usuario_RUT}</td>
-                <td>{renderDato(d.Docente_Especialidad, "Sin especialidad registrada")}</td>
+                <td><EtiquetasLectura texto={d.Docente_Especialidad} /></td>
                 <td>{renderDato(d.Docente_Correo_Institucional, "Sin correo institucional registrado")}</td>
                 <td>{renderDato(d.Usuario_Telefono, "Sin teléfono registrado")}</td>
-                <td>{renderDato(d.Docente_Carga_Horaria_Maxima, "Sin carga horaria registrada")}</td>
+                <td>
+                  {d.Docente_Carga_Horaria_Maxima == null || d.Docente_Carga_Horaria_Maxima === ""
+                    ? renderDato(null, "Sin carga horaria registrada")
+                    : `${d.Docente_Carga_Horaria_Maxima} h`}
+                </td>
                 <td>
                   {d.Usuario_Estado_Cuenta ? (
                     <span className="badge-activo">Activo</span>

@@ -170,6 +170,9 @@ async function ejecutarLimpieza(conn, l, nuevoVigente) {
     [lista(l.apoderados.desactivar)]
   );
   await run('UPDATE usuario SET Es_Apoderado = 0 WHERE Usuario_Id IN (?)', [lista(l.apoderados.quitarRol)]);
+
+  // CU107: la disponibilidad laboral es por período; la de períodos ya cerrados no se usa más
+  await run('DELETE FROM disponibilidad_docente WHERE Disponibilidad_Docente_Periodo_Lectivo < ?', [nuevoVigente]);
 }
 
 module.exports = { calcularLimpieza, conteo, datosRespaldo, ejecutarLimpieza };

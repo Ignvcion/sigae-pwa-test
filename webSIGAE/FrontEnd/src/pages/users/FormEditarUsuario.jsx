@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getEspecialidades, getDisponibilidadDocente } from "../../services/api";
+import EtiquetasInput, { separarEtiquetas } from "../../components/EtiquetasInput";
+import DisponibilidadSemanal from "../../components/DisponibilidadSemanal";
 import {
   validarNombreCompleto, validarCorreoInstitucional, validarCorreo, DOMINIO_INSTITUCIONAL,
   validarTelefonoChileno, validarDireccion, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
@@ -19,7 +22,7 @@ const direccionDesdeForm = (f) =>
 // Campos que aplican a cada rol: solo esos se validan y se envían al backend
 const CAMPOS_POR_ROL = {
   Es_Administrador: ["Administrador_Correo_Institucional"],
-  Es_Docente: ["Docente_Correo_Institucional", "Docente_Especialidad", "Docente_Carga_Horaria_Maxima"],
+  Es_Docente: ["Docente_Correo_Institucional", "Docente_Especialidades", "Docente_Carga_Horaria_Maxima"],
   Es_Apoderado: ["Apoderado_Correo_Natural"],
 };
 
@@ -27,7 +30,7 @@ function FormEditarUsuario({ datos, onGuardado }) {
   const [form, setForm] = useState({
     Usuario_Nombre_Completo: datos.Usuario_Nombre_Completo || "",
     Usuario_Telefono:        datos.Usuario_Telefono        || "",
-    Docente_Especialidad:             datos.Docente_Especialidad             || "",
+    Docente_Especialidades:           separarEtiquetas(datos.Docente_Especialidad),
     Docente_Carga_Horaria_Maxima:     datos.Docente_Carga_Horaria_Maxima     || "",
     Docente_Correo_Institucional:     datos.Docente_Correo_Institucional     || "",
     Administrador_Correo_Institucional: datos.Administrador_Correo_Institucional || "",
@@ -41,6 +44,25 @@ function FormEditarUsuario({ datos, onGuardado }) {
   const [msgExito, setMsgExito] = useState("");
   const [msgError, setMsgError] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [catalogo, setCatalogo] = useState([]);
+  // CU107: disponibilidad laboral semanal (solo el administrador ve este formulario)
+  const [disp, setDisp] = useState(null);
+  const [periodoPedido, setPeriodoPedido] = useState(""); // vacío = período vigente
+  const [errorDisp, setErrorDisp] = useState("");
+
+  useEffect(() => {
+    if (!datos.Es_Docente) return;
+    getEspecialidades().then((d) => setCatalogo((d || []).map((e) => e.Especialidad_Nombre))).catch(() => {});
+  }, [datos.Es_Docente]);
+
+  useEffect(() => {
+    if (!datos.Es_Docente) return;
+    let vigente = true;
+    getDisponibilidadDocente(datos.Usuario_Id, periodoPedido || undefined)
+      .then((d) => { if (vigente) { setDisp(d); setErrorDisp(""); } })
+      .catch((e) => vigente && setErrorDisp(e.message || "No fue posible cargar la disponibilidad"));
+    return () => { vigente = false; };
+  }, [datos.Es_Docente, datos.Usuario_Id, periodoPedido]);
 
   // La dirección es obligatoria para el apoderado; en los demás roles se valida y
   // envía solo si se ingresó (cuentas antiguas pueden no tenerla registrada)
@@ -55,6 +77,9 @@ function FormEditarUsuario({ datos, onGuardado }) {
   ];
 
   const validarCampo = (name, value, datosForm = form) => {
+    if (name === "Docente_Especialidades") {
+      return value.length === 0 ? "Agrega al menos una especialidad" : "";
+    }
     if (COLUMNAS_DIRECCION[name]) {
       return validarDireccion({ ...direccionDesdeForm(datosForm), [COLUMNAS_DIRECCION[name]]: value })[COLUMNAS_DIRECCION[name]] || "";
     }
@@ -113,13 +138,19 @@ function FormEditarUsuario({ datos, onGuardado }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(Object.fromEntries(camposAplicables.map((name) => [name, form[name]]))),
+        body: JSON.stringify({
+          ...Object.fromEntries(camposAplicables.map((name) => [name, form[name]])),
+          ...(datos.Es_Docente && disp
+            ? { Docente_Disponibilidad: { periodo: disp.periodo, bloques: disp.seleccion } }
+            : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
         setMsgError(data.mensaje || "Error al guardar cambios");
       } else {
-        setMsgExito("Datos actualizados correctamente");
+        const advertencia = data.Disponibilidad_Laboral?.advertencia;
+        setMsgExito(advertencia ? `Datos actualizados correctamente. ⚠ ${advertencia}` : "Datos actualizados correctamente");
         if (onGuardado) onGuardado();
       }
     } catch {
@@ -160,7 +191,7 @@ function FormEditarUsuario({ datos, onGuardado }) {
         )}
       </div>
 
-      {datos.Es_Administrador && (
+      {!!datos.Es_Administrador && (
         <div className="campo-pwd">
           <label>Correo Institucional (Administrador)</label>
           <input
@@ -176,7 +207,7 @@ function FormEditarUsuario({ datos, onGuardado }) {
         </div>
       )}
 
-      {datos.Es_Docente && (
+      {!!datos.Es_Docente && (
         <>
           <div className="campo-pwd">
             <label>Correo Institucional (Docente)</label>
@@ -192,17 +223,50 @@ function FormEditarUsuario({ datos, onGuardado }) {
             )}
           </div>
           <div className="campo-pwd">
-            <label>Especialidad</label>
-            <input name="Docente_Especialidad" value={form.Docente_Especialidad} onChange={handleChange} />
+            <label htmlFor="editar-especialidades">Especialidades</label>
+            <EtiquetasInput
+              id="editar-especialidades"
+              valores={form.Docente_Especialidades}
+              opciones={catalogo}
+              invalido={!!errores.Docente_Especialidades}
+              onChange={(valores) => {
+                setForm({ ...form, Docente_Especialidades: valores });
+                setErrores({ ...errores, Docente_Especialidades: validarCampo("Docente_Especialidades", valores) });
+              }}
+            />
+            {errores.Docente_Especialidades && (
+              <span className="input-error-msg">{errores.Docente_Especialidades}</span>
+            )}
           </div>
           <div className="campo-pwd">
-            <label>Carga Horaria Máxima (hrs)</label>
+            <label>Carga Horaria Semanal (hrs)</label>
             <input type="number" name="Docente_Carga_Horaria_Maxima" value={form.Docente_Carga_Horaria_Maxima} onChange={handleChange} min="1" max="44" />
+          </div>
+          <div className="campo-pwd">
+            <label>Disponibilidad laboral semanal</label>
+            <span className="etiquetas-ayuda">
+              Bloques en que el docente puede trabajar en el colegio. Vacía, no tiene restricción.
+            </span>
+            {errorDisp && <span className="input-error-msg">{errorDisp}</span>}
+            {!disp && !errorDisp && <span className="etiquetas-ayuda">Cargando disponibilidad…</span>}
+            {disp && (
+              <DisponibilidadSemanal
+                dias={disp.dias}
+                bloques={disp.bloques}
+                seleccion={disp.seleccion}
+                clases={disp.clases}
+                cargaSemanal={form.Docente_Carga_Horaria_Maxima}
+                periodo={disp.periodo}
+                periodos={disp.periodos}
+                onCambiarPeriodo={(p) => { setDisp(null); setErrorDisp(""); setPeriodoPedido(p); }}
+                onChange={(seleccion) => setDisp({ ...disp, seleccion })}
+              />
+            )}
           </div>
         </>
       )}
 
-      {datos.Es_Apoderado && (
+      {!!datos.Es_Apoderado && (
         <>
           <div className="campo-pwd">
             <label>Correo Personal (Apoderado)</label>

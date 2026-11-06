@@ -10,6 +10,7 @@ const pool = require('../config/db');
 const { mismoPeriodoQueCurso } = require('../utils/periodos');
 const { condicionDesajustado, motivoDesajuste } = require('../utils/bloquesDesajustados');
 const { claseVigente, purgarClasesEliminadas } = require('../utils/clasesEliminadas');
+const { periodoDelCurso, validarDisponibilidad } = require('../utils/disponibilidadLaboral');
 
 const ORDEN_DIAS = `FIELD(ha.Horario_Asignatura_Dia_Semana, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes')`;
 
@@ -227,6 +228,17 @@ const migrarClase = async (req, res) => {
       if (choqueDocente) {
         await conn.rollback();
         return res.status(409).json({ error: `El docente ya tiene clase con ${choqueDocente.Curso_Nombre} en ese horario el ${clase.Dia}` });
+      }
+
+      // CU107: el bloque de destino debe estar en la disponibilidad laboral del docente.
+      // Si los bloques se redefinieron, hay que actualizar también su disponibilidad.
+      const fueraDisponibilidad = await validarDisponibilidad(conn, {
+        docenteId: clase.Usuario_Id, periodo: await periodoDelCurso(conn, clase.Curso_Id),
+        dia: clase.Dia, bloqueId: destinoId,
+      });
+      if (fueraDisponibilidad) {
+        await conn.rollback();
+        return res.status(422).json({ error: fueraDisponibilidad });
       }
     }
 

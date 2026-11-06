@@ -1,7 +1,11 @@
 const pool = require('../config/db');
 const { condicionDesajustado, motivoDesajuste } = require('../utils/bloquesDesajustados');
 const { ESTADO_ELIMINADO, claseVigente } = require('../utils/clasesEliminadas');
-const { mismoPeriodoQueCurso, enPeriodoVigente, cursoNoArchivado } = require('../utils/periodos');
+const { mismoPeriodoQueCurso, enPeriodoVigente, cursoNoArchivado, obtenerPeriodos } = require('../utils/periodos');
+const {
+  periodoDelCurso, mapaDisponibilidad, estaDisponible, validarDisponibilidad,
+  resumenSemanal, advertenciaHorasAdeudadas,
+} = require('../utils/disponibilidadLaboral');
 const { esApoderadoDelEstudiante } = require('../utils/apoderadosEstudiante');
 
 // ── GET /api/horarios?curso_id=X  (admin ve todo, docente solo el suyo) ──
@@ -200,12 +204,15 @@ const getDocentes = async (req, res) => {
   }
 };
 
-// ── GET /api/horarios/docentes-disponibles  ── CU 56
+// ── GET /api/horarios/docentes-disponibles  ── CU 56, CU107
 // Devuelve todos los docentes activos enriquecidos con:
-//   conflicto_horario, excede_carga, carga_actual, carga_nueva, disponible
-// El frontend calcula coincide_especialidad comparando el texto.
+//   conflicto_horario, excede_carga, fuera_disponibilidad, carga_actual, carga_nueva,
+//   horas_disponibles, horas_adeudadas, disponible
+// curso_id (opcional) fija el período: conflictos, carga y disponibilidad se miden
+// en el período de ese curso (sin curso, el vigente).
+// El frontend calcula coincide_especialidad comparando las etiquetas con la asignatura.
 const getDocentesDisponibles = async (req, res) => {
-  const { asignatura_id, bloque_id, dia, horario_id } = req.query;
+  const { asignatura_id, bloque_id, dia, horario_id, curso_id } = req.query;
 
   if (!bloque_id || !dia) {
     return res.status(400).json({ error: 'bloque_id y dia son obligatorios' });
@@ -234,16 +241,19 @@ const getDocentesDisponibles = async (req, res) => {
     const userIds    = docentes.map(d => d.Usuario_Id);
     const phList     = userIds.map(() => '?').join(',');
     const excludeId  = horario_id ? parseInt(horario_id, 10) : null;
+    const periodo    = (curso_id && await periodoDelCurso(pool, curso_id)) || (await obtenerPeriodos(pool)).vigente;
 
-    // Docentes con conflicto en ese día+bloque
+    // Docentes con conflicto en ese día+bloque (mismo período)
     let conflictoQuery =
       `SELECT DISTINCT ha.Usuario_Id
        FROM horario_asignatura ha
+       JOIN curso c ON c.Curso_Id = ha.Curso_Id
        WHERE ha.Usuario_Id IN (${phList})
          AND ha.Bloque_Horario_Id = ?
          AND ha.Horario_Asignatura_Dia_Semana = ?
-         AND ha.Horario_Asignatura_Estado = 'Activo'`;
-    const conflictoParams = [...userIds, bloque_id, dia];
+         AND ha.Horario_Asignatura_Estado = 'Activo'
+         AND c.Curso_Periodo_Lectivo = ?`;
+    const conflictoParams = [...userIds, bloque_id, dia, periodo];
     if (excludeId) { conflictoQuery += ' AND ha.Horario_Asignatura_Id != ?'; conflictoParams.push(excludeId); }
 
     const [conflictos] = await pool.execute(conflictoQuery, conflictoParams);
@@ -257,20 +267,41 @@ const getDocentesDisponibles = async (req, res) => {
               ), 0) AS horas_actuales
        FROM horario_asignatura ha
        JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
+       JOIN curso c ON c.Curso_Id = ha.Curso_Id
        WHERE ha.Usuario_Id IN (${phList})
-         AND ha.Horario_Asignatura_Estado = 'Activo'`;
-    const cargaParams = [...userIds];
+         AND ha.Horario_Asignatura_Estado = 'Activo'
+         AND c.Curso_Periodo_Lectivo = ?`;
+    const cargaParams = [...userIds, periodo];
     if (excludeId) { cargaQuery += ' AND ha.Horario_Asignatura_Id != ?'; cargaParams.push(excludeId); }
     cargaQuery += ' GROUP BY ha.Usuario_Id';
 
     const [cargas] = await pool.execute(cargaQuery, cargaParams);
     const cargaMap = Object.fromEntries(cargas.map(c => [c.Usuario_Id, Number(c.horas_actuales)]));
 
+    // CU107: disponibilidad laboral semanal (horas disponibles por docente en el período)
+    const mapaDisp = await mapaDisponibilidad(pool, userIds, [periodo]);
+    const [horasDisp] = await pool.query(
+      `SELECT dd.Docente_Usuario_Id,
+              SUM(TIME_TO_SEC(TIMEDIFF(bh.Bloque_Horario_Hora_Fin, bh.Bloque_Horario_Hora_Inicio)) / 3600) AS horas
+       FROM disponibilidad_docente dd
+       JOIN bloque_horario bh ON bh.Bloque_Horario_Id = dd.Bloque_Horario_Id
+       WHERE dd.Docente_Usuario_Id IN (?) AND dd.Disponibilidad_Docente_Periodo_Lectivo = ?
+         AND bh.Bloque_Horario_Tipo = 'Clase' AND NOT ${condicionDesajustado('bh')}
+       GROUP BY dd.Docente_Usuario_Id`,
+      [userIds, periodo]
+    );
+    const horasDispMap = Object.fromEntries(horasDisp.map(h => [h.Docente_Usuario_Id, Math.round(Number(h.horas) * 100) / 100]));
+
     const resultado = docentes.map(d => {
       const cargaActual   = Math.round((cargaMap[d.Usuario_Id] || 0) * 100) / 100;
       const cargaMaxima   = d.Docente_Carga_Horaria_Maxima ?? null;
       const conflicto     = conflictoSet.has(d.Usuario_Id);
       const excedeCarga   = cargaMaxima !== null && (cargaActual + duracionNueva) > cargaMaxima;
+      const fueraDisp     = !estaDisponible(mapaDisp, { docenteId: d.Usuario_Id, periodo, dia, bloqueId: bloque_id });
+      const horasDisponibles = horasDispMap[d.Usuario_Id] ?? null;
+      const horasAdeudadas = horasDisponibles !== null && cargaMaxima !== null
+        ? Math.max(0, Math.round((cargaMaxima - horasDisponibles) * 100) / 100)
+        : 0;
 
       return {
         Usuario_Id:              d.Usuario_Id,
@@ -281,7 +312,11 @@ const getDocentesDisponibles = async (req, res) => {
         carga_nueva:    Math.round((cargaActual + duracionNueva) * 100) / 100,
         conflicto_horario: conflicto,
         excede_carga:      excedeCarga,
-        disponible:        !conflicto && !excedeCarga,
+        fuera_disponibilidad: fueraDisp,
+        horas_disponibles: horasDisponibles,
+        horas_adeudadas:   horasAdeudadas,
+        periodo,
+        disponible:        !conflicto && !excedeCarga && !fueraDisp,
       };
     });
 
@@ -291,6 +326,19 @@ const getDocentesDisponibles = async (req, res) => {
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
+
+// CU107: advertencia de horas adeudadas del docente en el período del curso (no bloquea)
+async function advertenciaDocente(docenteId, cursoId) {
+  if (!docenteId) return null;
+  try {
+    const periodo = await periodoDelCurso(pool, cursoId);
+    if (!periodo) return null;
+    return advertenciaHorasAdeudadas(await resumenSemanal(pool, docenteId, periodo));
+  } catch (error) {
+    console.error('advertenciaDocente:', error);
+    return null;
+  }
+}
 
 // ── POST /api/horarios  (crear entrada) ──
 const createHorario = async (req, res) => {
@@ -445,6 +493,13 @@ const createHorario = async (req, res) => {
         return res.status(409).json({ error: 'El docente ya tiene una clase asignada en ese día y bloque horario' });
       }
 
+      // CU107: el bloque debe estar dentro de la disponibilidad laboral del docente
+      const fueraDisponibilidad = await validarDisponibilidad(pool, {
+        docenteId: Usuario_Id, periodo: await periodoDelCurso(pool, Curso_Id),
+        dia: Horario_Asignatura_Dia_Semana, bloqueId: Bloque_Horario_Id,
+      });
+      if (fueraDisponibilidad) return res.status(422).json({ error: fueraDisponibilidad });
+
       const [[docente]] = await pool.execute(
         'SELECT Docente_Carga_Horaria_Maxima FROM usuario WHERE Usuario_Id = ? AND Es_Docente = 1',
         [Usuario_Id]
@@ -470,7 +525,7 @@ const createHorario = async (req, res) => {
         const maxHoras      = Number(docente.Docente_Carga_Horaria_Maxima);
         if ((horasActuales + duracion) > maxHoras) {
           return res.status(422).json({
-            error: `El docente excedería su carga horaria máxima de ${maxHoras}h semanales `
+            error: `El docente excedería su carga horaria semanal de ${maxHoras}h semanales `
                  + `(actual: ${horasActuales.toFixed(1)}h, este bloque añade: ${duracion.toFixed(1)}h)`,
           });
         }
@@ -530,7 +585,11 @@ const createHorario = async (req, res) => {
       );
 
       await conn.commit();
-      res.status(201).json({ mensaje: 'Horario creado correctamente', id: result.insertId });
+      res.status(201).json({
+        mensaje: 'Horario creado correctamente',
+        id: result.insertId,
+        advertencia: await advertenciaDocente(Usuario_Id, Curso_Id),
+      });
     } catch (error) {
       await conn.rollback();
       throw error;
@@ -561,7 +620,8 @@ const updateHorario = async (req, res) => {
 
   try {
     const [existe] = await pool.execute(
-      `SELECT Horario_Asignatura_Id, Bloque_Horario_Id, Horario_Asignatura_Estado
+      `SELECT Horario_Asignatura_Id, Bloque_Horario_Id, Horario_Asignatura_Estado,
+              Horario_Asignatura_Dia_Semana, Usuario_Id, Curso_Id
        FROM horario_asignatura WHERE Horario_Asignatura_Id = ?`,
       [id]
     );
@@ -703,6 +763,21 @@ const updateHorario = async (req, res) => {
         return res.status(409).json({ error: 'El docente ya tiene una clase asignada en ese día y bloque horario' });
       }
 
+      // CU107: solo se valida si cambia el docente, el día, el bloque o el curso. Una clase
+      // que ya estaba fuera de la disponibilidad se mantiene (con advertencia) al editar otros datos.
+      const original = existe[0];
+      const cambiaUbicacion = Number(original.Usuario_Id) !== Number(Usuario_Id)
+        || original.Horario_Asignatura_Dia_Semana !== Horario_Asignatura_Dia_Semana
+        || Number(original.Bloque_Horario_Id) !== Number(Bloque_Horario_Id)
+        || Number(original.Curso_Id) !== Number(Curso_Id);
+      if (cambiaUbicacion) {
+        const fueraDisponibilidad = await validarDisponibilidad(pool, {
+          docenteId: Usuario_Id, periodo: await periodoDelCurso(pool, Curso_Id),
+          dia: Horario_Asignatura_Dia_Semana, bloqueId: Bloque_Horario_Id,
+        });
+        if (fueraDisponibilidad) return res.status(422).json({ error: fueraDisponibilidad });
+      }
+
       const [[docente]] = await pool.execute(
         'SELECT Docente_Carga_Horaria_Maxima FROM usuario WHERE Usuario_Id = ? AND Es_Docente = 1',
         [Usuario_Id]
@@ -728,7 +803,7 @@ const updateHorario = async (req, res) => {
         const maxHoras      = Number(docente.Docente_Carga_Horaria_Maxima);
         if ((horasActuales + duracion) > maxHoras) {
           return res.status(422).json({
-            error: `El docente excedería su carga horaria máxima de ${maxHoras}h semanales `
+            error: `El docente excedería su carga horaria semanal de ${maxHoras}h semanales `
                  + `(actual: ${horasActuales.toFixed(1)}h, este bloque añade: ${duracion.toFixed(1)}h)`,
           });
         }
@@ -755,7 +830,10 @@ const updateHorario = async (req, res) => {
       ]
     );
 
-    res.json({ mensaje: 'Horario actualizado correctamente' });
+    res.json({
+      mensaje: 'Horario actualizado correctamente',
+      advertencia: await advertenciaDocente(Usuario_Id, Curso_Id),
+    });
   } catch (error) {
     console.error('Error en updateHorario:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
@@ -1819,6 +1897,21 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
     }
   }
 
+  // CU107: disponibilidad laboral semanal del docente. Solo se revisan los bloques
+  // que cambian de posición o de docente; una clase que ya estaba fuera se mantiene.
+  if ((cambiaPosicion || cambiaDoc) && docenteIds.length > 0) {
+    const mapa = await mapaDisponibilidad(db, docenteIds, propuestas.map((p) => p.periodo));
+    const avisados = new Set();
+    for (const p of propuestas) {
+      if (!p.Usuario_Id) continue;
+      if (estaDisponible(mapa, { docenteId: p.Usuario_Id, periodo: p.periodo, dia: p.dia, bloqueId: p.Bloque_Horario_Id })) continue;
+      const clave = `${p.Usuario_Id}|${p.dia}|${p.Bloque_Horario_Id}`;
+      if (avisados.has(clave)) continue;
+      avisados.add(clave);
+      conflictos.push(`${p.docente} no está disponible el ${etiqueta(p)} según su disponibilidad laboral de ${p.periodo}`);
+    }
+  }
+
   // Límite diario de bloques por curso (parámetro institucional)
   if (cambiaDia) {
     const [param] = await db.query(
@@ -1879,7 +1972,7 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
     }
   }
 
-  // Carga horaria máxima de los docentes involucrados
+  // Carga horaria semanal de los docentes involucrados
   if ((cambiaDoc || cambiaBloque) && docenteIds.length > 0) {
     const [docentes] = await db.query(
       `SELECT Usuario_Id, Usuario_Nombre_Completo, Docente_Carga_Horaria_Maxima
@@ -1895,7 +1988,7 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
       const cargaActual  = cargaOtros + seleccionados.filter(delDocente).reduce((acc, r) => acc + Number(r.duracion), 0);
       if (cargaNueva > max && cargaNueva > cargaActual) {
         conflictos.push(
-          `${d.Usuario_Nombre_Completo} excedería su carga horaria máxima de ${max}h semanales ` +
+          `${d.Usuario_Nombre_Completo} excedería su carga horaria semanal de ${max}h semanales ` +
           `(quedaría con ${cargaNueva.toFixed(1)}h)`
         );
       }

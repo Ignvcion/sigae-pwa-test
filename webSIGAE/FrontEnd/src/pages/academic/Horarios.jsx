@@ -419,6 +419,11 @@ export default function Horarios() {
       cerrarPanel();
       cargarHorarios(cursoSeleccionado);
       cargarAsignaturas(cursoSeleccionado);
+      // CU107: horas adeudadas del docente (solo advierte)
+      if (data.advertencia) {
+        setExito(`${data.mensaje} ⚠ ${data.advertencia}`);
+        setTimeout(() => setExito(""), 7000);
+      }
     } catch (e) {
       setErrorPanel(e.message || "Error al guardar");
     } finally {
@@ -1527,19 +1532,21 @@ function PanelForm({
       dia: form.Horario_Asignatura_Dia_Semana,
     });
     if (modoEdicion && idEditando) params.append("horario_id", idEditando);
+    if (form.Curso_Id) params.append("curso_id", form.Curso_Id); // período del curso (CU107)
 
     fetch(`/api/horarios/docentes-disponibles?${params}`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => {
         const asig = asignaturasCurso.find((a) => a.Asignatura_Id === Number(form.Asignatura_Id));
         const asigLow = (asig?.Asignatura_Nombre || "").toLowerCase();
+        // RF04: el docente puede tener varias especialidades (etiquetas separadas por coma)
         const enriched = data.map((d) => {
-          const espLow = (d.Docente_Especialidad || "").toLowerCase();
+          const etiquetas = (d.Docente_Especialidad || "").toLowerCase().split(",").map((e) => e.trim()).filter(Boolean);
           return {
             ...d,
             coincide_especialidad:
-              espLow.length > 0 &&
-              (asigLow.includes(espLow) || espLow.includes(asigLow)),
+              asigLow.length > 0 &&
+              etiquetas.some((esp) => asigLow.includes(esp) || esp.includes(asigLow)),
           };
         });
         enriched.sort((a, b) => {
@@ -1551,7 +1558,7 @@ function PanelForm({
       })
       .catch(() => setDocentesInfo([]))
       .finally(() => setCargandoDoc(false));
-  }, [form.Asignatura_Id, form.Bloque_Horario_Id, form.Horario_Asignatura_Dia_Semana, modoEdicion, idEditando]);
+  }, [form.Asignatura_Id, form.Bloque_Horario_Id, form.Horario_Asignatura_Dia_Semana, form.Curso_Id, modoEdicion, idEditando]);
 
   const sugeridos = docentesInfo.filter((d) => d.disponible && d.coincide_especialidad);
   const disponibles = docentesInfo.filter((d) => d.disponible && !d.coincide_especialidad);
@@ -1744,7 +1751,9 @@ function PanelForm({
                           {d.Usuario_Nombre_Completo} —{" "}
                           {d.conflicto_horario
                             ? "conflicto de horario"
-                            : `carga máxima (${d.carga_actual}h/${d.Docente_Carga_Horaria_Maxima}h)`}
+                            : d.fuera_disponibilidad
+                            ? "fuera de su disponibilidad laboral"
+                            : `carga semanal completa (${d.carga_actual}h/${d.Docente_Carga_Horaria_Maxima}h)`}
                         </option>
                       ))}
                     </optgroup>
@@ -1772,8 +1781,13 @@ function PanelForm({
                   : "ℹ Sin especialidad registrada."}
                 {docSel.Docente_Carga_Horaria_Maxima != null && (
                   <span style={{ marginLeft: 8, color: "#64748b" }}>
-                    Carga: {docSel.carga_nueva}h / {docSel.Docente_Carga_Horaria_Maxima}h sem.
+                    Carga semanal: {docSel.carga_nueva}h / {docSel.Docente_Carga_Horaria_Maxima}h
                   </span>
+                )}
+                {docSel.horas_adeudadas > 0 && (
+                  <div style={{ marginTop: 4, color: "#92400e" }}>
+                    ⚠ Disponible {docSel.horas_disponibles}h a la semana: debe {docSel.horas_adeudadas}h de su carga semanal.
+                  </div>
                 )}
               </div>
             )}

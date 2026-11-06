@@ -1,0 +1,137 @@
+SIGAE - Incremento 4
+Disponibilidad laboral del docente (CU107) y especialidades como etiquetas (RF04)
+Fecha: 2026-11-06
+
+======================================================================
+1. DISPONIBILIDAD LABORAL SEMANAL (CU107; RF04, RF35)
+======================================================================
+
+1.1 Es un patrón SEMANAL por período lectivo: los días (lunes a viernes) y
+    bloques de clase en que el docente puede trabajar en el colegio. Se
+    repite todas las semanas del período, igual que la carga horaria, que
+    también es semanal (usuario.Docente_Carga_Horaria_Maxima se muestra
+    como "Carga horaria semanal"; la columna conserva su nombre).
+
+1.2 Solo el administrador la ve y la edita, y la carga horaria semanal
+    también. Se configura en el formulario de registro de docente y en
+    "Editar datos" del perfil del docente. El docente no la ve ni la edita.
+
+1.3 Un docente sin bloques registrados en un período NO tiene restricción:
+    puede asignarse en cualquier bloque. Así siguen funcionando los
+    horarios ya armados y los docentes registrados antes de este cambio.
+
+1.4 Asignar una clase fuera de la disponibilidad se BLOQUEA (crear o editar
+    una clase, edición masiva CU63/CU64, migrar clases CU81). El bloqueo se
+    levanta editando la disponibilidad del docente. Solo se valida cuando
+    cambia el docente, el día, el bloque o el curso de la clase.
+
+1.5 Horas adeudadas = carga horaria semanal − horas disponibles a la
+    semana. Solo ADVIERTE (al guardar la disponibilidad y al asignar
+    clases); no impide armar el horario.
+
+1.6 Si al editar la disponibilidad una clase ya asignada queda en un bloque
+    no disponible, la clase se mantiene y se informa con advertencia.
+
+1.7 Al iniciar un nuevo período se borra la disponibilidad de los períodos
+    anteriores al nuevo vigente. Durante el cierre se puede registrar la
+    del período siguiente (selector de período en el perfil del docente).
+
+1.8 Si se redefinen los bloques horarios, la disponibilidad apunta a los
+    bloques antiguos: hay que volver a marcarla con los bloques nuevos.
+
+======================================================================
+2. ESPECIALIDADES COMO ETIQUETAS (RF04)
+======================================================================
+
+2.1 Un docente puede tener de 1 a 6 especialidades. Se eligen como
+    etiquetas (al estilo Notion): al escribir se sugieren las existentes y
+    se puede crear una nueva con Enter.
+
+2.2 El catálogo `especialidad` se arma solo con las etiquetas que se
+    asignan. El nombre es único sin distinguir mayúsculas ni tildes:
+    "matematicas" reutiliza "Matemáticas". Las etiquetas que quedan sin
+    docentes se eliminan del catálogo.
+
+2.3 usuario.Docente_Especialidad guarda el resumen en texto
+    ("Matemáticas, Física") que usan los listados, la mensajería y el
+    creador de horarios. Lo escribe solo utils/especialidades.js.
+
+2.4 El listado de docentes filtra por etiqueta del catálogo (CU31) y el
+    creador de horarios recomienda al docente si alguna de sus etiquetas
+    coincide con la asignatura.
+
+======================================================================
+3. ESQUEMA (SIGAE.sql y schema_base.sql regenerado)
+======================================================================
+
+  - disponibilidad_docente (docente, período, día, bloque), con CASCADE
+    al borrar el docente o el bloque.
+  - especialidad (catálogo) y docente_especialidad (docente ↔ etiqueta).
+  - usuario.Docente_Especialidad pasa de varchar(100) a varchar(255).
+
+  Si la base de la RDS ya está cargada, aplicar a mano (MariaDB):
+
+    ALTER TABLE usuario MODIFY Docente_Especialidad varchar(255) DEFAULT NULL;
+
+    CREATE TABLE especialidad (
+      Especialidad_Id int unsigned NOT NULL AUTO_INCREMENT,
+      Especialidad_Nombre varchar(40) NOT NULL,
+      PRIMARY KEY (Especialidad_Id),
+      UNIQUE KEY Especialidad_Nombre_UNIQUE (Especialidad_Nombre)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE docente_especialidad (
+      Docente_Usuario_Id int unsigned NOT NULL,
+      Especialidad_Id int unsigned NOT NULL,
+      PRIMARY KEY (Docente_Usuario_Id, Especialidad_Id),
+      KEY fk_Docente_Especialidad_Especialidad_idx (Especialidad_Id),
+      CONSTRAINT fk_Docente_Especialidad_Especialidad FOREIGN KEY (Especialidad_Id)
+        REFERENCES especialidad (Especialidad_Id) ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT fk_Docente_Especialidad_Usuario FOREIGN KEY (Docente_Usuario_Id)
+        REFERENCES usuario (Usuario_Id) ON DELETE CASCADE ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE disponibilidad_docente (
+      Disponibilidad_Docente_Id int unsigned NOT NULL AUTO_INCREMENT,
+      Disponibilidad_Docente_Periodo_Lectivo varchar(10) NOT NULL,
+      Disponibilidad_Docente_Dia_Semana varchar(20) NOT NULL,
+      Bloque_Horario_Id int unsigned NOT NULL,
+      Docente_Usuario_Id int unsigned NOT NULL,
+      PRIMARY KEY (Disponibilidad_Docente_Id),
+      UNIQUE KEY Disponibilidad_Docente_UNIQUE (Docente_Usuario_Id, Disponibilidad_Docente_Periodo_Lectivo,
+        Disponibilidad_Docente_Dia_Semana, Bloque_Horario_Id),
+      KEY fk_Disponibilidad_Docente_Bloque_Horario_idx (Bloque_Horario_Id),
+      KEY Disponibilidad_Docente_Periodo_idx (Disponibilidad_Docente_Periodo_Lectivo),
+      CONSTRAINT fk_Disponibilidad_Docente_Bloque_Horario FOREIGN KEY (Bloque_Horario_Id)
+        REFERENCES bloque_horario (Bloque_Horario_Id) ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT fk_Disponibilidad_Docente_Usuario FOREIGN KEY (Docente_Usuario_Id)
+        REFERENCES usuario (Usuario_Id) ON DELETE CASCADE ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    -- Pasar las especialidades existentes al catálogo (una por docente):
+    INSERT IGNORE INTO especialidad (Especialidad_Nombre)
+      SELECT DISTINCT TRIM(Docente_Especialidad) FROM usuario
+       WHERE Es_Docente = 1 AND TRIM(COALESCE(Docente_Especialidad, '')) <> '';
+    INSERT IGNORE INTO docente_especialidad (Docente_Usuario_Id, Especialidad_Id)
+      SELECT u.Usuario_Id, e.Especialidad_Id FROM usuario u
+        JOIN especialidad e ON e.Especialidad_Nombre = TRIM(u.Docente_Especialidad)
+       WHERE u.Es_Docente = 1;
+
+======================================================================
+4. DÓNDE ESTÁ
+======================================================================
+
+  - Reglas: BackEnd/utils/disponibilidadLaboral.js, utils/especialidades.js.
+  - API (solo administrador):
+      GET /api/especialidades
+      GET /api/usuarios/disponibilidad/opciones
+      GET /api/usuarios/:id/disponibilidad?periodo=
+      POST /api/usuarios y PUT /api/usuarios/:id reciben
+        Docente_Especialidades: ["Matemáticas", ...] y
+        Docente_Disponibilidad: { periodo?, bloques: [{ dia, Bloque_Horario_Id }] }
+  - Validación al asignar: horarioController (crear, editar, edición
+    masiva, docentes-disponibles) y conflictosHorarioController (migrar).
+  - Pantallas: Registrar docente, Editar datos (perfil del docente),
+    Gestión de roles (etiquetas), Docentes (filtro por etiqueta),
+    creador de horarios (motivo "fuera de su disponibilidad laboral" y
+    aviso de horas adeudadas).

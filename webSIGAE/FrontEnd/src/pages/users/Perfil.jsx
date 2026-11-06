@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { Link, useParams } from "react-router-dom";
 import FormEditarUsuario from "./FormEditarUsuario";
+import { EtiquetasLectura } from "../../components/EtiquetasInput";
 import { apiFetch, getAsignacionesDocente, getEstudiantesAsociados, getDetalleEstudiante, editarPerfilPropio, actualizarFotoPerfil } from "../../services/api";
 import { validarTelefonoChileno, validarDireccion, formatearDireccion, COLUMNAS_DIRECCION_ESTUDIANTE, MENSAJE_TELEFONO } from "../../utils/validaciones";
 
@@ -431,11 +432,11 @@ function Perfil() {
             {datos?.Es_Docente ? (
               <>
                 <div className="perfil-campo">
-                  <label>Especialidad</label>
-                  <span>{datos.Docente_Especialidad || "Sin especialidad registrada"}</span>
+                  <label>Especialidades</label>
+                  <span><EtiquetasLectura texto={datos.Docente_Especialidad} /></span>
                 </div>
                 <div className="perfil-campo">
-                  <label>Carga Horaria Máxima</label>
+                  <label>Carga Horaria Semanal</label>
                   <span>{datos.Docente_Carga_Horaria_Maxima || "Sin carga horaria registrada"} hrs</span>
                 </div>
               </>

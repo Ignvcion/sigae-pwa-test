@@ -158,7 +158,7 @@ describe('Pruebas Unitarias - CU63: Reasignando docente en múltiples bloques', 
     expect(res.json.mock.calls[0][0].conflictos[0]).toContain('dos clases simultáneas');
   });
 
-  test('Excepción "Docente sin disponibilidad o con conflicto": excede su carga horaria máxima', async () => {
+  test('Excepción "Docente sin disponibilidad o con conflicto": excede su carga horaria semanal', async () => {
     pool.query
       .mockResolvedValueOnce([[SELECCIONADO, SELECCIONADO_2]])
       .mockResolvedValueOnce([[DOCENTE_NUEVO]])
@@ -173,7 +173,7 @@ describe('Pruebas Unitarias - CU63: Reasignando docente en múltiples bloques', 
     await horarioController.validarReasignacion(req, res);
 
     expect(res.status).toHaveBeenCalledWith(409);
-    expect(res.json.mock.calls[0][0].conflictos[0]).toContain('carga horaria máxima');
+    expect(res.json.mock.calls[0][0].conflictos[0]).toContain('carga horaria semanal');
   });
 
   test('Flujo correcto: confirma y actualiza los bloques con el nuevo docente', async () => {

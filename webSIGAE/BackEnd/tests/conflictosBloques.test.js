@@ -95,6 +95,8 @@ describe('Reubicación de clases tras redefinir la jornada o los bloques', () =>
       .mockResolvedValueOnce([[DESTINO_VIGENTE]])   // destino
       .mockResolvedValueOnce([[]])                  // choque curso
       .mockResolvedValueOnce([[]])                  // choque docente
+      .mockResolvedValueOnce([[{ Curso_Periodo_Lectivo: '2026' }]]) // período del curso (CU107)
+      .mockResolvedValueOnce([[]])                  // disponibilidad laboral: sin restricción
       .mockResolvedValueOnce([{ affectedRows: 1 }]) // UPDATE
       .mockResolvedValueOnce([[{ Desajustado: 1, Clases: 0, Eventos: 0 }]]) // bloque viejo
       .mockResolvedValueOnce([{ affectedRows: 0 }]) // DELETE clases eliminadas del bloque viejo
@@ -102,9 +104,9 @@ describe('Reubicación de clases tras redefinir la jornada o los bloques', () =>
 
     await conflictos.migrarClase(req, res);
 
-    expect(conn.query.mock.calls[4][1]).toEqual([11111115, 222222]);
-    expect(conn.query.mock.calls[6][1]).toEqual([[11111111], 'Eliminado']);
-    expect(conn.query.mock.calls[7][1]).toEqual([11111111]);
+    expect(conn.query.mock.calls[6][1]).toEqual([11111115, 222222]);
+    expect(conn.query.mock.calls[8][1]).toEqual([[11111111], 'Eliminado']);
+    expect(conn.query.mock.calls[9][1]).toEqual([11111111]);
     expect(conn.commit).toHaveBeenCalled();
     expect(conn.release).toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith({ mensaje: 'Clase migrada al nuevo bloque', bloqueEliminado: true });
@@ -128,12 +130,34 @@ describe('Reubicación de clases tras redefinir la jornada o los bloques', () =>
       .mockResolvedValueOnce([[DESTINO_VIGENTE]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ Curso_Periodo_Lectivo: '2026' }]])
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
       .mockResolvedValueOnce([[{ Desajustado: 0, Clases: 0, Eventos: 0 }]]);
 
     await conflictos.migrarClase(req, res);
 
     expect(res.json).toHaveBeenCalledWith({ mensaje: 'Clase migrada al nuevo bloque', bloqueEliminado: false });
+  });
+
+  test('CU107: no migra si el destino queda fuera de la disponibilidad laboral del docente', async () => {
+    conn.query
+      .mockResolvedValueOnce([[CLASE_PENDIENTE]])
+      .mockResolvedValueOnce([[DESTINO_VIGENTE]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ Curso_Periodo_Lectivo: '2026' }]])
+      .mockResolvedValueOnce([[ // disponible solo el lunes en otro bloque
+        { Docente_Usuario_Id: 3, periodo: '2026', dia: 'Lunes', Bloque_Horario_Id: 11111112 },
+      ]])
+      .mockResolvedValueOnce([[DESTINO_VIGENTE]]); // horas del bloque para el mensaje
+
+    await conflictos.migrarClase(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(422);
+    expect(res.json.mock.calls[0][0].error).toContain('disponibilidad laboral de 2026');
+    expect(conn.rollback).toHaveBeenCalled();
+    expect(conn.commit).not.toHaveBeenCalled();
   });
 
   test('Rechaza un destino desajustado o de recreo', async () => {

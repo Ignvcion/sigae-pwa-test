@@ -201,6 +201,77 @@ CREATE TABLE `curso` (
 
 
 --
+-- Table structure for table `disponibilidad_docente`
+-- Incremento 4, CU107 (RF04, RF35): disponibilidad laboral del docente. Patrón semanal
+-- por período: cada fila es un día y bloque en que el docente puede trabajar en el colegio.
+-- Un docente sin filas en un período no tiene restricción de disponibilidad.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `disponibilidad_docente` (
+  `Disponibilidad_Docente_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Disponibilidad_Docente_Periodo_Lectivo` varchar(10) NOT NULL,
+  `Disponibilidad_Docente_Dia_Semana` varchar(20) NOT NULL,
+  `Bloque_Horario_Id` int unsigned NOT NULL,
+  `Docente_Usuario_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Disponibilidad_Docente_Id`),
+  UNIQUE KEY `Disponibilidad_Docente_UNIQUE` (`Docente_Usuario_Id`,`Disponibilidad_Docente_Periodo_Lectivo`,`Disponibilidad_Docente_Dia_Semana`,`Bloque_Horario_Id`),
+  KEY `fk_Disponibilidad_Docente_Bloque_Horario_idx` (`Bloque_Horario_Id`),
+  KEY `Disponibilidad_Docente_Periodo_idx` (`Disponibilidad_Docente_Periodo_Lectivo`),
+  CONSTRAINT `fk_Disponibilidad_Docente_Bloque_Horario` FOREIGN KEY (`Bloque_Horario_Id`) REFERENCES `bloque_horario` (`Bloque_Horario_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Disponibilidad_Docente_Usuario` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+--
+
+
+--
+-- Table structure for table `docente_especialidad`
+-- Incremento 4, RF04: especialidades de cada docente (etiquetas del catálogo `especialidad`).
+-- usuario.Docente_Especialidad guarda el resumen en texto ("A, B") para los listados.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `docente_especialidad` (
+  `Docente_Usuario_Id` int unsigned NOT NULL,
+  `Especialidad_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Docente_Usuario_Id`,`Especialidad_Id`),
+  KEY `fk_Docente_Especialidad_Especialidad_idx` (`Especialidad_Id`),
+  CONSTRAINT `fk_Docente_Especialidad_Especialidad` FOREIGN KEY (`Especialidad_Id`) REFERENCES `especialidad` (`Especialidad_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Docente_Especialidad_Usuario` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+--
+
+
+--
+-- Table structure for table `especialidad`
+-- Incremento 4, RF04: catálogo de especialidades docentes. Se llena solo al asignar
+-- especialidades a un docente (como etiquetas); el nombre es único sin distinguir
+-- mayúsculas ni tildes (collation utf8mb4_unicode_ci).
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `especialidad` (
+  `Especialidad_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Especialidad_Nombre` varchar(40) NOT NULL,
+  PRIMARY KEY (`Especialidad_Id`),
+  UNIQUE KEY `Especialidad_Nombre_UNIQUE` (`Especialidad_Nombre`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+--
+
+
+--
 -- Table structure for table `estudiante`
 --
 
@@ -636,7 +707,7 @@ CREATE TABLE `usuario` (
   `Usuario_Foto_Perfil` varchar(255) DEFAULT NULL,
   `Es_Docente` tinyint(1) NOT NULL,
   `Docente_Carga_Horaria_Maxima` int DEFAULT NULL,
-  `Docente_Especialidad` varchar(100) DEFAULT NULL,
+  `Docente_Especialidad` varchar(255) DEFAULT NULL,
   `Docente_Correo_Institucional` varchar(100) DEFAULT NULL,
   `Es_Administrador` tinyint(1) NOT NULL,
   `Administrador_Tipo` varchar(20) DEFAULT NULL,
