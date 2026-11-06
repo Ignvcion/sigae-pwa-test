@@ -30,6 +30,13 @@ Cada punto indica:
     schema_base.sql en la RDS. Después, cada cambio es un ALTER TABLE a
     mano sobre datos reales.
 
+1.4 [INTERPRETACIÓN] La RDS arranca vacía y nadie puede crear niveles
+    desde la aplicación, pero sin ellos (y su orden) la promoción no
+    funciona. Por eso hay un archivo aparte, catalogos_base.sql, con los
+    14 niveles educativos y su orden, sin datos de prueba. Se carga una
+    vez después de schema_base.sql (INSERT IGNORE: correrlo de nuevo no
+    duplica nada). Debe entrar en el sparse-checkout del servidor.
+
 
 ======================================================================
 2. RF57 - APODERADO TITULAR Y SUPLENTES
@@ -100,6 +107,9 @@ Cada punto indica:
       - Registrado: confirmada y lista para aplicar.
       - Aplicado: la promoción ya se ejecutó. No se puede modificar
         (CU98, Excepción 2).
+    Al confirmar, si ningún estudiante queda sin situación, también se
+    registran los borradores guardados antes. Si falta alguno, todo queda
+    en borrador y el sistema lista a los faltantes.
 
 4.4 [DECIDIDO] Qué pasa al aplicar la promoción:
       - Promovido: pasa al curso del nivel siguiente, misma sección,
@@ -217,6 +227,13 @@ Cada punto indica:
     no cada vez que se quita una asociación. Un apoderado que queda sin
     estudiantes a mitad de año sigue activo hasta el próximo cambio de
     período.
+    [INTERPRETACIÓN] Un egresado sigue siendo un estudiante asociado
+    hasta que se elimina (segundo cambio de período). Por eso su
+    apoderado queda inactivo en ese cambio y se elimina en el siguiente,
+    si para entonces no tiene otro estudiante.
+    [INTERPRETACIÓN] Solo se reactiva automáticamente al apoderado
+    inactivado por falta de asociaciones. Una cuenta que un administrador
+    desactivó a mano sigue rechazándose al asociarla.
 
 
 ======================================================================
@@ -260,7 +277,7 @@ Cada punto indica:
 
 
 ======================================================================
-9. QUÉ SE IMPLEMENTA AHORA
+9. QUÉ SE IMPLEMENTÓ (rama produccion-marcha-blanca)
 ======================================================================
 
   1. Esquema en SIGAE.sql:
@@ -280,3 +297,12 @@ Cada punto indica:
   6. Períodos (backend + frontend): iniciar cierre, estado del cierre,
      respaldo Excel, iniciar nuevo período con la limpieza (6).
   7. Pruebas unitarias y prueba de punta a punta en MariaDB.
+
+  Dónde está:
+    - Reglas: BackEnd/utils/periodos.js, jefatura.js, situacionFinal.js,
+      limpiezaPeriodo.js, historial.js.
+    - API: /api/cursos/:id/profesor-jefe, /api/cursos/:id/estudiantes,
+      /api/cursos/mis-jefaturas, /api/promocion/cursos/:cursoId/...,
+      /api/promocion/periodos/...
+    - Pantallas: Cursos (detalle del curso), /situacion-final,
+      /cierre-periodo.

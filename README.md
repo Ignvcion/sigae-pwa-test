@@ -103,7 +103,7 @@ web-dev-SIGAE/
 └── webSIGAE/
     ├── BackEnd/       # API Node.js + Express
     ├── FrontEnd/      # App Vite + React
-    └── Database/      # SIGAE.sql (desarrollo) y schema_base.sql (producción)
+    └── Database/      # SIGAE.sql (desarrollo); schema_base.sql y catalogos_base.sql (producción)
 ```
 
 ### 📚 Documentación
@@ -114,7 +114,8 @@ Toda la documentación, salvo este README, está en `docs/`. No agregues archivo
 | --- | --- |
 | [`docs/api-citaciones.md`](docs/api-citaciones.md) | Contrato entre frontend y backend del módulo de citaciones (CU74–CU79): endpoints, formato de respuestas y permisos. |
 | [`docs/navegacion-sidebar.md`](docs/navegacion-sidebar.md) | Cómo funciona el sidebar (`MainLayout.jsx`), reglas para agregar enlaces y pendientes conocidos. |
-| [`docs/tabla-historial.md`](docs/tabla-historial.md) | Estado de la tabla de auditoría `historial` y qué hacer al llegar a la fase alfa. |
+| [`docs/tabla-historial.md`](docs/tabla-historial.md) | Estado de la tabla de auditoría `historial` y cómo se escriben sus valores. |
+| [`docs/decisiones-rf60-rf61-periodos.txt`](docs/decisiones-rf60-rf61-periodos.txt) | Acuerdos del Incremento 4 que van más allá del mockup: profesor jefe, situación final, promoción, períodos lectivos y limpieza de datos. |
 
 ---
 
@@ -240,7 +241,7 @@ Producción durante la marcha blanca:
 
 ### 1. Código en el servidor
 
-El servidor solo recibe el backend y el esquema (sparse-checkout de lista blanca): `webSIGAE/BackEnd/` y `webSIGAE/Database/schema_base.sql`, **excluyendo** `SIGAE.sql`, `BackEnd/tests/`, `BackEnd/scripts/` y `BackEnd/hashPasswords.js`. Usa la misma versión mayor de Node que el codespace (`node --version`).
+El servidor solo recibe el backend y el esquema (sparse-checkout de lista blanca): `webSIGAE/BackEnd/`, `webSIGAE/Database/schema_base.sql` y `webSIGAE/Database/catalogos_base.sql`, **excluyendo** `SIGAE.sql`, `BackEnd/tests/`, `BackEnd/scripts/` y `BackEnd/hashPasswords.js`. Usa la misma versión mayor de Node que el codespace (`node --version`).
 
 Instala las dependencias sin las de desarrollo y sin el Chromium de Puppeteer (se usa el del sistema, `apt install chromium`):
 
@@ -254,7 +255,8 @@ cd webSIGAE/BackEnd && PUPPETEER_SKIP_DOWNLOAD=true npm ci --omit=dev
 - Carga el esquema **una sola vez**, con el usuario administrador de la RDS: `mariadb -h <endpoint> -u <admin> -p < webSIGAE/Database/schema_base.sql`.
 - Crea un usuario para la app con permisos acotados (la app no necesita DDL):
   `GRANT SELECT, INSERT, UPDATE, DELETE ON sigae.* TO 'sigae_app'@'%';` (restringe el host a la subred de la EC2 si puedes).
-- `schema_base.sql` deja las tablas vacías: los catálogos (niveles educativos, parámetros institucionales, cursos, asignaturas) se cargan desde la aplicación o con un script puntual revisado.
+- Después del esquema, carga **una vez** los niveles educativos con su orden (sin ellos no funciona la promoción): `mariadb -h <endpoint> -u <admin> -p < webSIGAE/Database/catalogos_base.sql`. Es idempotente (`INSERT IGNORE`).
+- El resto parte vacío: parámetros institucionales y bloques, asignaturas, planes, cursos y horarios se cargan desde la aplicación. Al guardar los parámetros institucionales queda fijado el período vigente (el año actual).
 - El primer administrador real se crea con un script puntual (contraseña hasheada con bcrypt); **no** con `hashPasswords.js`.
 
 ### 3. `.env` de producción
@@ -296,6 +298,7 @@ El backend escucha solo en `127.0.0.1:3000`; únicamente Nginx llega a él.
 
 - La RDS: snapshots automáticos (y uno manual antes de cualquier cambio de esquema).
 - **`/var/sigae/uploads` no la cubren los snapshots de la RDS**: respáldala aparte.
+- Al cambiar de período (Gestión Académica › Cierre de Período), el super administrador descarga un Excel con todo lo que se va a eliminar (cursos de dos períodos atrás, sus egresados y retirados con su historial, y apoderados sin estudiantes) y lo sube a la cuenta de Google Drive de respaldos. Tiene datos personales de menores: no se guarda en equipos personales.
 
 ### Actualizar el backend
 
