@@ -19,6 +19,7 @@ import {
   validarMotivoCancelacion,
 } from "../../utils/citaciones";
 import EstadoCitacionBadge from "./EstadoCitacionBadge";
+import ContactosApoderados from "./ContactosApoderados";
 
 // Detalle de una citación desde la agenda, con las acciones de:
 //  CU75 confirmar · CU76 cancelar (motivo obligatorio) · CU77 reprogramar fecha/tramo
@@ -205,6 +206,9 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
                 </>
               )}
             </dl>
+
+            {/* RF57 / CU91: el docente y el administrador ven los contactos del titular y los suplentes */}
+            {rol !== "Apoderado" && <ContactosApoderados estudianteId={citacion.Estudiante_Id} />}
 
             {!esEditable(citacion) && (
               <p className="cit-nota">

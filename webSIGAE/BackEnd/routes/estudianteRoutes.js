@@ -2,6 +2,7 @@ const express = require('express');
 const router  = express.Router();
 
 const estudianteController = require('../controllers/estudianteController');
+const apoderadosEstudianteController = require('../controllers/apoderadosEstudianteController');
 const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
 
 router.get('/',               verifyToken,             estudianteController.getEstudiantes);
@@ -22,6 +23,9 @@ router.get('/apoderado/:apoderadoId/asociados/:estudianteId', verifyToken, estud
 router.delete('/:estudianteId/apoderado', verifyToken, verifyAdmin, estudianteController.eliminarAsociacionEspecifica);
 // CU39: reasignar o quitar el apoderado de un estudiante puntual
 router.put('/:estudianteId/apoderado', verifyToken, verifyAdmin, estudianteController.editarAsociaciones);
+// CU90 (RF57): apoderado titular y hasta 4 suplentes del estudiante
+router.get('/:estudianteId/apoderados', verifyToken, verifyAdmin, apoderadosEstudianteController.getApoderadosEstudiante);
+router.put('/:estudianteId/apoderados', verifyToken, verifyAdmin, apoderadosEstudianteController.designarApoderados);
 router.put('/:id', verifyToken, verifyAdmin, estudianteController.updateEstudiante);
 router.delete('/:id', verifyToken, verifyAdmin, estudianteController.deleteEstudiante);
 

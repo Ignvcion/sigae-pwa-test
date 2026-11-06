@@ -48,11 +48,27 @@ describe('Horario semanal de un estudiante visto por su apoderado', () => {
   test('Un apoderado no puede ver el horario de un estudiante que no es suyo (404)', async () => {
     req.user = { id: 8, roles: ['Apoderado'] };
     pool.execute.mockResolvedValueOnce([[estudiante()]]);
+    pool.query = jest.fn().mockResolvedValueOnce([[]]); // tampoco es suplente
 
     await horarioController.getHorarioEstudiante(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
     expect(pool.execute).toHaveBeenCalledTimes(1);
+    expect(pool.query.mock.calls[0][0]).toContain('apoderado_suplente');
+  });
+
+  test('RF57: un apoderado suplente puede ver el horario del estudiante', async () => {
+    req.user = { id: 8, roles: ['Apoderado'] };
+    pool.execute
+      .mockResolvedValueOnce([[estudiante()]])
+      .mockResolvedValueOnce([[]]);
+    pool.query = jest.fn().mockResolvedValueOnce([[{ 1: 1 }]]);
+
+    await horarioController.getHorarioEstudiante(req, res);
+
+    expect(pool.query.mock.calls[0][1]).toEqual([222222222, 8, 8]);
+    expect(res.status).not.toHaveBeenCalledWith(404);
+    expect(pool.execute).toHaveBeenCalledTimes(2);
   });
 
   test('Un administrador puede ver el horario de cualquier estudiante', async () => {

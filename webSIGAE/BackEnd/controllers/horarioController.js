@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const { condicionDesajustado, motivoDesajuste } = require('../utils/bloquesDesajustados');
 const { ESTADO_ELIMINADO, claseVigente } = require('../utils/clasesEliminadas');
+const { esApoderadoDelEstudiante } = require('../utils/apoderadosEstudiante');
 
 // ── GET /api/horarios?curso_id=X  (admin ve todo, docente solo el suyo) ──
 // Las clases eliminadas solo se incluyen con ?incluir_eliminadas=1 y para
@@ -1172,7 +1173,10 @@ const getHorarioEstudiante = async (req, res) => {
     );
 
     // Un apoderado que no es Admin no distingue "no existe" de "no es suyo"
-    if (!estudiante || (!esAdmin && Number(estudiante.Apoderado_Usuario_Id) !== Number(userId))) {
+    // RF57: el titular y los suplentes son apoderados asociados del estudiante
+    const esSuyo = estudiante && (esAdmin || Number(estudiante.Apoderado_Usuario_Id) === Number(userId)
+      || await esApoderadoDelEstudiante(pool, userId, estudianteId));
+    if (!estudiante || !esSuyo) {
       return res.status(404).json({ mensaje: 'El estudiante no fue encontrado' });
     }
 
