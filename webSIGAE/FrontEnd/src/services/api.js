@@ -133,7 +133,7 @@ export async function registrarDocente({ nombre, rut, correo, telefono, password
       Es_Docente                   : 1,
       Docente_Especialidades       : especialidades,
       Docente_Carga_Horaria_Maxima : parseInt(cargaHoraria, 10), // carga horaria semanal
-      Docente_Disponibilidad       : { bloques: disponibilidad || [] },
+      Docente_Disponibilidad       : { tramos: disponibilidad || [] }, // CU107: tramos desde–hasta por día
       Docente_Correo_Institucional : correo,
       ...columnasDireccionUsuario({ calle, numero, depto, comuna }),
       Es_Administrador             : 0,

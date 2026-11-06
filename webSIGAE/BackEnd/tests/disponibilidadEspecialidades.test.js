@@ -6,6 +6,8 @@ const {
   guardarEspecialidadesDocente,
 } = require('../utils/especialidades');
 const {
+  normalizarTramos,
+  unirTramos,
   mapaDisponibilidad,
   estaDisponible,
   validarDisponibilidad,
@@ -86,57 +88,75 @@ describe('RF04: especialidades del docente como etiquetas', () => {
   });
 });
 
-describe('CU107: disponibilidad laboral semanal del docente', () => {
+describe('CU107: disponibilidad laboral semanal del docente (tramos desde–hasta)', () => {
   beforeEach(() => jest.clearAllMocks());
 
+  // Ana: lunes 08:00–12:00 y 13:00–17:00; martes 08:00–10:00 y 10:00–12:00 (contiguos)
   const filas = [
-    { Docente_Usuario_Id: 5, periodo: '2026', dia: 'Lunes', Bloque_Horario_Id: 1 },
-    { Docente_Usuario_Id: 5, periodo: '2026', dia: 'Martes', Bloque_Horario_Id: 2 },
+    { Docente_Usuario_Id: 5, periodo: '2026', dia: 'Lunes', hora_inicio: '08:00:00', hora_fin: '12:00:00' },
+    { Docente_Usuario_Id: 5, periodo: '2026', dia: 'Lunes', hora_inicio: '13:00:00', hora_fin: '17:00:00' },
+    { Docente_Usuario_Id: 5, periodo: '2026', dia: 'Martes', hora_inicio: '08:00:00', hora_fin: '10:00:00' },
+    { Docente_Usuario_Id: 5, periodo: '2026', dia: 'Martes', hora_inicio: '10:00:00', hora_fin: '12:00:00' },
   ];
+  const mapaDe = async () => mapaDisponibilidad({ query: jest.fn().mockResolvedValue([filas]) }, [5, 6], ['2026']);
 
-  test('un docente sin disponibilidad registrada no tiene restricción', async () => {
-    const db = { query: jest.fn().mockResolvedValue([filas]) };
-    const mapa = await mapaDisponibilidad(db, [5, 6], ['2026']);
-    expect(estaDisponible(mapa, { docenteId: 6, periodo: '2026', dia: 'Viernes', bloqueId: 3 })).toBe(true);
-  });
-
-  test('con disponibilidad registrada solo puede asignarse en sus bloques y período', async () => {
-    const db = { query: jest.fn().mockResolvedValue([filas]) };
-    const mapa = await mapaDisponibilidad(db, [5], ['2026']);
-    expect(estaDisponible(mapa, { docenteId: 5, periodo: '2026', dia: 'Lunes', bloqueId: 1 })).toBe(true);
-    expect(estaDisponible(mapa, { docenteId: 5, periodo: '2026', dia: 'Lunes', bloqueId: 2 })).toBe(false);
+  test('un docente sin tramos registrados no tiene restricción', async () => {
+    const mapa = await mapaDe();
+    expect(estaDisponible(mapa, { docenteId: 6, periodo: '2026', dia: 'Viernes', horaInicio: '18:00', horaFin: '18:45' })).toBe(true);
     // Otro período sin registro: sin restricción
-    expect(estaDisponible(mapa, { docenteId: 5, periodo: '2027', dia: 'Lunes', bloqueId: 2 })).toBe(true);
+    expect(estaDisponible(mapa, { docenteId: 5, periodo: '2027', dia: 'Viernes', horaInicio: '09:15', horaFin: '10:00' })).toBe(true);
   });
 
-  test('validarDisponibilidad explica el bloqueo con día, horario y período', async () => {
+  test('un bloque de 45 minutos está disponible solo si cae completo dentro de un tramo', async () => {
+    const mapa = await mapaDe();
+    const lunes = (horaInicio, horaFin) => estaDisponible(mapa, { docenteId: 5, periodo: '2026', dia: 'Lunes', horaInicio, horaFin });
+    expect(lunes('09:15:00', '10:00:00')).toBe(true);
+    expect(lunes('11:45', '12:30')).toBe(false); // termina después del tramo de la mañana
+    expect(lunes('12:15', '13:00')).toBe(false); // en la pausa entre tramos
+    expect(lunes('16:15', '17:00')).toBe(true);
+    expect(estaDisponible(mapa, { docenteId: 5, periodo: '2026', dia: 'Viernes', horaInicio: '09:15', horaFin: '10:00' })).toBe(false);
+  });
+
+  test('los tramos contiguos se unen: un bloque puede cruzar el límite entre ellos', async () => {
+    const mapa = await mapaDe();
+    expect(estaDisponible(mapa, { docenteId: 5, periodo: '2026', dia: 'Martes', horaInicio: '09:45', horaFin: '10:30' })).toBe(true);
+    expect(unirTramos([{ inicio: 600, fin: 660 }, { inicio: 480, fin: 600 }])).toEqual([{ inicio: 480, fin: 660 }]);
+  });
+
+  test('validarDisponibilidad explica el bloqueo con los tramos disponibles de ese día', async () => {
     const db = {
       query: jest.fn()
         .mockResolvedValueOnce([filas])
-        .mockResolvedValueOnce([[{ Bloque_Horario_Hora_Inicio: '14:00:00', Bloque_Horario_Hora_Fin: '14:45:00' }]]),
+        .mockResolvedValueOnce([[{ Bloque_Horario_Hora_Inicio: '12:15:00', Bloque_Horario_Hora_Fin: '13:00:00' }]]),
     };
-    const mensaje = await validarDisponibilidad(db, { docenteId: 5, periodo: '2026', dia: 'Viernes', bloqueId: 4 });
-    expect(mensaje).toContain('Viernes 14:00–14:45');
-    expect(mensaje).toContain('2026');
+    const mensaje = await validarDisponibilidad(db, { docenteId: 5, periodo: '2026', dia: 'Lunes', bloqueId: 4 });
+    expect(mensaje).toContain('Lunes 12:15–13:00');
+    expect(mensaje).toContain('08:00–12:00 y 13:00–17:00');
   });
 
-  test('horas adeudadas = carga semanal − horas disponibles; solo advierte', async () => {
+  test('validarDisponibilidad no consulta el bloque si el docente no tiene restricción', async () => {
+    const db = { query: jest.fn().mockResolvedValueOnce([[]]) };
+    expect(await validarDisponibilidad(db, { docenteId: 9, periodo: '2026', dia: 'Lunes', bloqueId: 4 })).toBeNull();
+    expect(db.query).toHaveBeenCalledTimes(1);
+  });
+
+  test('horas adeudadas = carga semanal − horas de los tramos (incluyen recreos y horas sin clases)', async () => {
     const db = {
       query: jest.fn()
         .mockResolvedValueOnce([[{ Docente_Carga_Horaria_Maxima: 32 }]])
-        .mockResolvedValueOnce([[{ bloques: 12, horas: '9.0000' }]])
+        .mockResolvedValueOnce([[{ tramos: 4, horas: '12.0000' }]])
         .mockResolvedValueOnce([[{ horas: '1.5' }]]),
     };
     const r = await resumenSemanal(db, 5, '2026');
-    expect(r).toMatchObject({ cargaSemanal: 32, configurada: true, horasDisponibles: 9, horasAsignadas: 1.5, horasAdeudadas: 23 });
-    expect(advertenciaHorasAdeudadas(r)).toContain('debe 23 h');
+    expect(r).toMatchObject({ cargaSemanal: 32, configurada: true, tramos: 4, horasDisponibles: 12, horasAsignadas: 1.5, horasAdeudadas: 20 });
+    expect(advertenciaHorasAdeudadas(r)).toContain('debe 20 h');
   });
 
   test('sin disponibilidad registrada no hay horas adeudadas', async () => {
     const db = {
       query: jest.fn()
         .mockResolvedValueOnce([[{ Docente_Carga_Horaria_Maxima: 32 }]])
-        .mockResolvedValueOnce([[{ bloques: 0, horas: 0 }]])
+        .mockResolvedValueOnce([[{ tramos: 0, horas: 0 }]])
         .mockResolvedValueOnce([[{ horas: 0 }]]),
     };
     const r = await resumenSemanal(db, 5, '2026');
@@ -144,20 +164,34 @@ describe('CU107: disponibilidad laboral semanal del docente', () => {
     expect(advertenciaHorasAdeudadas(r)).toBeNull();
   });
 
-  test('leerDisponibilidad valida días hábiles y bloques, y quita duplicados', () => {
-    expect(leerDisponibilidad({ bloques: [{ dia: 'Lunes', Bloque_Horario_Id: 1 }, { dia: 'Lunes', Bloque_Horario_Id: 1 }] }))
-      .toEqual({ ok: true, periodo: undefined, bloques: [{ dia: 'Lunes', bloqueId: 1 }] });
-    expect(leerDisponibilidad({ bloques: [{ dia: 'Sábado', Bloque_Horario_Id: 1 }] }).ok).toBe(false);
-    expect(leerDisponibilidad({ bloques: [{ dia: 'Lunes', Bloque_Horario_Id: 'x' }] }).ok).toBe(false);
+  test('normalizarTramos valida día, formato, orden, superposición y límites', () => {
+    expect(normalizarTramos([
+      { dia: 'Martes', hora_inicio: '13:00', hora_fin: '17:30' },
+      { dia: 'Lunes', hora_inicio: '07:30', hora_fin: '12:00' },
+    ])).toEqual({ ok: true, tramos: [{ dia: 'Lunes', inicio: 450, fin: 720 }, { dia: 'Martes', inicio: 780, fin: 1050 }] });
+    expect(normalizarTramos([{ dia: 'Sábado', hora_inicio: '08:00', hora_fin: '12:00' }]).ok).toBe(false);
+    expect(normalizarTramos([{ dia: 'Lunes', hora_inicio: '8', hora_fin: '12:00' }]).ok).toBe(false);
+    expect(normalizarTramos([{ dia: 'Lunes', hora_inicio: '12:00', hora_fin: '08:00' }]).ok).toBe(false);
+    expect(normalizarTramos([{ dia: 'Lunes', hora_inicio: '05:00', hora_fin: '08:00' }]).ok).toBe(false);
+    expect(normalizarTramos([
+      { dia: 'Lunes', hora_inicio: '08:00', hora_fin: '12:00' },
+      { dia: 'Lunes', hora_inicio: '11:00', hora_fin: '14:00' },
+    ]).mensaje).toContain('se superponen');
+    expect(normalizarTramos(undefined).ok).toBe(false);
+  });
+
+  test('leerDisponibilidad acepta { periodo, tramos } y una lista vacía quita la restricción', () => {
+    expect(leerDisponibilidad({ periodo: '2027', tramos: [] })).toEqual({ ok: true, periodo: '2027', tramos: [] });
+    expect(leerDisponibilidad({ tramos: [{ dia: 'Lunes', hora_inicio: '08:00', hora_fin: '09:00' }] }).tramos)
+      .toEqual([{ dia: 'Lunes', inicio: 480, fin: 540 }]);
     expect(leerDisponibilidad({}).ok).toBe(false);
-    expect(leerDisponibilidad({ periodo: '2027', bloques: [] })).toEqual({ ok: true, periodo: '2027', bloques: [] });
   });
 
   test('editar la disponibilidad de alguien que no es docente responde 400', async () => {
     pool.query = jest.fn().mockResolvedValueOnce([[{ Es_Administrador: 0, Administrador_Tipo: null, Es_Apoderado: 1, Es_Docente: 0 }]]);
     const req = {
       params: { id: '8' },
-      body: { Docente_Disponibilidad: { bloques: [] } },
+      body: { Docente_Disponibilidad: { tramos: [] } },
       user: { id: 2, roles: ['Administrador'], administradorTipo: 'Administrador Normal' },
     };
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };

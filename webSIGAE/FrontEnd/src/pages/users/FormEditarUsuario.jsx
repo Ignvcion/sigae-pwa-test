@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getEspecialidades, getDisponibilidadDocente } from "../../services/api";
 import EtiquetasInput, { separarEtiquetas } from "../../components/EtiquetasInput";
-import DisponibilidadSemanal from "../../components/DisponibilidadSemanal";
+import DisponibilidadSemanal, { errorTramos } from "../../components/DisponibilidadSemanal";
 import "./FormEditarUsuario.css";
 import {
   validarNombreCompleto, validarCorreoInstitucional, validarCorreo, DOMINIO_INSTITUCIONAL,
@@ -274,11 +274,13 @@ function BloqueDisponibilidad({ datos, onGuardado }) {
     return () => { vigente = false; };
   }, [datos.Usuario_Id, periodoPedido]);
 
+  const errorDeTramos = disp ? errorTramos(disp.tramos, disp.dias) : "";
+
   const onSubmit = (e) => {
     e.preventDefault();
-    if (!disp) return;
+    if (!disp || errorDeTramos) return;
     guardar(
-      { Docente_Disponibilidad: { periodo: disp.periodo, bloques: disp.seleccion } },
+      { Docente_Disponibilidad: { periodo: disp.periodo, tramos: disp.tramos } },
       `Disponibilidad de ${disp.periodo} guardada`
     );
   };
@@ -288,7 +290,8 @@ function BloqueDisponibilidad({ datos, onGuardado }) {
       <h2>Disponibilidad laboral semanal</h2>
       <form className="cambiar-pwd-form" onSubmit={onSubmit}>
         <p className="etiquetas-ayuda">
-          Bloques en que el docente puede trabajar en el colegio. Si no marcas ninguno, no tiene restricción.
+          Tramos de cada día en que el docente está en el colegio, con recreos y horas sin clases
+          (corregir pruebas, reuniones). Sin tramos, no tiene restricción.
         </p>
         {errorCarga && <span className="input-error-msg">{errorCarga}</span>}
         {!disp && !errorCarga && <span className="etiquetas-ayuda">Cargando disponibilidad…</span>}
@@ -296,13 +299,15 @@ function BloqueDisponibilidad({ datos, onGuardado }) {
           <DisponibilidadSemanal
             dias={disp.dias}
             bloques={disp.bloques}
-            seleccion={disp.seleccion}
+            jornada={disp.jornada}
+            limites={disp.limites}
+            tramos={disp.tramos}
             clases={disp.clases}
             cargaSemanal={datos.Docente_Carga_Horaria_Maxima}
             periodo={disp.periodo}
             periodos={disp.periodos}
             onCambiarPeriodo={(p) => { setDisp(null); setErrorCarga(""); setPeriodoPedido(p); }}
-            onChange={(seleccion) => setDisp({ ...disp, seleccion })}
+            onChange={(tramos) => setDisp({ ...disp, tramos })}
           />
         )}
         {disp && <PieBloque estado={estado} texto="Guardar disponibilidad" />}

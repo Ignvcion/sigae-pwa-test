@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { Link, useParams } from "react-router-dom";
 import FormEditarUsuario from "./FormEditarUsuario";
 import { EtiquetasLectura } from "../../components/EtiquetasInput";
+import MiDisponibilidadLaboral from "../../components/MiDisponibilidadLaboral";
 import { apiFetch, getAsignacionesDocente, getEstudiantesAsociados, getDetalleEstudiante, editarPerfilPropio, actualizarFotoPerfil } from "../../services/api";
 import { validarTelefonoChileno, validarDireccion, formatearDireccion, COLUMNAS_DIRECCION_ESTUDIANTE, MENSAJE_TELEFONO } from "../../utils/validaciones";
 
@@ -726,6 +727,9 @@ function Perfil() {
             </form>
           </div>
         )}
+
+        {/* CU107: el docente ve su disponibilidad laboral (la edita solo el administrador) */}
+        {esPerfilPropio && !!datos?.Es_Docente && <MiDisponibilidadLaboral usuarioId={datos.Usuario_Id} />}
 
         {/* Edición por el administrador, en bloques separados (cada uno se guarda por su cuenta) */}
         {puedeEditar && <FormEditarUsuario datos={datos} onGuardado={recargarDatos} />}

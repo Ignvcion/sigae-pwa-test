@@ -147,15 +147,15 @@ describe('Reubicación de clases tras redefinir la jornada o los bloques', () =>
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[{ Curso_Periodo_Lectivo: '2026' }]])
-      .mockResolvedValueOnce([[ // disponible solo el lunes en otro bloque
-        { Docente_Usuario_Id: 3, periodo: '2026', dia: 'Lunes', Bloque_Horario_Id: 11111112 },
-      ]])
-      .mockResolvedValueOnce([[DESTINO_VIGENTE]]); // horas del bloque para el mensaje
+      .mockResolvedValueOnce([[ // el lunes solo está disponible de 10:00 a 13:00; el destino es 08:30–10:00
+        { Docente_Usuario_Id: 3, periodo: '2026', dia: 'Lunes', hora_inicio: '10:00:00', hora_fin: '13:00:00' },
+      ]]);
 
     await conflictos.migrarClase(req, res);
 
     expect(res.status).toHaveBeenCalledWith(422);
     expect(res.json.mock.calls[0][0].error).toContain('disponibilidad laboral de 2026');
+    expect(res.json.mock.calls[0][0].error).toContain('10:00–13:00');
     expect(conn.rollback).toHaveBeenCalled();
     expect(conn.commit).not.toHaveBeenCalled();
   });

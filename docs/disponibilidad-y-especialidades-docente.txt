@@ -6,38 +6,47 @@ Fecha: 2026-11-06
 1. DISPONIBILIDAD LABORAL SEMANAL (CU107; RF04, RF35)
 ======================================================================
 
-1.1 Es un patrón SEMANAL por período lectivo: los días (lunes a viernes) y
-    bloques de clase en que el docente puede trabajar en el colegio. Se
-    repite todas las semanas del período, igual que la carga horaria, que
-    también es semanal (usuario.Docente_Carga_Horaria_Maxima se muestra
-    como "Carga horaria semanal"; la columna conserva su nombre).
+1.1 Es un patrón SEMANAL por período lectivo: por cada día (lunes a viernes),
+    uno o más TRAMOS "desde–hasta" en que el docente está en el colegio
+    (por ejemplo, lunes 08:00–13:00 y 14:00–17:30). Los tramos incluyen
+    recreos y horas sin clases (corregir pruebas, reuniones), no solo los
+    bloques de clase. Se repite todas las semanas del período, igual que la
+    carga horaria, que también es semanal (usuario.Docente_Carga_Horaria_Maxima
+    se muestra como "Carga horaria semanal"; la columna conserva su nombre).
 
-1.2 Solo el administrador la ve y la edita, y la carga horaria semanal
-    también. Se configura en el formulario de registro de docente y en
-    "Editar datos" del perfil del docente. El docente no la ve ni la edita.
+1.2 Las clases se siguen asignando por bloques de 45 minutos: un bloque está
+    disponible si cae COMPLETO dentro de un tramo (los tramos contiguos se
+    unen). La "Vista por bloques de clase" muestra qué bloques quedan
+    cubiertos, y un clic en un bloque libre lo suma a los tramos.
 
-1.3 Un docente sin bloques registrados en un período NO tiene restricción:
+1.3 Reglas de los tramos: entre 06:00 y 23:00, de al menos 15 minutos, sin
+    superponerse en el mismo día y hasta 6 por día.
+
+1.4 Solo el administrador la edita, y la carga horaria semanal también. Se
+    configura al registrar un docente y en el bloque "Disponibilidad laboral
+    semanal" de su perfil. El docente la ve (solo lectura) en "Mi
+    disponibilidad laboral" de su propio perfil.
+
+1.5 Un docente sin tramos registrados en un período NO tiene restricción:
     puede asignarse en cualquier bloque. Así siguen funcionando los
     horarios ya armados y los docentes registrados antes de este cambio.
 
-1.4 Asignar una clase fuera de la disponibilidad se BLOQUEA (crear o editar
-    una clase, edición masiva CU63/CU64, migrar clases CU81). El bloqueo se
-    levanta editando la disponibilidad del docente. Solo se valida cuando
-    cambia el docente, el día, el bloque o el curso de la clase.
+1.6 Asignar una clase fuera de la disponibilidad se BLOQUEA (crear o editar
+    una clase, edición masiva CU63/CU64, migrar clases CU81); el mensaje dice
+    qué tramos tiene libres ese día. El bloqueo se levanta editando la
+    disponibilidad. Solo se valida cuando cambia el docente, el día, el
+    bloque o el curso de la clase.
 
-1.5 Horas adeudadas = carga horaria semanal − horas disponibles a la
-    semana. Solo ADVIERTE (al guardar la disponibilidad y al asignar
-    clases); no impide armar el horario.
+1.7 Horas disponibles = suma de los tramos de la semana (con recreos y horas
+    sin clases). Horas adeudadas = carga horaria semanal − horas disponibles.
+    Solo ADVIERTE; no impide armar el horario.
 
-1.6 Si al editar la disponibilidad una clase ya asignada queda en un bloque
-    no disponible, la clase se mantiene y se informa con advertencia.
+1.8 Si al editar la disponibilidad una clase ya asignada queda fuera de los
+    tramos, la clase se mantiene y se informa con advertencia.
 
-1.7 Al iniciar un nuevo período se borra la disponibilidad de los períodos
+1.9 Al iniciar un nuevo período se borra la disponibilidad de los períodos
     anteriores al nuevo vigente. Durante el cierre se puede registrar la
-    del período siguiente (selector de período en el perfil del docente).
-
-1.8 Si se redefinen los bloques horarios, la disponibilidad apunta a los
-    bloques antiguos: hay que volver a marcarla con los bloques nuevos.
+    del período siguiente (selector de período).
 
 ======================================================================
 2. ESPECIALIDADES COMO ETIQUETAS (RF04)
@@ -64,8 +73,8 @@ Fecha: 2026-11-06
 3. ESQUEMA (SIGAE.sql y schema_base.sql regenerado)
 ======================================================================
 
-  - disponibilidad_docente (docente, período, día, bloque), con CASCADE
-    al borrar el docente o el bloque.
+  - disponibilidad_docente (docente, período, día, hora de inicio y de
+    término del tramo), con CASCADE al borrar el docente.
   - especialidad (catálogo) y docente_especialidad (docente ↔ etiqueta).
   - usuario.Docente_Especialidad pasa de varchar(100) a varchar(255).
 
@@ -95,15 +104,13 @@ Fecha: 2026-11-06
       Disponibilidad_Docente_Id int unsigned NOT NULL AUTO_INCREMENT,
       Disponibilidad_Docente_Periodo_Lectivo varchar(10) NOT NULL,
       Disponibilidad_Docente_Dia_Semana varchar(20) NOT NULL,
-      Bloque_Horario_Id int unsigned NOT NULL,
+      Disponibilidad_Docente_Hora_Inicio time NOT NULL,
+      Disponibilidad_Docente_Hora_Fin time NOT NULL,
       Docente_Usuario_Id int unsigned NOT NULL,
       PRIMARY KEY (Disponibilidad_Docente_Id),
       UNIQUE KEY Disponibilidad_Docente_UNIQUE (Docente_Usuario_Id, Disponibilidad_Docente_Periodo_Lectivo,
-        Disponibilidad_Docente_Dia_Semana, Bloque_Horario_Id),
-      KEY fk_Disponibilidad_Docente_Bloque_Horario_idx (Bloque_Horario_Id),
+        Disponibilidad_Docente_Dia_Semana, Disponibilidad_Docente_Hora_Inicio),
       KEY Disponibilidad_Docente_Periodo_idx (Disponibilidad_Docente_Periodo_Lectivo),
-      CONSTRAINT fk_Disponibilidad_Docente_Bloque_Horario FOREIGN KEY (Bloque_Horario_Id)
-        REFERENCES bloque_horario (Bloque_Horario_Id) ON DELETE CASCADE ON UPDATE CASCADE,
       CONSTRAINT fk_Disponibilidad_Docente_Usuario FOREIGN KEY (Docente_Usuario_Id)
         REFERENCES usuario (Usuario_Id) ON DELETE CASCADE ON UPDATE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -122,16 +129,17 @@ Fecha: 2026-11-06
 ======================================================================
 
   - Reglas: BackEnd/utils/disponibilidadLaboral.js, utils/especialidades.js.
-  - API (solo administrador):
+  - API (administrador, salvo donde se indica):
       GET /api/especialidades
       GET /api/usuarios/disponibilidad/opciones
-      GET /api/usuarios/:id/disponibilidad?periodo=
+      GET /api/usuarios/:id/disponibilidad?periodo=  (también el propio docente)
       POST /api/usuarios y PUT /api/usuarios/:id reciben
         Docente_Especialidades: ["Matemáticas", ...] y
-        Docente_Disponibilidad: { periodo?, bloques: [{ dia, Bloque_Horario_Id }] }
+        Docente_Disponibilidad: { periodo?, tramos: [{ dia, hora_inicio: "08:00", hora_fin: "13:00" }] }
   - Validación al asignar: horarioController (crear, editar, edición
     masiva, docentes-disponibles) y conflictosHorarioController (migrar).
   - Pantallas: Registrar docente, Editar datos (perfil del docente),
+    Mi disponibilidad laboral (perfil propio del docente, solo lectura),
     Gestión de roles (etiquetas), Docentes (filtro por etiqueta),
     creador de horarios (motivo "fuera de su disponibilidad laboral" y
     aviso de horas adeudadas).

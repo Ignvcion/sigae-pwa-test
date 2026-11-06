@@ -388,7 +388,7 @@ const createUsuario = async (req, res) => {
         ]
       );
       if (especialidades) await guardarEspecialidadesDocente(conn, resultado.insertId, especialidades);
-      if (disponibilidad && disponibilidad.bloques.length > 0) {
+      if (disponibilidad && disponibilidad.tramos.length > 0) {
         guardadoDisponibilidad = await guardarDisponibilidadDocente(conn, {
           docenteId: resultado.insertId, disponibilidad, responsableId: req.user.id,
         });

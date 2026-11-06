@@ -56,9 +56,9 @@ router.put('/:id/estado', verifyToken, verifyAdmin, usuarioController.toggleEsta
 router.delete('/:id',    verifyToken, verifyAdmin, usuarioController.deleteUsuario);
 
 // Asignar un nuevo rol a usuario existente (Admin puede asignar Docente/Apoderado; solo SuperAdmin puede asignar Admin)
-// CU107: disponibilidad laboral semanal del docente. Solo el administrador la ve y la edita;
-// se guarda al registrar o editar al docente (POST / y PUT /:id, campo Docente_Disponibilidad).
-router.get('/:id/disponibilidad', verifyToken, verifyAdmin, disponibilidadLaboral.getDisponibilidad);
+// CU107: disponibilidad laboral semanal del docente. Solo el administrador la edita (POST / y
+// PUT /:id, campo Docente_Disponibilidad); la consultan el administrador y el propio docente.
+router.get('/:id/disponibilidad', verifyToken, disponibilidadLaboral.getDisponibilidad);
 
 router.post('/:id/asignar-rol', verifyToken, verifyAdmin, usuarioController.asignarRol);
 

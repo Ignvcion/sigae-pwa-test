@@ -234,7 +234,7 @@ const migrarClase = async (req, res) => {
       // Si los bloques se redefinieron, hay que actualizar también su disponibilidad.
       const fueraDisponibilidad = await validarDisponibilidad(conn, {
         docenteId: clase.Usuario_Id, periodo: await periodoDelCurso(conn, clase.Curso_Id),
-        dia: clase.Dia, bloqueId: destinoId,
+        dia: clase.Dia, horaInicio: destino.Bloque_Horario_Hora_Inicio, horaFin: destino.Bloque_Horario_Hora_Fin,
       });
       if (fueraDisponibilidad) {
         await conn.rollback();

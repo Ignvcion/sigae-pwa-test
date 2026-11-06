@@ -229,10 +229,10 @@ const getDocentesDisponibles = async (req, res) => {
 
     if (docentes.length === 0) return res.json([]);
 
-    // Duración del bloque nuevo (en horas)
+    // Duración y horario del bloque nuevo (en horas)
     const [bloqueInfo] = await pool.execute(
       `SELECT TIME_TO_SEC(TIMEDIFF(Bloque_Horario_Hora_Fin, Bloque_Horario_Hora_Inicio)) / 3600
-         AS duracion_horas
+         AS duracion_horas, Bloque_Horario_Hora_Inicio, Bloque_Horario_Hora_Fin
        FROM bloque_horario WHERE Bloque_Horario_Id = ?`,
       [bloque_id]
     );
@@ -278,16 +278,14 @@ const getDocentesDisponibles = async (req, res) => {
     const [cargas] = await pool.execute(cargaQuery, cargaParams);
     const cargaMap = Object.fromEntries(cargas.map(c => [c.Usuario_Id, Number(c.horas_actuales)]));
 
-    // CU107: disponibilidad laboral semanal (horas disponibles por docente en el período)
+    // CU107: disponibilidad laboral semanal (tramos y horas disponibles por docente en el período)
     const mapaDisp = await mapaDisponibilidad(pool, userIds, [periodo]);
     const [horasDisp] = await pool.query(
-      `SELECT dd.Docente_Usuario_Id,
-              SUM(TIME_TO_SEC(TIMEDIFF(bh.Bloque_Horario_Hora_Fin, bh.Bloque_Horario_Hora_Inicio)) / 3600) AS horas
-       FROM disponibilidad_docente dd
-       JOIN bloque_horario bh ON bh.Bloque_Horario_Id = dd.Bloque_Horario_Id
-       WHERE dd.Docente_Usuario_Id IN (?) AND dd.Disponibilidad_Docente_Periodo_Lectivo = ?
-         AND bh.Bloque_Horario_Tipo = 'Clase' AND NOT ${condicionDesajustado('bh')}
-       GROUP BY dd.Docente_Usuario_Id`,
+      `SELECT Docente_Usuario_Id,
+              SUM(TIME_TO_SEC(TIMEDIFF(Disponibilidad_Docente_Hora_Fin, Disponibilidad_Docente_Hora_Inicio))) / 3600 AS horas
+       FROM disponibilidad_docente
+       WHERE Docente_Usuario_Id IN (?) AND Disponibilidad_Docente_Periodo_Lectivo = ?
+       GROUP BY Docente_Usuario_Id`,
       [userIds, periodo]
     );
     const horasDispMap = Object.fromEntries(horasDisp.map(h => [h.Docente_Usuario_Id, Math.round(Number(h.horas) * 100) / 100]));
@@ -297,7 +295,10 @@ const getDocentesDisponibles = async (req, res) => {
       const cargaMaxima   = d.Docente_Carga_Horaria_Maxima ?? null;
       const conflicto     = conflictoSet.has(d.Usuario_Id);
       const excedeCarga   = cargaMaxima !== null && (cargaActual + duracionNueva) > cargaMaxima;
-      const fueraDisp     = !estaDisponible(mapaDisp, { docenteId: d.Usuario_Id, periodo, dia, bloqueId: bloque_id });
+      const fueraDisp     = bloqueInfo.length > 0 && !estaDisponible(mapaDisp, {
+        docenteId: d.Usuario_Id, periodo, dia,
+        horaInicio: bloqueInfo[0].Bloque_Horario_Hora_Inicio, horaFin: bloqueInfo[0].Bloque_Horario_Hora_Fin,
+      });
       const horasDisponibles = horasDispMap[d.Usuario_Id] ?? null;
       const horasAdeudadas = horasDisponibles !== null && cargaMaxima !== null
         ? Math.max(0, Math.round((cargaMaxima - horasDisponibles) * 100) / 100)
@@ -1904,7 +1905,9 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
     const avisados = new Set();
     for (const p of propuestas) {
       if (!p.Usuario_Id) continue;
-      if (estaDisponible(mapa, { docenteId: p.Usuario_Id, periodo: p.periodo, dia: p.dia, bloqueId: p.Bloque_Horario_Id })) continue;
+      if (estaDisponible(mapa, {
+        docenteId: p.Usuario_Id, periodo: p.periodo, dia: p.dia, horaInicio: p.hora_inicio, horaFin: p.hora_fin,
+      })) continue;
       const clave = `${p.Usuario_Id}|${p.dia}|${p.Bloque_Horario_Id}`;
       if (avisados.has(clave)) continue;
       avisados.add(clave);

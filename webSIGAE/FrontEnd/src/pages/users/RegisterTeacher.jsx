@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { registrarDocente, getEspecialidades, getOpcionesDisponibilidad } from "../../services/api";
 import EtiquetasInput from "../../components/EtiquetasInput";
-import DisponibilidadSemanal from "../../components/DisponibilidadSemanal";
+import DisponibilidadSemanal, { errorTramos } from "../../components/DisponibilidadSemanal";
 import {
   validarRut, normalizarRut, validarNombreCompleto, validarCorreoInstitucional, DOMINIO_INSTITUCIONAL,
   validarTelefonoChileno, validarFortalezaContrasena, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
@@ -97,6 +97,7 @@ function RegisterTeacher() {
       password: validarCampo("password", formData.password),
       cargaHoraria: validarCampo("cargaHoraria", formData.cargaHoraria),
       especialidades: validarCampo("especialidades", formData.especialidades),
+      disponibilidad: opcionesDisp ? errorTramos(formData.disponibilidad, opcionesDisp.dias || []) : "",
       ...validarDireccion(formData),
     };
 
@@ -310,16 +311,22 @@ function RegisterTeacher() {
           <div className="campo-pwd">
             <label>Disponibilidad laboral semanal</label>
             <span className="etiquetas-ayuda">
-              Marca los bloques en que el docente puede trabajar en el colegio. Déjala vacía si no tiene restricción.
+              Tramos de cada día en que el docente está en el colegio, con recreos y horas sin clases.
+              Déjala vacía si no tiene restricción.
             </span>
             {opcionesDisp ? (
               <DisponibilidadSemanal
                 dias={opcionesDisp.dias}
                 bloques={opcionesDisp.bloques}
+                jornada={opcionesDisp.jornada}
+                limites={opcionesDisp.limites}
                 periodo={opcionesDisp.periodos?.vigente}
-                seleccion={formData.disponibilidad}
+                tramos={formData.disponibilidad}
                 cargaSemanal={formData.cargaHoraria}
-                onChange={(disponibilidad) => setFormData({ ...formData, disponibilidad })}
+                onChange={(disponibilidad) => {
+                  setFormData({ ...formData, disponibilidad });
+                  setErrores({ ...errores, disponibilidad: "" });
+                }}
               />
             ) : (
               <span className="etiquetas-ayuda">Cargando bloques horarios…</span>

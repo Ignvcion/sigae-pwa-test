@@ -245,8 +245,9 @@ UNLOCK TABLES;
 --
 -- Table structure for table `disponibilidad_docente`
 -- Incremento 4, CU107 (RF04, RF35): disponibilidad laboral del docente. Patrón semanal
--- por período: cada fila es un día y bloque en que el docente puede trabajar en el colegio.
--- Un docente sin filas en un período no tiene restricción de disponibilidad.
+-- por período: cada fila es un tramo horario (desde-hasta) de un día en que el docente
+-- trabaja en el colegio, con recreos y horas sin clases incluidos. Un bloque de clase
+-- está disponible si cae completo dentro de un tramo. Sin filas en un período: sin restricción.
 --
 
 DROP TABLE IF EXISTS `disponibilidad_docente`;
@@ -256,15 +257,14 @@ CREATE TABLE `disponibilidad_docente` (
   `Disponibilidad_Docente_Id` int unsigned NOT NULL AUTO_INCREMENT,
   `Disponibilidad_Docente_Periodo_Lectivo` varchar(10) NOT NULL,
   `Disponibilidad_Docente_Dia_Semana` varchar(20) NOT NULL,
-  `Bloque_Horario_Id` int unsigned NOT NULL,
+  `Disponibilidad_Docente_Hora_Inicio` time NOT NULL,
+  `Disponibilidad_Docente_Hora_Fin` time NOT NULL,
   `Docente_Usuario_Id` int unsigned NOT NULL,
   PRIMARY KEY (`Disponibilidad_Docente_Id`),
-  UNIQUE KEY `Disponibilidad_Docente_UNIQUE` (`Docente_Usuario_Id`,`Disponibilidad_Docente_Periodo_Lectivo`,`Disponibilidad_Docente_Dia_Semana`,`Bloque_Horario_Id`),
-  KEY `fk_Disponibilidad_Docente_Bloque_Horario_idx` (`Bloque_Horario_Id`),
+  UNIQUE KEY `Disponibilidad_Docente_UNIQUE` (`Docente_Usuario_Id`,`Disponibilidad_Docente_Periodo_Lectivo`,`Disponibilidad_Docente_Dia_Semana`,`Disponibilidad_Docente_Hora_Inicio`),
   KEY `Disponibilidad_Docente_Periodo_idx` (`Disponibilidad_Docente_Periodo_Lectivo`),
-  CONSTRAINT `fk_Disponibilidad_Docente_Bloque_Horario` FOREIGN KEY (`Bloque_Horario_Id`) REFERENCES `bloque_horario` (`Bloque_Horario_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_Disponibilidad_Docente_Usuario` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -273,7 +273,7 @@ CREATE TABLE `disponibilidad_docente` (
 
 LOCK TABLES `disponibilidad_docente` WRITE;
 /*!40000 ALTER TABLE `disponibilidad_docente` DISABLE KEYS */;
-INSERT INTO `disponibilidad_docente` VALUES (1,'2026','Lunes',11111111,5),(2,'2026','Lunes',11111112,5),(3,'2026','Lunes',11111113,5),(4,'2026','Martes',11111111,5),(5,'2026','Martes',11111112,5),(6,'2026','Martes',11111113,5),(7,'2026','Miércoles',11111111,5),(8,'2026','Miércoles',11111112,5),(9,'2026','Miércoles',11111113,5),(10,'2026','Jueves',11111111,5),(11,'2026','Jueves',11111112,5),(12,'2026','Jueves',11111113,5);
+INSERT INTO `disponibilidad_docente` VALUES (1,'2026','Lunes','09:00:00','12:00:00',5),(2,'2026','Martes','09:00:00','12:00:00',5),(3,'2026','Miércoles','09:00:00','12:00:00',5),(4,'2026','Jueves','09:00:00','12:00:00',5);
 /*!40000 ALTER TABLE `disponibilidad_docente` ENABLE KEYS */;
 UNLOCK TABLES;
 
