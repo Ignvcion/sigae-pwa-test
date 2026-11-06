@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import FormEditarUsuario from "./FormEditarUsuario";
 import { EtiquetasLectura } from "../../components/EtiquetasInput";
 import MiDisponibilidadLaboral from "../../components/MiDisponibilidadLaboral";
+import HorarioAtencionSemanal from "../../components/HorarioAtencionSemanal";
 import { apiFetch, getAsignacionesDocente, getEstudiantesAsociados, getDetalleEstudiante, editarPerfilPropio, actualizarFotoPerfil } from "../../services/api";
 import { validarTelefonoChileno, validarDireccion, formatearDireccion, COLUMNAS_DIRECCION_ESTUDIANTE, MENSAJE_TELEFONO } from "../../utils/validaciones";
 
@@ -380,7 +381,7 @@ function Perfil() {
     <div className="perfil-container perfil-container--amplio">
       <div className="perfil-header">
         <h1>{esPerfilPropio ? "Mi Perfil" : `Perfil de ${datos?.Usuario_Nombre_Completo || "Usuario"}`}</h1>
-        <p>{esPerfilPropio ? "Información de tu cuenta en SIGAE" : "Vista de perfil (solo lectura)"}</p>
+        {esPerfilPropio && <p>Información de tu cuenta en SIGAE</p>}
       </div>
 
       {/* Grilla en bloques: la identidad ocupa todo el ancho (sus datos en a lo más
@@ -405,7 +406,31 @@ function Perfil() {
               </div>
             </div>
           </div>
-          <h2>Información Personal</h2>
+          <div className="perfil-card-titulo">
+            <h2>Información Personal</h2>
+            {/* CU19: el propio usuario edita su perfil; el administrador va a "Editar datos" */}
+            {esPerfilPropio && !editandoPerfil && (
+              <button
+                type="button"
+                className="btn-roles"
+                onClick={() => {
+                  abrirEdicionPerfil();
+                  requestAnimationFrame(() => document.getElementById("editar-perfil-propio")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+                }}
+              >
+                Editar perfil
+              </button>
+            )}
+            {puedeEditar && (
+              <button
+                type="button"
+                className="btn-roles"
+                onClick={() => document.getElementById("editar-seccion-titulo")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              >
+                Editar datos
+              </button>
+            )}
+          </div>
           <div className="perfil-grid perfil-grid--fluida">
             <div className="perfil-campo">
               <label>RUT</label>
@@ -612,72 +637,69 @@ function Perfil() {
           </div>
         )}
 
-        {/* CU19: editar datos personales del propio perfil (correo, teléfono y/o dirección) */}
-        {esPerfilPropio && (
-          <div className="perfil-card">
+        {/* CU19: editar datos personales del propio perfil (correo, teléfono y/o dirección);
+            se abre con el botón junto a "Información Personal" */}
+        {esPerfilPropio && editandoPerfil && (
+          <div className="perfil-card" id="editar-perfil-propio">
             <h2>Editar Perfil</h2>
-            {!editandoPerfil ? (
-              <button className="btn-roles" onClick={abrirEdicionPerfil}>Editar perfil</button>
-            ) : (
-              <form className="cambiar-pwd-form" onSubmit={handleGuardarPerfil}>
+            <form className="cambiar-pwd-form" onSubmit={handleGuardarPerfil}>
+              <div className="campo-pwd">
+                <label>Nombre Completo</label>
+                <input value={datos?.Usuario_Nombre_Completo || ""} readOnly disabled />
+              </div>
+              <div className="campo-pwd">
+                <label>RUT</label>
+                <input value={datos?.Usuario_RUT || ""} readOnly disabled />
+              </div>
+              {!!(datos?.Es_Administrador || datos?.Es_Docente || datos?.Es_Apoderado) && (
                 <div className="campo-pwd">
-                  <label>Nombre Completo</label>
-                  <input value={datos?.Usuario_Nombre_Completo || ""} readOnly disabled />
-                </div>
-                <div className="campo-pwd">
-                  <label>RUT</label>
-                  <input value={datos?.Usuario_RUT || ""} readOnly disabled />
-                </div>
-                {!!(datos?.Es_Administrador || datos?.Es_Docente || datos?.Es_Apoderado) && (
-                  <div className="campo-pwd">
-                    <label htmlFor="correoPerfil">Correo</label>
-                    <input
-                      id="correoPerfil"
-                      value={formPerfil.correo}
-                      onChange={(e) => setFormPerfil((f) => ({ ...f, correo: e.target.value }))}
-                    />
-                  </div>
-                )}
-                <div className="campo-pwd">
-                  <label htmlFor="telefonoPerfil">Teléfono</label>
+                  <label htmlFor="correoPerfil">Correo</label>
                   <input
-                    id="telefonoPerfil"
-                    type="tel"
-                    placeholder="912345678 o +56912345678"
-                    value={formPerfil.telefono}
-                    onChange={(e) => setFormPerfil((f) => ({ ...f, telefono: e.target.value }))}
+                    id="correoPerfil"
+                    value={formPerfil.correo}
+                    onChange={(e) => setFormPerfil((f) => ({ ...f, correo: e.target.value }))}
                   />
                 </div>
-                {[
-                  { name: "calle",  label: "Calle",                  maxLength: 100 },
-                  { name: "numero", label: "Número",                 maxLength: 7 },
-                  { name: "depto",  label: "Depto./Casa (opcional)", maxLength: 20 },
-                  { name: "comuna", label: "Comuna",                 maxLength: 60 },
-                ].map((campo) => (
-                  <div className="campo-pwd" key={campo.name}>
-                    <label htmlFor={`${campo.name}Perfil`}>{campo.label}</label>
-                    <input
-                      id={`${campo.name}Perfil`}
-                      maxLength={campo.maxLength}
-                      value={formPerfil[campo.name]}
-                      onChange={(e) => setFormPerfil((f) => ({ ...f, [campo.name]: e.target.value }))}
-                    />
-                  </div>
-                ))}
-
-                {msgExitoPerfil && <div className="msg-exito">{msgExitoPerfil}</div>}
-                {msgErrorPerfil && <div className="msg-error-form">{msgErrorPerfil}</div>}
-
-                <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                  <button type="submit" className="btn-primario" disabled={guardandoPerfil}>
-                    {guardandoPerfil ? "Guardando..." : "Guardar cambios"}
-                  </button>
-                  <button type="button" className="btn-desactivar" onClick={cancelarEdicionPerfil} disabled={guardandoPerfil}>
-                    Cancelar
-                  </button>
+              )}
+              <div className="campo-pwd">
+                <label htmlFor="telefonoPerfil">Teléfono</label>
+                <input
+                  id="telefonoPerfil"
+                  type="tel"
+                  placeholder="912345678 o +56912345678"
+                  value={formPerfil.telefono}
+                  onChange={(e) => setFormPerfil((f) => ({ ...f, telefono: e.target.value }))}
+                />
+              </div>
+              {[
+                { name: "calle",  label: "Calle",                  maxLength: 100 },
+                { name: "numero", label: "Número",                 maxLength: 7 },
+                { name: "depto",  label: "Depto./Casa (opcional)", maxLength: 20 },
+                { name: "comuna", label: "Comuna",                 maxLength: 60 },
+              ].map((campo) => (
+                <div className="campo-pwd" key={campo.name}>
+                  <label htmlFor={`${campo.name}Perfil`}>{campo.label}</label>
+                  <input
+                    id={`${campo.name}Perfil`}
+                    maxLength={campo.maxLength}
+                    value={formPerfil[campo.name]}
+                    onChange={(e) => setFormPerfil((f) => ({ ...f, [campo.name]: e.target.value }))}
+                  />
                 </div>
-              </form>
-            )}
+              ))}
+
+              {msgExitoPerfil && <div className="msg-exito">{msgExitoPerfil}</div>}
+              {msgErrorPerfil && <div className="msg-error-form">{msgErrorPerfil}</div>}
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                <button type="submit" className="btn-primario" disabled={guardandoPerfil}>
+                  {guardandoPerfil ? "Guardando..." : "Guardar cambios"}
+                </button>
+                <button type="button" className="btn-desactivar" onClick={cancelarEdicionPerfil} disabled={guardandoPerfil}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
           </div>
         )}
 
@@ -730,6 +752,17 @@ function Perfil() {
 
         {/* CU107: el docente ve su disponibilidad laboral (la edita solo el administrador) */}
         {esPerfilPropio && !!datos?.Es_Docente && <MiDisponibilidadLaboral usuarioId={datos.Usuario_Id} />}
+
+        {/* RF55 / CU87, CU88: el docente configura su horario de atención de apoderados */}
+        {esPerfilPropio && !!datos?.Es_Docente && (
+          <div className="perfil-card perfil-card--ancha">
+            <h2>Mi horario de atención de apoderados</h2>
+            <p className="etiquetas-ayuda" style={{ marginBottom: 12 }}>
+              Tramos en que atiendes apoderados. Ellos solicitan citaciones de 30 minutos dentro de estos tramos.
+            </p>
+            <HorarioAtencionSemanal />
+          </div>
+        )}
 
         {/* Edición por el administrador, en bloques separados (cada uno se guarda por su cuenta) */}
         {puedeEditar && <FormEditarUsuario datos={datos} onGuardado={recargarDatos} />}

@@ -1440,6 +1440,24 @@ select {
   border-bottom: 1px solid #e2e8f0;
 }
 
+/* Título de tarjeta con una acción a la derecha (p. ej. "Editar perfil") */
+.perfil-card-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.perfil-card .perfil-card-titulo h2 {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
 .perfil-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2586,4 +2604,23 @@ body.bloques-panel-open .main-content {
 /* Selector de archivo dentro de tarjetas: no debe salirse en pantallas angostas */
 .form-card input[type="file"] {
   max-width: 100%;
+}
+
+/* CU89: horario de atención semanal del docente en la solicitud de citación */
+.sol-horario-atencion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  padding: 10px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  font-size: 0.85rem;
+  color: #1e3a8a;
+}
+
+.sol-horario-atencion-titulo {
+  font-weight: 700;
+  margin-right: 4px;
 }

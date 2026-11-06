@@ -303,6 +303,7 @@ function BloqueDisponibilidad({ datos, onGuardado }) {
             limites={disp.limites}
             tramos={disp.tramos}
             clases={disp.clases}
+            atencion={disp.atencion}
             cargaSemanal={datos.Docente_Carga_Horaria_Maxima}
             periodo={disp.periodo}
             periodos={disp.periodos}

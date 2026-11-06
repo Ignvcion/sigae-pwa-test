@@ -269,3 +269,75 @@
   font-size: 0.78rem;
   color: #64748b;
 }
+
+/* Horario de atención de apoderados (RF55) y estados extra de la vista por bloques */
+.disp-semanal .disp-tramo--atencion {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.disp-semanal .disp-tramo--atencion input[type="time"] {
+  border-color: #bfdbfe;
+  color: #1e3a8a;
+}
+
+.disp-semanal .disp-tramo--atencion button.disp-quitar {
+  color: #1e40af;
+}
+
+.disp-semanal .disp-celda--atencion {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+.disp-semanal .disp-celda--clase {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #334155;
+  font-weight: 600;
+}
+
+.disp-semanal .disp-celda--bloqueada {
+  background: repeating-linear-gradient(45deg, #f8fafc, #f8fafc 4px, #eef2f7 4px, #eef2f7 8px);
+  border-color: #e2e8f0;
+}
+
+.disp-semanal .disp-celda--parcial {
+  background: linear-gradient(90deg, #dbeafe 50%, #f8fafc 50%);
+}
+
+.disp-semanal .disp-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 6px 0;
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.disp-semanal .disp-leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.disp-semanal .disp-muestra {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+}
+
+.disp-semanal .disp-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.disp-semanal .msg-error-form ul {
+  margin: 6px 0 0 18px;
+}

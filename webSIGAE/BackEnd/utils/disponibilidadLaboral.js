@@ -57,11 +57,19 @@ const cabeEnTramos = (tramos, inicio, fin) => tramos.some((t) => t.inicio <= ini
 /**
  * Valida y normaliza los tramos que envía el cliente:
  * [{ dia: 'Lunes', hora_inicio: '08:00', hora_fin: '13:00' }, ...]
+ * Las opciones permiten reutilizarla en el horario de atención de apoderados (RF55),
+ * que usa otros límites.
  * @returns {{ ok: true, tramos: {dia, inicio, fin}[] } | { ok: false, mensaje: string }}
  */
-function normalizarTramos(lista) {
+function normalizarTramos(lista, {
+  minimo = HORA_MINIMA,
+  maximo = HORA_MAXIMA,
+  minDuracion = MIN_DURACION_TRAMO,
+  maxPorDia = MAX_TRAMOS_POR_DIA,
+  nombre = 'La disponibilidad laboral',
+} = {}) {
   if (!Array.isArray(lista)) {
-    return { ok: false, mensaje: 'La disponibilidad laboral debe indicar sus tramos como una lista (vacía para quitar la restricción)' };
+    return { ok: false, mensaje: `${nombre} debe indicar sus tramos como una lista (vacía para quitar todos los tramos)` };
   }
   const porDia = new Map();
   for (const t of lista) {
@@ -74,11 +82,11 @@ function normalizarTramos(lista) {
     if (Number.isNaN(inicio) || Number.isNaN(fin)) {
       return { ok: false, mensaje: `El ${dia} tiene un tramo con una hora no válida (formato HH:MM)` };
     }
-    if (fin - inicio < MIN_DURACION_TRAMO) {
-      return { ok: false, mensaje: `El ${dia} tiene un tramo cuya hora de término no es al menos ${MIN_DURACION_TRAMO} minutos posterior a la de inicio` };
+    if (fin - inicio < minDuracion) {
+      return { ok: false, mensaje: `El ${dia} tiene un tramo cuya hora de término no es al menos ${minDuracion} minutos posterior a la de inicio` };
     }
-    if (inicio < HORA_MINIMA || fin > HORA_MAXIMA) {
-      return { ok: false, mensaje: `Los tramos deben estar entre las ${aHora(HORA_MINIMA)} y las ${aHora(HORA_MAXIMA)}` };
+    if (inicio < minimo || fin > maximo) {
+      return { ok: false, mensaje: `Los tramos deben estar entre las ${aHora(minimo)} y las ${aHora(maximo)}` };
     }
     if (!porDia.has(dia)) porDia.set(dia, []);
     porDia.get(dia).push({ dia, inicio, fin });
@@ -86,8 +94,8 @@ function normalizarTramos(lista) {
   const tramos = [];
   for (const dia of DIAS_SEMANA) {
     const delDia = (porDia.get(dia) || []).sort((a, b) => a.inicio - b.inicio);
-    if (delDia.length > MAX_TRAMOS_POR_DIA) {
-      return { ok: false, mensaje: `El ${dia} puede tener como máximo ${MAX_TRAMOS_POR_DIA} tramos` };
+    if (delDia.length > maxPorDia) {
+      return { ok: false, mensaje: `El ${dia} puede tener como máximo ${maxPorDia} tramos` };
     }
     for (let i = 1; i < delDia.length; i += 1) {
       if (delDia[i].inicio < delDia[i - 1].fin) {

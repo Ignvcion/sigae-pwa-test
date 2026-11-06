@@ -33,6 +33,7 @@ function MiDisponibilidadLaboral({ usuarioId }) {
           bloques={disp.bloques}
           tramos={disp.tramos}
           clases={disp.clases}
+          atencion={disp.atencion}
           cargaSemanal={disp.docente?.Docente_Carga_Horaria_Maxima}
           periodo={disp.periodo}
           periodos={disp.periodos}

@@ -695,36 +695,23 @@ export async function getMiHorarioAtencion() {
   return handleResponse(res);
 }
 
-// CU87: registrar bloque { dia, horaInicio, horaFin }
-export async function crearBloqueAtencion(bloque) {
-  const res = await fetch(`${BASE_URL}/horario-atencion`, {
-    method : 'POST',
+// CU87 / CU88: semana completa de atención (tramos por día + vista por bloques)
+export async function getSemanaAtencion() {
+  const res = await fetch(`${BASE_URL}/horario-atencion/semana`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// Reemplaza la semana; si hay citaciones a futuro afectadas responde 409 con requiereConfirmacion
+export async function guardarSemanaAtencion(tramos, confirmar = false) {
+  const res = await fetch(`${BASE_URL}/horario-atencion/semana`, {
+    method : 'PUT',
     headers: authHeaders(),
-    body   : JSON.stringify(bloque),
+    body   : JSON.stringify({ tramos, confirmar }),
   });
   return handleResponse(res);
 }
 
 // CU88: modificar bloque. Si tiene citaciones a futuro el backend responde 409 con
-// requiereConfirmacion; se reintenta con confirmar = true.
-export async function actualizarBloqueAtencion(id, bloque, confirmar = false) {
-  const res = await fetch(`${BASE_URL}/horario-atencion/${id}`, {
-    method : 'PUT',
-    headers: authHeaders(),
-    body   : JSON.stringify({ ...bloque, confirmar }),
-  });
-  return handleResponse(res);
-}
-
-// CU88: eliminar bloque (misma confirmación que al modificar)
-export async function eliminarBloqueAtencion(id, confirmar = false) {
-  const res = await fetch(`${BASE_URL}/horario-atencion/${id}${confirmar ? '?confirmar=true' : ''}`, {
-    method : 'DELETE',
-    headers: authHeaders(),
-  });
-  return handleResponse(res);
-}
-
 // ── SOLICITUD DE CITACIÓN DEL APODERADO (RF56 / CU89) ────────
 
 // Estudiantes del apoderado (como titular o suplente)

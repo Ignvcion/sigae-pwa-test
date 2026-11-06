@@ -1,54 +1,17 @@
 import "./DisponibilidadSemanal.css";
+import EditorTramos from "./tramos/EditorTramos";
+import VistaBloques from "./tramos/VistaBloques";
+import { cubre, errorTramos, horasDelDia, redondear, sumarIntervalo, tramosUnidos } from "./tramos/tramos";
+
+export { errorTramos };
 
 // CU107: disponibilidad laboral semanal del docente, en tramos "desde–hasta" por día.
 // Los tramos incluyen recreos y horas sin clases (corregir pruebas, reuniones).
 // Debajo, la vista por bloques de 45 minutos muestra qué bloques de clase quedan
-// cubiertos: un bloque está disponible si cae completo dentro de un tramo.
+// cubiertos (un bloque está disponible si cae completo dentro de un tramo), las clases
+// y el horario de atención de apoderados (RF55).
 // El patrón se repite todas las semanas del período, igual que la carga horaria semanal.
 // Solo el administrador la edita; el docente la ve en su perfil (soloLectura).
-
-const aMin = (h) => {
-  const m = /^(\d{1,2}):(\d{2})/.exec(String(h ?? ""));
-  return m ? Number(m[1]) * 60 + Number(m[2]) : NaN;
-};
-const aHora = (min) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
-const redondear = (h) => Math.round(h * 100) / 100;
-
-/** Tramos de un día como minutos, unidos si se tocan o superponen. */
-function tramosUnidos(tramos, dia) {
-  const orden = tramos
-    .filter((t) => t.dia === dia)
-    .map((t) => ({ inicio: aMin(t.hora_inicio), fin: aMin(t.hora_fin) }))
-    .filter((t) => t.fin > t.inicio)
-    .sort((a, b) => a.inicio - b.inicio);
-  const unidos = [];
-  for (const t of orden) {
-    const u = unidos[unidos.length - 1];
-    if (u && t.inicio <= u.fin) u.fin = Math.max(u.fin, t.fin);
-    else unidos.push({ ...t });
-  }
-  return unidos;
-}
-
-const cubre = (unidos, inicio, fin) => unidos.some((t) => t.inicio <= aMin(inicio) && aMin(fin) <= t.fin);
-
-/** Primer error de los tramos (para bloquear el guardado), o "" si están bien. */
-export function errorTramos(tramos, dias) {
-  for (const dia of dias) {
-    const delDia = tramos.filter((t) => t.dia === dia);
-    for (const t of delDia) {
-      const i = aMin(t.hora_inicio);
-      const f = aMin(t.hora_fin);
-      if (Number.isNaN(i) || Number.isNaN(f)) return `Completa las horas de los tramos del ${dia}`;
-      if (f - i < 15) return `El ${dia} tiene un tramo cuya hora de término no es posterior a la de inicio`;
-    }
-    const orden = delDia.map((t) => [aMin(t.hora_inicio), aMin(t.hora_fin)]).sort((a, b) => a[0] - b[0]);
-    for (let k = 1; k < orden.length; k += 1) {
-      if (orden[k][0] < orden[k - 1][1]) return `El ${dia} tiene tramos que se superponen`;
-    }
-  }
-  return "";
-}
 
 function DisponibilidadSemanal({
   dias = [],
@@ -59,60 +22,49 @@ function DisponibilidadSemanal({
   onChange,
   cargaSemanal,
   clases = [],
+  atencion = [],
   periodo,
   periodos,
   onCambiarPeriodo,
   soloLectura = false,
 }) {
   const unidosPorDia = new Map(dias.map((d) => [d, tramosUnidos(tramos, d)]));
-  const horasDia = (d) => redondear(unidosPorDia.get(d).reduce((acc, t) => acc + (t.fin - t.inicio) / 60, 0));
-  const horasDisponibles = redondear(dias.reduce((acc, d) => acc + horasDia(d), 0));
+  const atencionPorDia = new Map(dias.map((d) => [d, tramosUnidos(atencion, d)]));
+  const horasDisponibles = redondear(dias.reduce((acc, d) => acc + horasDelDia(tramos, d), 0));
   const carga = cargaSemanal === "" || cargaSemanal === null || cargaSemanal === undefined ? null : Number(cargaSemanal);
   const sinRestriccion = tramos.length === 0;
   const adeudadas = !sinRestriccion && carga !== null && !Number.isNaN(carga) ? redondear(Math.max(0, carga - horasDisponibles)) : 0;
-  const clasesFuera = sinRestriccion ? [] : clases.filter((c) => !cubre(unidosPorDia.get(c.dia) || [], c.hora_inicio, c.hora_fin));
+  const fueraDe = (lista) => (sinRestriccion ? [] : lista.filter((c) => !cubre(unidosPorDia.get(c.dia) || [], c.hora_inicio, c.hora_fin)));
+  const clasesFuera = fueraDe(clases);
+  const atencionFuera = fueraDe(atencion);
   const error = soloLectura ? "" : errorTramos(tramos, dias);
-  const jornadaTexto = jornada ? `${jornada.inicio}–${jornada.fin}` : "";
-
-  const conIndices = tramos.map((t, i) => ({ ...t, i }));
-  const actualizar = (i, cambios) => onChange(tramos.map((t, k) => (k === i ? { ...t, ...cambios } : t)));
-  const quitar = (i) => onChange(tramos.filter((_, k) => k !== i));
-  const agregar = (dia) => {
-    const delDia = unidosPorDia.get(dia);
-    const ultimo = delDia[delDia.length - 1];
-    // Sugerencia: la jornada institucional o, si ya hay tramos, una hora después del último
-    const inicio = ultimo ? Math.min(ultimo.fin + 30, aMin(limites.maximo) - 60) : aMin(jornada?.inicio || "08:00");
-    const fin = ultimo ? Math.min(inicio + 60, aMin(limites.maximo)) : aMin(jornada?.fin || "17:00");
-    onChange([...tramos, { dia, hora_inicio: aHora(inicio), hora_fin: aHora(fin) }]);
-  };
-  const jornadaCompleta = () => {
-    if (!jornada) return;
-    onChange(dias.map((dia) => ({ dia, hora_inicio: jornada.inicio, hora_fin: jornada.fin })));
-  };
-  const copiarPrimerDia = () => {
-    const base = tramos.filter((t) => t.dia === dias[0]);
-    onChange([...base, ...dias.slice(1).flatMap((dia) => base.map((t) => ({ ...t, dia })))]);
-  };
-  // Clic en un bloque no cubierto: agrega su horario, uniéndolo a un tramo vecino si lo toca
-  const agregarBloque = (dia, b) => {
-    const i0 = aMin(b.hora_inicio);
-    const f0 = aMin(b.hora_fin);
-    const vecino = conIndices.find((t) => t.dia === dia && aMin(t.hora_inicio) <= f0 && i0 <= aMin(t.hora_fin));
-    if (vecino) {
-      actualizar(vecino.i, {
-        hora_inicio: aHora(Math.min(aMin(vecino.hora_inicio), i0)),
-        hora_fin: aHora(Math.max(aMin(vecino.hora_fin), f0)),
-      });
-    } else {
-      onChange([...tramos, { dia, hora_inicio: b.hora_inicio, hora_fin: b.hora_fin }]);
-    }
-  };
 
   const clasesPorCelda = new Map();
   for (const c of clases) {
     const k = `${c.dia}|${c.Bloque_Horario_Id}`;
     clasesPorCelda.set(k, [...(clasesPorCelda.get(k) || []), c]);
   }
+
+  const celda = (d, b) => {
+    const cubierto = cubre(unidosPorDia.get(d), b.hora_inicio, b.hora_fin);
+    const enCelda = clasesPorCelda.get(`${d}|${b.Bloque_Horario_Id}`) || [];
+    const deAtencion = cubre(atencionPorDia.get(d), b.hora_inicio, b.hora_fin);
+    // Sin tramos registrados no hay restricción: nada se marca como fuera
+    const fuera = (enCelda.length > 0 || deAtencion) && !cubierto && !sinRestriccion;
+    let estado = cubierto ? "on" : "";
+    let texto = cubierto ? "✓" : "";
+    if (deAtencion) { estado = fuera ? "fuera" : "atencion"; texto = fuera ? "⚠ Atención" : "Atención"; }
+    if (enCelda.length > 0) { estado = fuera ? "fuera" : "on"; texto = fuera ? "⚠ Clase" : "Clase"; }
+    const titulo = enCelda.map((c) => `${c.asignatura} · ${c.curso}`).join("\n") || (deAtencion ? "Atención de apoderados" : undefined);
+    const puedeSumar = !soloLectura && b.tipo !== "Recreo" && !cubierto;
+    return {
+      estado,
+      texto,
+      titulo: titulo || (puedeSumar ? "Sumar este bloque" : undefined),
+      etiqueta: `Sumar ${d} ${b.hora_inicio} a ${b.hora_fin}`,
+      onClick: puedeSumar ? () => onChange(sumarIntervalo(tramos, d, b.hora_inicio, b.hora_fin)) : undefined,
+    };
+  };
 
   return (
     <div className={`disp-semanal${soloLectura ? " disp-semanal--lectura" : ""}`}>
@@ -131,16 +83,24 @@ function DisponibilidadSemanal({
         {!soloLectura && (
           <div className="disp-acciones">
             {jornada && (
-              <button type="button" className="disp-accion" onClick={jornadaCompleta} title="Reemplaza todos los tramos">
-                Jornada {jornadaTexto} toda la semana
+              <button
+                type="button"
+                className="disp-accion"
+                title="Reemplaza todos los tramos"
+                onClick={() => onChange(dias.map((dia) => ({ dia, hora_inicio: jornada.inicio, hora_fin: jornada.fin })))}
+              >
+                Jornada {jornada.inicio}–{jornada.fin} toda la semana
               </button>
             )}
             <button
               type="button"
               className="disp-accion"
-              onClick={copiarPrimerDia}
               disabled={!tramos.some((t) => t.dia === dias[0])}
               title={`Copia los tramos del ${dias[0]} al resto de los días`}
+              onClick={() => {
+                const base = tramos.filter((t) => t.dia === dias[0]);
+                onChange([...base, ...dias.slice(1).flatMap((dia) => base.map((t) => ({ ...t, dia })))]);
+              }}
             >
               Copiar {dias[0]?.toLowerCase()} al resto
             </button>
@@ -151,54 +111,16 @@ function DisponibilidadSemanal({
         )}
       </div>
 
-      {/* Tramos por día */}
-      <ul className="disp-dias">
-        {dias.map((dia) => {
-          const delDia = conIndices.filter((t) => t.dia === dia);
-          return (
-            <li key={dia} className="disp-dia">
-              <span className="disp-dia-nombre">{dia}</span>
-              <div className="disp-tramos">
-                {delDia.length === 0 && <span className="disp-sin-tramos">{sinRestriccion ? "—" : "No disponible"}</span>}
-                {delDia.map((t) =>
-                  soloLectura ? (
-                    <span key={t.i} className="disp-tramo disp-tramo--lectura">{t.hora_inicio}–{t.hora_fin}</span>
-                  ) : (
-                    <span key={t.i} className="disp-tramo">
-                      <input
-                        type="time"
-                        step="300"
-                        min={limites.minimo}
-                        max={limites.maximo}
-                        value={t.hora_inicio}
-                        aria-label={`${dia}: desde`}
-                        onChange={(e) => actualizar(t.i, { hora_inicio: e.target.value })}
-                      />
-                      <span aria-hidden="true">–</span>
-                      <input
-                        type="time"
-                        step="300"
-                        min={limites.minimo}
-                        max={limites.maximo}
-                        value={t.hora_fin}
-                        aria-label={`${dia}: hasta`}
-                        onChange={(e) => actualizar(t.i, { hora_fin: e.target.value })}
-                      />
-                      <button type="button" className="disp-quitar" aria-label={`Quitar tramo del ${dia}`} onClick={() => quitar(t.i)}>
-                        ×
-                      </button>
-                    </span>
-                  )
-                )}
-                {!soloLectura && (
-                  <button type="button" className="disp-agregar" onClick={() => agregar(dia)}>+ Tramo</button>
-                )}
-              </div>
-              <span className="disp-dia-horas">{horasDia(dia) > 0 ? `${horasDia(dia)} h` : ""}</span>
-            </li>
-          );
-        })}
-      </ul>
+      <EditorTramos
+        dias={dias}
+        tramos={tramos}
+        onChange={onChange}
+        soloLectura={soloLectura}
+        limites={limites}
+        sugerencia={jornada ? { inicio: jornada.inicio, fin: jornada.fin } : undefined}
+        vacio={sinRestriccion ? "—" : "No disponible"}
+        detalleDia={(d) => (horasDelDia(tramos, d) > 0 ? `${horasDelDia(tramos, d)} h` : "")}
+      />
 
       {error && <p className="input-error-msg" role="alert">{error}</p>}
 
@@ -226,68 +148,25 @@ function DisponibilidadSemanal({
             {!soloLectura && " y se mantienen"}: {clasesFuera.map((c) => `${c.dia} ${c.hora_inicio} ${c.asignatura} (${c.curso})`).join("; ")}.
           </p>
         )}
+        {atencionFuera.length > 0 && (
+          <p className="disp-aviso" role="status">
+            ⚠ Horario de atención de apoderados fuera de la disponibilidad
+            {!soloLectura && " (se mantiene; el docente debe ajustarlo)"}: {atencionFuera.map((a) => `${a.dia} ${a.hora_inicio}–${a.hora_fin}`).join("; ")}.
+          </p>
+        )}
       </div>
 
-      {/* Vista por bloques de 45 minutos */}
-      {bloques.length > 0 && (
-        <details className="disp-vista-bloques" open>
-          <summary>Vista por bloques de clase</summary>
-          <p className="disp-nota">
-            Un bloque está disponible si cae completo dentro de un tramo.
-            {!soloLectura && " Haz clic en un bloque libre para sumarlo a la disponibilidad."}
-          </p>
-          <div className="disp-tabla-wrap">
-            <table className="disp-tabla">
-              <thead>
-                <tr>
-                  <th scope="col">Bloque</th>
-                  {dias.map((d) => <th key={d} scope="col">{d.slice(0, 3)}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {bloques.map((b) => {
-                  const recreo = b.tipo === "Recreo";
-                  return (
-                    <tr key={b.Bloque_Horario_Id} className={recreo ? "disp-fila-recreo" : ""}>
-                      <th scope="row">
-                        {b.hora_inicio}–{b.hora_fin}
-                        {recreo && <span className="disp-etiqueta-recreo">Recreo</span>}
-                      </th>
-                      {dias.map((d) => {
-                        // Sin tramos registrados no hay restricción: nada se marca como fuera
-                        const cubierto = cubre(unidosPorDia.get(d), b.hora_inicio, b.hora_fin);
-                        const enCelda = clasesPorCelda.get(`${d}|${b.Bloque_Horario_Id}`) || [];
-                        const fuera = enCelda.length > 0 && !cubierto && !sinRestriccion;
-                        const texto = enCelda.length > 0 ? (fuera ? "⚠ Clase" : "Clase") : cubierto ? "✓" : "";
-                        const clase = `disp-celda${cubierto ? " disp-celda--on" : ""}${fuera ? " disp-celda--fuera" : ""}`;
-                        const titulo = enCelda.map((c) => `${c.asignatura} · ${c.curso}`).join("\n") || undefined;
-                        const puedeSumar = !soloLectura && !recreo && !cubierto;
-                        return (
-                          <td key={d}>
-                            {puedeSumar ? (
-                              <button
-                                type="button"
-                                className={clase}
-                                title={titulo || "Sumar este bloque"}
-                                aria-label={`Sumar ${d} ${b.hora_inicio} a ${b.hora_fin}`}
-                                onClick={() => agregarBloque(d, b)}
-                              >
-                                {texto}
-                              </button>
-                            ) : (
-                              <span className={clase} title={titulo}>{texto}</span>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </details>
-      )}
+      <VistaBloques
+        dias={dias}
+        bloques={bloques}
+        celda={celda}
+        nota={`Un bloque está disponible si cae completo dentro de un tramo.${soloLectura ? "" : " Haz clic en un bloque libre para sumarlo a la disponibilidad."}`}
+        leyenda={[
+          { estado: "on", texto: "Disponible" },
+          ...(atencion.length > 0 ? [{ estado: "atencion", texto: "Atención de apoderados" }] : []),
+          { estado: "fuera", texto: "Fuera de la disponibilidad" },
+        ]}
+      />
       <p className="disp-nota">La disponibilidad se repite todas las semanas del período.</p>
     </div>
   );

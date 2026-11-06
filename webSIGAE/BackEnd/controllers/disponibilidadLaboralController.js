@@ -100,6 +100,29 @@ async function tramosGuardados(db, docenteId, periodo) {
   }));
 }
 
+/** Horario de atención de apoderados del docente (RF55), como tramos en minutos. */
+async function tramosDeAtencion(db, docenteId) {
+  const [filas] = await db.query(
+    `SELECT Horario_Atencion_Dia_Semana AS dia, Horario_Atencion_Hora_Inicio AS hora_inicio,
+            Horario_Atencion_Hora_Fin AS hora_fin
+       FROM horario_atencion WHERE Docente_Usuario_Id = ?
+      ORDER BY FIELD(Horario_Atencion_Dia_Semana, ?), Horario_Atencion_Hora_Inicio`,
+    [docenteId, DIAS_SEMANA]
+  );
+  return (Array.isArray(filas) ? filas : []).map((f) => ({
+    dia: f.dia, inicio: aMinutos(f.hora_inicio), fin: aMinutos(f.hora_fin),
+  }));
+}
+
+/** Tramos de atención que no caben en la disponibilidad (con tramos registrados). */
+function atencionFuera(atencion, tramos) {
+  if (tramos.length === 0) return [];
+  const porDia = new Map(DIAS_SEMANA.map((d) => [d, unirTramos(tramos.filter((t) => t.dia === d))]));
+  return atencion.filter((a) => !cabeEnTramos(porDia.get(a.dia) || [], a.inicio, a.fin)).map((a) => ({
+    dia: a.dia, hora_inicio: aHora(a.inicio), hora_fin: aHora(a.fin),
+  }));
+}
+
 /** Clases que no caben completas en los tramos de su día (con tramos registrados). */
 function clasesFuera(clases, tramos) {
   if (tramos.length === 0) return [];
@@ -135,6 +158,8 @@ const getDisponibilidad = async (req, res) => {
     const tramos = await tramosGuardados(pool, id, periodo);
     const clases = await clasesDelDocente(pool, id, periodo);
     const resumen = await resumenSemanal(pool, id, periodo);
+    // RF55: el horario de atención es semanal (sin período); se muestra en el período vigente
+    const atencion = periodo === periodos.vigente ? await tramosDeAtencion(pool, id) : [];
 
     return res.json({
       docente: {
@@ -151,6 +176,8 @@ const getDisponibilidad = async (req, res) => {
       tramos: tramos.map(formatoTramo),
       clases,
       clasesFueraDeDisponibilidad: clasesFuera(clases, tramos),
+      atencion: atencion.map(formatoTramo),
+      atencionFueraDeDisponibilidad: atencionFuera(atencion, tramos),
       resumen,
       advertencia: advertenciaHorasAdeudadas(resumen, docente.Usuario_Nombre_Completo),
       puedeEditar: esAdmin,
@@ -186,7 +213,7 @@ class ErrorDisponibilidad extends Error {
  * @param {{ periodo?: string, tramos: {dia, inicio, fin}[] }} disponibilidad salida de leerDisponibilidad
  */
 async function guardarDisponibilidadDocente(conn, { docenteId, disponibilidad, responsableId }) {
-  const { periodo, valido } = await resolverPeriodo(conn, disponibilidad.periodo);
+  const { periodos, periodo, valido } = await resolverPeriodo(conn, disponibilidad.periodo);
   if (!valido) throw new ErrorDisponibilidad(400, `El período ${periodo} no está disponible para la disponibilidad laboral`);
 
   const antes = await resumenSemanal(conn, docenteId, periodo);
@@ -218,13 +245,16 @@ async function guardarDisponibilidadDocente(conn, { docenteId, disponibilidad, r
     });
   }
 
-  // CU107: las clases ya asignadas que quedan fuera de los tramos se mantienen, con advertencia
+  // CU107: las clases ya asignadas y los tramos de atención (RF55) que quedan fuera se
+  // mantienen, con advertencia
   const clases = await clasesDelDocente(conn, docenteId, periodo);
+  const atencion = periodo === periodos.vigente ? await tramosDeAtencion(conn, docenteId) : [];
   return {
     periodo,
     resumen: despues,
     advertencia: advertenciaHorasAdeudadas(despues),
     clasesFueraDeDisponibilidad: clasesFuera(clases, disponibilidad.tramos),
+    atencionFueraDeDisponibilidad: atencionFuera(atencion, disponibilidad.tramos),
   };
 }
 
@@ -246,6 +276,10 @@ const getOpcionesDisponibilidad = async (req, res) => {
 };
 
 module.exports = {
+  // Compartidos con el horario de atención de apoderados (RF55 / CU87, CU88)
+  bloquesDeJornada,
+  clasesDelDocente,
+  tramosGuardados,
   getDisponibilidad,
   getOpcionesDisponibilidad,
   leerDisponibilidad,

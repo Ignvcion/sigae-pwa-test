@@ -1,5 +1,6 @@
 SIGAE - Incremento 4
-Disponibilidad laboral del docente (CU107) y especialidades como etiquetas (RF04)
+Disponibilidad laboral del docente (CU107), horario de atención de apoderados
+(RF55, RF56 / CU87, CU88, CU89) y especialidades como etiquetas (RF04)
 Fecha: 2026-11-06
 
 ======================================================================
@@ -47,6 +48,72 @@ Fecha: 2026-11-06
 1.9 Al iniciar un nuevo período se borra la disponibilidad de los períodos
     anteriores al nuevo vigente. Durante el cierre se puede registrar la
     del período siguiente (selector de período).
+
+======================================================================
+1B. HORARIO DE ATENCIÓN DE APODERADOS (RF55, RF56 / CU87, CU88, CU89)
+======================================================================
+
+1B.1 El DOCENTE configura su horario de atención con la misma interfaz que la
+     disponibilidad laboral: tramos "desde–hasta" por día y la vista por
+     bloques de 45 minutos (un clic en un bloque libre lo suma). Se edita en
+     "Mi horario" (vía de CU87) y en "Mi horario de atención de apoderados"
+     de su perfil; ambos usan el mismo componente. La semana se guarda
+     completa (PUT /api/horario-atencion/semana); los endpoints por bloque
+     (POST/PUT/DELETE /api/horario-atencion) se mantienen.
+
+1B.2 Reglas que lo enlazan con el resto del sistema:
+       - Entre 08:00 y 18:00 (rango de los tramos de citación).
+       - Cada tramo debe incluir al menos una citación de 30 minutos en punto
+         o y media. Ya no se exige que el tramo empiece en punto o y media:
+         puede seguir los bloques de 45 minutos (p. ej. 09:15–10:00 ofrece la
+         citación 09:30–10:00).
+       - CU87 Excepción 2: no se superpone con sus clases del período vigente.
+       - CU87 Excepción 3: no se superpone con otro tramo de atención.
+       - NUEVO, CU107: debe quedar dentro de la disponibilidad laboral del
+         docente en el período vigente, si la tiene registrada.
+       - CU88 Excepción 1: si el cambio deja fuera citaciones a futuro
+         (pendientes o confirmadas), se listan y se pide confirmación; las
+         citaciones se mantienen.
+
+1B.3 Si el administrador reduce la disponibilidad laboral y un tramo de
+     atención queda fuera, se guarda igual con advertencia (como las clases)
+     y el docente debe ajustarlo: su editor marca el tramo y no deja guardar
+     hasta corregirlo. La vista de disponibilidad muestra la atención.
+
+1B.4 CU89: al solicitar una citación, el apoderado ve el horario de atención
+     semanal del docente ("Lunes 10:00–11:00 · Martes 14:00–16:00 …") y,
+     debajo, los tramos de 30 minutos libres de las próximas semanas.
+
+1B.5 Las citaciones siguen durando 30 minutos (Citacion_Tramo_Horario
+     "HH:MM - HH:MM"); no se cambiaron a 45 minutos.
+
+======================================================================
+1C. TEXTO PROPUESTO PARA DOCUMENTO 0 (alinear CU con lo implementado)
+======================================================================
+
+  CU107, Descripciones: "El actor abre el perfil del docente (o lo registra)
+    y, en Disponibilidad laboral semanal, define por día uno o más tramos
+    desde–hasta en que el docente está en el colegio, incluidos recreos y
+    horas sin clases. El sistema muestra la vista por bloques de 45 minutos
+    con los bloques cubiertos, las clases y el horario de atención [...]".
+    Excepción 2: agregar "o tramos de atención de apoderados".
+    Agregar: "El docente ve su disponibilidad en su perfil, sin editarla."
+    Pendiente: el indicador "debe horas" en el horario por docente y en el
+    horario maestro (hoy se muestra en el creador de horarios y en el perfil).
+
+  CU87, Descripciones: "El docente accede a su horario o a su perfil y
+    define, por día, tramos desde–hasta de atención [...]. El sistema valida
+    que no se superpongan con sus clases del período vigente [Excepción 2]
+    ni entre sí [Excepción 3], que queden dentro de su disponibilidad laboral
+    [Excepción 4] y que incluyan al menos una citación de 30 minutos
+    [Excepción 1]". Nueva Excepción 4: "El tramo queda fuera de la
+    disponibilidad laboral del docente. El sistema lo rechaza e indica los
+    tramos disponibles de ese día." Dependencias: agregar RF04 (CU107).
+
+  CU88, Excepción 2: agregar "o quedan fuera de la disponibilidad laboral".
+
+  CU89, Descripciones: "El sistema muestra el horario de atención semanal
+    del docente y los tramos de 30 minutos disponibles [Excepción 2]".
 
 ======================================================================
 2. ESPECIALIDADES COMO ETIQUETAS (RF04)
@@ -138,8 +205,12 @@ Fecha: 2026-11-06
         Docente_Disponibilidad: { periodo?, tramos: [{ dia, hora_inicio: "08:00", hora_fin: "13:00" }] }
   - Validación al asignar: horarioController (crear, editar, edición
     masiva, docentes-disponibles) y conflictosHorarioController (migrar).
+  - Horario de atención: GET/PUT /api/horario-atencion/semana (docente);
+    reglas en BackEnd/controllers/horarioAtencionController.js.
   - Pantallas: Registrar docente, Editar datos (perfil del docente),
     Mi disponibilidad laboral (perfil propio del docente, solo lectura),
+    Mi horario de atención de apoderados (perfil del docente y Mi horario),
+    Solicitar citación (apoderado: horario de atención del docente),
     Gestión de roles (etiquetas), Docentes (filtro por etiqueta),
     creador de horarios (motivo "fuera de su disponibilidad laboral" y
     aviso de horas adeudadas).
