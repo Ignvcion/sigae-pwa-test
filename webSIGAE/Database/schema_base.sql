@@ -48,6 +48,29 @@ CREATE TABLE `afecta` (
 
 
 --
+-- Table structure for table `apoderado_suplente`
+-- Incremento 4, RF57: suplentes del estudiante, hasta 4 (el titular es estudiante.Apoderado_Usuario_Id)
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `apoderado_suplente` (
+  `Apoderado_Suplente_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Estudiante_Id` int unsigned NOT NULL,
+  `Suplente_Usuario_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Apoderado_Suplente_Id`),
+  UNIQUE KEY `Apoderado_Suplente_Estudiante_Usuario_UNIQUE` (`Estudiante_Id`,`Suplente_Usuario_Id`),
+  KEY `fk_Apoderado_Suplente_Usuario_idx` (`Suplente_Usuario_Id`),
+  CONSTRAINT `fk_Apoderado_Suplente_Estudiante` FOREIGN KEY (`Estudiante_Id`) REFERENCES `estudiante` (`Estudiante_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Apoderado_Suplente_Usuario` FOREIGN KEY (`Suplente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+--
+
+
+--
 -- Table structure for table `asignatura`
 --
 
@@ -108,6 +131,7 @@ CREATE TABLE `citacion` (
   `Estudiante_Id` int unsigned NOT NULL,
   `Apoderado_Usuario_Id` int unsigned NOT NULL,
   `Docente_Usuario_Id` int unsigned NOT NULL,
+  `Citacion_Solicitante_Rol` varchar(50) NOT NULL DEFAULT 'Docente',
   PRIMARY KEY (`Citacion_Id`),
   KEY `fk_Citacion_Estudiante_idx` (`Estudiante_Id`),
   KEY `fk_Citacion_Usuario_idx` (`Apoderado_Usuario_Id`),
@@ -134,6 +158,7 @@ CREATE TABLE `conversacion` (
   `Conversacion_Estado` tinyint(1) NOT NULL,
   `Docente_Usuario_Id` int unsigned NOT NULL,
   `Apoderado_Usuario_Id` int unsigned NOT NULL,
+  `Conversacion_Habilitada_Hasta` datetime DEFAULT NULL,
   PRIMARY KEY (`Conversacion_Id`),
   KEY `fk Conversacion_Usuario_idx` (`Docente_Usuario_Id`),
   KEY `fk Conversacion_Apoderado_idx` (`Apoderado_Usuario_Id`),
@@ -148,6 +173,8 @@ CREATE TABLE `conversacion` (
 
 --
 -- Table structure for table `curso`
+-- Incremento 4, RF61: cada curso pertenece a un período lectivo (Curso_Periodo_Lectivo);
+-- el nombre es único dentro de cada período (puede haber un "2do Básico A" en 2026 y otro en 2027)
 --
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -157,10 +184,15 @@ CREATE TABLE `curso` (
   `Curso_Seccion` varchar(10) NOT NULL,
   `Curso_Nombre` varchar(100) NOT NULL,
   `Nivel_Educativo_Id` int unsigned NOT NULL,
+  `Curso_Profesor_Jefe_Usuario_Id` int unsigned DEFAULT NULL,
+  `Curso_Periodo_Lectivo` varchar(10) NOT NULL,
   PRIMARY KEY (`Curso_Id`),
-  UNIQUE KEY `Curso_Nombre_UNIQUE` (`Curso_Nombre`),
+  UNIQUE KEY `Curso_Nombre_Periodo_UNIQUE` (`Curso_Nombre`,`Curso_Periodo_Lectivo`),
+  KEY `Curso_Periodo_Lectivo_idx` (`Curso_Periodo_Lectivo`),
   KEY `fk_Curso_Nivel_Educativo_idx` (`Nivel_Educativo_Id`),
-  CONSTRAINT `fk_Curso_Nivel_Educativo` FOREIGN KEY (`Nivel_Educativo_Id`) REFERENCES `nivel_educativo` (`Nivel_Educativo_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
+  KEY `fk_Curso_Profesor_Jefe_Usuario_idx` (`Curso_Profesor_Jefe_Usuario_Id`),
+  CONSTRAINT `fk_Curso_Nivel_Educativo` FOREIGN KEY (`Nivel_Educativo_Id`) REFERENCES `nivel_educativo` (`Nivel_Educativo_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Curso_Profesor_Jefe_Usuario` FOREIGN KEY (`Curso_Profesor_Jefe_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -192,6 +224,35 @@ CREATE TABLE `estudiante` (
   KEY `fk_Estudiante_Apoderado_idx` (`Apoderado_Usuario_Id`),
   CONSTRAINT `fk_Estudiante_Apoderado` FOREIGN KEY (`Apoderado_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_Estudiante_Curso` FOREIGN KEY (`Curso_Id`) REFERENCES `curso` (`Curso_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+--
+
+
+--
+-- Table structure for table `evaluacion`
+-- Incremento 4, RF58 y RF59: calendario de evaluaciones
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `evaluacion` (
+  `Evaluacion_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Evaluacion_Fecha` date NOT NULL,
+  `Evaluacion_Tipo` varchar(50) NOT NULL,
+  `Evaluacion_Contenidos` text NOT NULL,
+  `Curso_Id` int unsigned NOT NULL,
+  `Asignatura_Id` int unsigned NOT NULL,
+  `Docente_Usuario_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Evaluacion_Id`),
+  KEY `Evaluacion_Curso_Fecha_idx` (`Curso_Id`,`Evaluacion_Fecha`),
+  KEY `fk_Evaluacion_Asignatura_idx` (`Asignatura_Id`),
+  KEY `fk_Evaluacion_Docente_Usuario_idx` (`Docente_Usuario_Id`),
+  CONSTRAINT `fk_Evaluacion_Asignatura` FOREIGN KEY (`Asignatura_Id`) REFERENCES `asignatura` (`Asignatura_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Evaluacion_Curso` FOREIGN KEY (`Curso_Id`) REFERENCES `curso` (`Curso_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Evaluacion_Docente_Usuario` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -287,6 +348,30 @@ CREATE TABLE `horario_asignatura` (
 
 
 --
+-- Table structure for table `horario_atencion`
+-- Incremento 4, RF55: horario de atención de apoderados del docente
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `horario_atencion` (
+  `Horario_Atencion_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Horario_Atencion_Dia_Semana` varchar(20) NOT NULL,
+  `Horario_Atencion_Hora_Inicio` time NOT NULL,
+  `Horario_Atencion_Hora_Fin` time NOT NULL,
+  `Docente_Usuario_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Horario_Atencion_Id`),
+  UNIQUE KEY `Horario_Atencion_Docente_Dia_Inicio_UNIQUE` (`Docente_Usuario_Id`,`Horario_Atencion_Dia_Semana`,`Horario_Atencion_Hora_Inicio`),
+  CONSTRAINT `fk_Horario_Atencion_Docente_Usuario` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `chk_Horario_Atencion_Horas` CHECK (`Horario_Atencion_Hora_Inicio` < `Horario_Atencion_Hora_Fin`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+--
+
+
+--
 -- Table structure for table `incluyeasig`
 --
 
@@ -336,6 +421,7 @@ CREATE TABLE `mensaje` (
 
 --
 -- Table structure for table `nivel_educativo`
+-- Incremento 4, RF61: Nivel_Educativo_Orden define el nivel siguiente (Pre-Kinder = 1 ... 4to Medio = 14)
 --
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -343,8 +429,39 @@ CREATE TABLE `mensaje` (
 CREATE TABLE `nivel_educativo` (
   `Nivel_Educativo_Id` int unsigned NOT NULL AUTO_INCREMENT,
   `Nivel_Educativo_Nombre` varchar(100) NOT NULL,
+  `Nivel_Educativo_Orden` int unsigned NOT NULL,
   PRIMARY KEY (`Nivel_Educativo_Id`),
-  UNIQUE KEY `Nivel_Educativo_Nombre_UNIQUE` (`Nivel_Educativo_Nombre`)
+  UNIQUE KEY `Nivel_Educativo_Nombre_UNIQUE` (`Nivel_Educativo_Nombre`),
+  UNIQUE KEY `Nivel_Educativo_Orden_UNIQUE` (`Nivel_Educativo_Orden`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+--
+
+
+--
+-- Table structure for table `notificacion`
+-- Incremento 4, RF62 (reserva): notificaciones en la plataforma
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `notificacion` (
+  `Notificacion_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Notificacion_Tipo` varchar(50) NOT NULL,
+  `Notificacion_Fecha_Hora` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Notificacion_Leida` tinyint(1) NOT NULL DEFAULT 0,
+  `Usuario_Id` int unsigned NOT NULL,
+  `Mensaje_Id` int unsigned DEFAULT NULL,
+  `Citacion_Id` int unsigned DEFAULT NULL,
+  PRIMARY KEY (`Notificacion_Id`),
+  KEY `Notificacion_Usuario_Leida_idx` (`Usuario_Id`,`Notificacion_Leida`),
+  KEY `fk_Notificacion_Mensaje_idx` (`Mensaje_Id`),
+  KEY `fk_Notificacion_Citacion_idx` (`Citacion_Id`),
+  CONSTRAINT `fk_Notificacion_Citacion` FOREIGN KEY (`Citacion_Id`) REFERENCES `citacion` (`Citacion_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Notificacion_Mensaje` FOREIGN KEY (`Mensaje_Id`) REFERENCES `mensaje` (`Mensaje_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Notificacion_Usuario` FOREIGN KEY (`Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -354,6 +471,8 @@ CREATE TABLE `nivel_educativo` (
 
 --
 -- Table structure for table `parametro_institucional`
+-- Incremento 4, RF61: Periodo_Vigente es el año escolar en curso; Periodo_Siguiente se llena
+-- con "Iniciar cierre" y vuelve a NULL con "Iniciar nuevo período"
 --
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -365,6 +484,8 @@ CREATE TABLE `parametro_institucional` (
   `Parametro_Institucional_Fin_Jornada` time NOT NULL,
   `Parametro_Institucional_Bloques_Maximos_Diarios` int NOT NULL,
   `Parametro_Institucional_Duracion_Recreo` int NOT NULL,
+  `Parametro_Institucional_Periodo_Vigente` varchar(10) DEFAULT NULL,
+  `Parametro_Institucional_Periodo_Siguiente` varchar(10) DEFAULT NULL,
   PRIMARY KEY (`Parametro_Institucional_Id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -421,6 +542,36 @@ CREATE TABLE `sesion` (
 
 
 --
+-- Table structure for table `situacion_final`
+-- Incremento 4, RF61 (por confirmar): situación final de los estudiantes
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `situacion_final` (
+  `Situacion_Final_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Situacion_Final_Periodo_Lectivo` varchar(50) NOT NULL,
+  `Situacion_Final_Valor` varchar(20) NOT NULL,
+  `Situacion_Final_Estado` varchar(20) NOT NULL DEFAULT 'Borrador',
+  `Situacion_Final_Fecha_Registro` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Estudiante_Id` int unsigned NOT NULL,
+  `Curso_Id` int unsigned NOT NULL,
+  `Usuario_Responsable_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Situacion_Final_Id`),
+  UNIQUE KEY `Situacion_Final_Estudiante_Periodo_UNIQUE` (`Estudiante_Id`,`Situacion_Final_Periodo_Lectivo`),
+  KEY `Situacion_Final_Curso_Periodo_idx` (`Curso_Id`,`Situacion_Final_Periodo_Lectivo`),
+  KEY `fk_Situacion_Final_Usuario_Responsable_idx` (`Usuario_Responsable_Id`),
+  CONSTRAINT `fk_Situacion_Final_Curso` FOREIGN KEY (`Curso_Id`) REFERENCES `curso` (`Curso_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Situacion_Final_Estudiante` FOREIGN KEY (`Estudiante_Id`) REFERENCES `estudiante` (`Estudiante_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Situacion_Final_Usuario_Responsable` FOREIGN KEY (`Usuario_Responsable_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+--
+
+
+--
 -- Table structure for table `solicitud_recuperacion`
 --
 
@@ -469,6 +620,8 @@ CREATE TABLE `tieneasig` (
 
 --
 -- Table structure for table `usuario`
+-- Incremento 4, RF61: Apoderado_Sin_Asociaciones_Desde marca el período en que un apoderado quedó
+-- sin estudiantes (inactivo); se elimina en el siguiente cambio de período si sigue así
 --
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -494,6 +647,8 @@ CREATE TABLE `usuario` (
   `Usuario_Direccion_Depto` varchar(20) DEFAULT NULL,
   `Usuario_Direccion_Comuna` varchar(60) DEFAULT NULL,
   `Apoderado_Correo_Natural` varchar(100) DEFAULT NULL,
+  `Docente_Recepcion_Mensajes` tinyint(1) NOT NULL DEFAULT 1,
+  `Apoderado_Sin_Asociaciones_Desde` varchar(10) DEFAULT NULL,
   PRIMARY KEY (`Usuario_Id`),
   UNIQUE KEY `Usuario_RUT_UNIQUE` (`Usuario_RUT`),
   UNIQUE KEY `Apoderado_Correo_Natural_UNIQUE` (`Apoderado_Correo_Natural`),
