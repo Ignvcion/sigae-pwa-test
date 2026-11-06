@@ -1272,12 +1272,43 @@ select {
   min-width: 0;
 }
 
-/* Con espacio para 2+ columnas: identidad alta, cursos y estudiantes anchos */
-@media (min-width: 1100px) {
-  .perfil-card--identidad {
-    grid-row: span 2;
+/* Tarjeta de identidad fluida: ocupa todo el ancho y reparte sus datos en
+   columnas de al menos 136px, para que queden en dos filas como máximo desde
+   tablets hasta escritorio. Correo y dirección, más largos, usan dos columnas
+   cuando caben cuatro; en un celular angosto los datos se apilan. */
+.perfil-card--identidad {
+  grid-column: 1 / -1;
+  container-type: inline-size;
+}
+
+.perfil-grid.perfil-grid--fluida {
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  gap: 16px;
+}
+
+.perfil-grid--fluida .perfil-campo span {
+  overflow-wrap: anywhere;
+}
+
+@container (min-width: 600px) {
+  .perfil-campo--doble {
+    grid-column: span 2;
+  }
+}
+
+/* Celular: dos columnas; correo y dirección a lo ancho para no cortar el texto */
+@container (max-width: 371px) {
+  .perfil-grid.perfil-grid--fluida {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .perfil-campo--doble {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Con espacio para 2+ columnas: cursos y estudiantes anchos */
+@media (min-width: 1100px) {
   .perfil-card--ancha {
     grid-column: span 2;
   }

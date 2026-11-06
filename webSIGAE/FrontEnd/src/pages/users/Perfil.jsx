@@ -382,8 +382,8 @@ function Perfil() {
         <p>{esPerfilPropio ? "Información de tu cuenta en SIGAE" : "Vista de perfil (solo lectura)"}</p>
       </div>
 
-      {/* Grilla en bloques: identidad alta a la izquierda, cursos y estudiantes
-          anchos y las tarjetas de la cuenta rellenan los huecos */}
+      {/* Grilla en bloques: la identidad ocupa todo el ancho (sus datos en a lo más
+          dos filas), cursos y estudiantes anchos y las tarjetas de la cuenta debajo */}
       <div className="perfil-bento">
         <div className="perfil-card perfil-card--identidad">
           <div className="perfil-identidad">
@@ -398,11 +398,14 @@ function Perfil() {
                 {roles.length > 0
                   ? roles.map((r) => getBadgeRol(r))
                   : <span>Sin roles asignados</span>}
+                {datos?.Usuario_Estado_Cuenta
+                  ? <span className="badge-activo" title="Estado de cuenta">Cuenta activa</span>
+                  : <span className="badge-inactivo" title="Estado de cuenta">Cuenta inactiva</span>}
               </div>
             </div>
           </div>
           <h2>Información Personal</h2>
-          <div className="perfil-grid">
+          <div className="perfil-grid perfil-grid--fluida">
             <div className="perfil-campo">
               <label>RUT</label>
               <span>{datos?.Usuario_RUT || "Sin RUT registrado"}</span>
@@ -411,17 +414,10 @@ function Perfil() {
               <label>Teléfono</label>
               <span>{datos?.Usuario_Telefono || "Sin teléfono registrado"}</span>
             </div>
-            <div className="perfil-campo">
-              <label>Estado de Cuenta</label>
-              <span>
-                {datos?.Usuario_Estado_Cuenta
-                  ? <span className="badge-activo">Activo</span>
-                  : <span className="badge-inactivo">Inactivo</span>}
-              </span>
-            </div>
-            <div className="perfil-campo" style={{ gridColumn: "1 / -1" }}>
+            <div className="perfil-campo perfil-campo--doble">
               <label>Correo(s)</label>
-              <span>{correos.length > 0 ? correos.join(" · ") : "Sin correos registrados"}</span>
+              {/* Espacio invisible tras la @: si no cabe, el correo corta ahí y no a mitad de palabra */}
+              <span>{correos.length > 0 ? correos.join(" · ").replaceAll("@", "@\u200B") : "Sin correos registrados"}</span>
             </div>
             {/* CU17 - Excepción "Sin información complementaria": el usuario no tiene ningún rol con datos adicionales */}
             {roles.length === 0 && (
@@ -441,7 +437,7 @@ function Perfil() {
                 </div>
               </>
             ) : null}
-            <div className="perfil-campo" style={{ gridColumn: "1 / -1" }}>
+            <div className="perfil-campo perfil-campo--doble">
               <label>Dirección</label>
               <span>{formatearDireccion(datos) || "Sin dirección registrada"}</span>
             </div>
