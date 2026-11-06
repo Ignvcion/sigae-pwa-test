@@ -3,7 +3,7 @@
 // no tiene login. Es solo una ficha con información académica.
 
 const db = require('../config/db');
-const { registrarHistorial } = require('../utils/historial');
+const { registrarHistorial, refPersona, buscarPersonas } = require('../utils/historial');
 const { claseVigente } = require('../utils/clasesEliminadas');
 const { condicionApoderadoAsociado, rolApoderadoSQL } = require('../utils/apoderadosEstudiante');
 const {
@@ -519,7 +519,7 @@ const eliminarTodasAsociacionesApoderado = async (req, res) => {
   try {
     // 1. Validar existencia y estado del apoderado
     const [apoderado] = await db.query(
-      'SELECT Usuario_Id, Usuario_Nombre_Completo, Usuario_Estado_Cuenta, Es_Apoderado FROM usuario WHERE Usuario_Id = ?',
+      'SELECT Usuario_Id, Usuario_RUT, Usuario_Nombre_Completo, Usuario_Estado_Cuenta, Es_Apoderado FROM usuario WHERE Usuario_Id = ?',
       [apoderadoId]
     );
 
@@ -570,7 +570,7 @@ const eliminarTodasAsociacionesApoderado = async (req, res) => {
     for (const { Estudiante_Id } of comoTitular) {
       await registrarHistorial(conn, {
         atributo: 'Apoderado_Usuario_Id',
-        anterior: apoderadoId,
+        anterior: refPersona(apoderado[0]),
         nuevo: null,
         descripcion: 'CU9: eliminación de todas las asociaciones del apoderado',
         usuarioId: Number(apoderadoId),
@@ -581,7 +581,7 @@ const eliminarTodasAsociacionesApoderado = async (req, res) => {
     for (const { Estudiante_Id } of comoSuplente) {
       await registrarHistorial(conn, {
         atributo: 'apoderado_suplente',
-        anterior: apoderadoId,
+        anterior: refPersona(apoderado[0]),
         nuevo: null,
         descripcion: 'CU9: eliminación de todas las asociaciones del apoderado (suplencia)',
         usuarioId: Number(apoderadoId),
@@ -648,9 +648,10 @@ const eliminarAsociacionEspecifica = async (req, res) => {
     }
 
     // Registra trazabilidad
+    const personasCU10 = await buscarPersonas(conn, [apoderadoAnterior]);
     await registrarHistorial(conn, {
       atributo: 'Apoderado_Usuario_Id',
-      anterior: apoderadoAnterior,
+      anterior: refPersona(personasCU10.get(Number(apoderadoAnterior))),
       nuevo: null,
       descripcion: 'CU10: eliminación de la asociación apoderado-estudiante',
       usuarioId: apoderadoAnterior,
@@ -810,10 +811,11 @@ const editarAsociaciones = async (req, res) => {
     }
 
     // Registra trazabilidad
+    const personasCU39 = await buscarPersonas(conn, [apoderadoActual, apoderadoId]);
     await registrarHistorial(conn, {
       atributo: 'Apoderado_Usuario_Id',
-      anterior: apoderadoActual,
-      nuevo: apoderadoId,
+      anterior: apoderadoActual === null ? null : refPersona(personasCU39.get(Number(apoderadoActual))),
+      nuevo: apoderadoId === null ? null : refPersona(personasCU39.get(Number(apoderadoId))),
       descripcion: apoderadoId === null
         ? 'CU39: eliminación de la asociación del estudiante'
         : 'CU39: reasignación del apoderado del estudiante',

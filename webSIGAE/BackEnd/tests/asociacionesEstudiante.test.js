@@ -112,7 +112,13 @@ describe('Pruebas Unitarias - CU39: Editar Asociaciones de un Estudiante', () =>
   beforeEach(() => {
     jest.clearAllMocks();
     conn = {
-      query: jest.fn().mockResolvedValue([{ affectedRows: 1 }]), // UPDATE e INSERT historial
+      // UPDATE e INSERT historial; la consulta de RUT y nombre devuelve los apoderados 4 y 7
+      query: jest.fn(async (sql) => (/FROM usuario WHERE Usuario_Id IN/.test(sql)
+        ? [[
+          { Usuario_Id: 4, Usuario_RUT: '14.444.444-4', Usuario_Nombre_Completo: 'Pedro Fernandez' },
+          { Usuario_Id: 7, Usuario_RUT: '17.777.777-k', Usuario_Nombre_Completo: 'Ana Torres' },
+        ]]
+        : [{ affectedRows: 1 }])),
       beginTransaction: jest.fn().mockResolvedValue(),
       commit: jest.fn().mockResolvedValue(),
       rollback: jest.fn().mockResolvedValue(),
@@ -140,7 +146,7 @@ describe('Pruebas Unitarias - CU39: Editar Asociaciones de un Estudiante', () =>
     // Registra trazabilidad: de apoderado 4 a apoderado 7, hecho por el usuario 1
     const inserts = insertsHistorial();
     expect(inserts).toHaveLength(1);
-    expect(inserts[0][1]).toEqual(['4', expect.stringContaining('CU39'), 'Apoderado_Usuario_Id', '7', 4, 1, null, null, 1]);
+    expect(inserts[0][1]).toEqual(['14444444 (Pedro Fernandez)', expect.stringContaining('CU39'), 'Apoderado_Usuario_Id', '17777777 (Ana Torres)', 4, 1, null, null, 1]);
     expect(conn.commit).toHaveBeenCalled();
     expect(conn.release).toHaveBeenCalled();
   });
@@ -188,7 +194,7 @@ describe('Pruebas Unitarias - CU39: Editar Asociaciones de un Estudiante', () =>
     expect(res.json).toHaveBeenCalledWith({ mensaje: 'Asociaciones actualizadas correctamente' });
     const inserts = insertsHistorial();
     expect(inserts).toHaveLength(1);
-    expect(inserts[0][1].slice(0, 4)).toEqual(['4', expect.stringContaining('eliminación'), 'Apoderado_Usuario_Id', 'NULL']);
+    expect(inserts[0][1].slice(0, 4)).toEqual(['14444444 (Pedro Fernandez)', expect.stringContaining('eliminación'), 'Apoderado_Usuario_Id', '—']);
   });
 
   test('Retorna 404 si la ficha de estudiante no existe', async () => {

@@ -5,28 +5,15 @@
 const pool = require('../config/db');
 const { claseVigente } = require('../utils/clasesEliminadas');
 const { MAX_SUPLENTES, obtenerApoderadosEstudiante } = require('../utils/apoderadosEstudiante');
+const { registrarHistorial, refPersona, refPersonas } = require('../utils/historial');
 
 const esAdministrador = (user) => (user?.roles || []).includes('Administrador');
 const esDocente = (user) => (user?.roles || []).includes('Docente');
 
 const ESTUDIANTE_NO_EXISTE = { mensaje: 'Ficha de estudiante no encontrada' };
-const SIN_VALOR = '—';
-
 const idValido = (v) => Number.isInteger(Number(v)) && Number(v) > 0;
 
-/** Lista de nombres para el historial: "Ana Pérez, Luis Ramos" o "—" */
-const nombres = (lista) => (lista.length ? lista.map((u) => u.Usuario_Nombre_Completo).join(', ') : SIN_VALOR);
-
-async function registrarHistorial(conn, { estudianteId, atributo, anterior, nuevo, descripcion, responsableId }) {
-  await conn.query(
-    `INSERT INTO historial (
-       Historial_Valor_Anterior, Historial_Hora_Registro, Historial_Descripcion_Cambio,
-       Historial_Atributo_Modificado, Historial_Valor_Nuevo, Historial_Fecha_Registro,
-       Estudiante_Id, Usuario_Responsable_Id
-     ) VALUES (?, CURTIME(), ?, ?, ?, CURDATE(), ?, ?)`,
-    [anterior, descripcion, atributo, nuevo, estudianteId, responsableId]
-  );
-}
+// Historial: personas como "RUT sin DV (Nombre)", con el helper común (utils/historial.js).
 
 /**
  * Valida el cuerpo de CU90. Devuelve { error } o { titularId, suplenteIds } normalizados.
@@ -88,7 +75,7 @@ const designarApoderados = async (req, res) => {
     // Todos deben ser apoderados con cuenta activa
     const ids = [titularId, ...suplenteIds];
     const [usuarios] = await pool.query(
-      `SELECT Usuario_Id, Usuario_Nombre_Completo, Es_Apoderado, Usuario_Estado_Cuenta
+      `SELECT Usuario_Id, Usuario_RUT, Usuario_Nombre_Completo, Es_Apoderado, Usuario_Estado_Cuenta
          FROM usuario WHERE Usuario_Id IN (?)`,
       [ids]
     );
@@ -121,8 +108,8 @@ const designarApoderados = async (req, res) => {
       await registrarHistorial(conn, {
         estudianteId,
         atributo: 'Apoderado_Usuario_Id',
-        anterior: actual.titular ? actual.titular.Usuario_Nombre_Completo : SIN_VALOR,
-        nuevo: porId.get(titularId).Usuario_Nombre_Completo,
+        anterior: refPersona(actual.titular),
+        nuevo: refPersona(porId.get(titularId)),
         descripcion: 'Designación de apoderado titular',
         responsableId: req.user.id,
       });
@@ -139,8 +126,8 @@ const designarApoderados = async (req, res) => {
       await registrarHistorial(conn, {
         estudianteId,
         atributo: 'apoderado_suplente',
-        anterior: nombres(actual.suplentes),
-        nuevo: nombres(suplenteIds.map((id) => porId.get(id))),
+        anterior: refPersonas(actual.suplentes),
+        nuevo: refPersonas(suplenteIds.map((id) => porId.get(id))),
         descripcion: 'Designación de apoderados suplentes',
         responsableId: req.user.id,
       });

@@ -64,7 +64,7 @@ describe('Pruebas Unitarias - CU9 y CU10: Gestión de Asociaciones Apoderado-Est
     test('Registra trazabilidad en historial: una fila por estudiante desvinculado', async () => {
       req.params.apoderadoId = 5;
       db.query.mockResolvedValueOnce([
-        [{ Usuario_Id: 5, Usuario_Nombre_Completo: 'Juan Perez', Usuario_Estado_Cuenta: 1, Es_Apoderado: 1 }]
+        [{ Usuario_Id: 5, Usuario_RUT: '15.555.555-5', Usuario_Nombre_Completo: 'Juan Perez', Usuario_Estado_Cuenta: 1, Es_Apoderado: 1 }]
       ]);
       conn.query
         .mockResolvedValueOnce([[{ Estudiante_Id: 1 }, { Estudiante_Id: 2 }]])
@@ -78,7 +78,8 @@ describe('Pruebas Unitarias - CU9 y CU10: Gestión de Asociaciones Apoderado-Est
       const inserts = insertsHistorial(conn);
       expect(inserts).toHaveLength(2);
       // [anterior, descripcion, atributo, nuevo, Usuario_Id, Estudiante_Id, Citacion_Id, Horario_Asignatura_Id, Responsable]
-      expect(inserts[0][1]).toEqual(['5', expect.stringContaining('CU9'), 'Apoderado_Usuario_Id', 'NULL', 5, 1, null, null, 1]);
+      // Persona como "RUT sin DV (Nombre)"; sin apoderado = "—"
+      expect(inserts[0][1]).toEqual(['15555555 (Juan Perez)', expect.stringContaining('CU9'), 'Apoderado_Usuario_Id', '—', 5, 1, null, null, 1]);
       expect(inserts[1][1][5]).toBe(2);
     });
 
@@ -143,6 +144,7 @@ describe('Pruebas Unitarias - CU9 y CU10: Gestión de Asociaciones Apoderado-Est
       ]);
       conn.query
         .mockResolvedValueOnce([{ affectedRows: 1 }]) // UPDATE
+        .mockResolvedValueOnce([[{ Usuario_Id: 5, Usuario_RUT: '15.555.555-5', Usuario_Nombre_Completo: 'Juan Perez' }]]) // RUT y nombre
         .mockResolvedValueOnce([{ affectedRows: 1 }]); // INSERT historial
 
       await estudianteController.eliminarAsociacionEspecifica(req, res);
@@ -155,7 +157,7 @@ describe('Pruebas Unitarias - CU9 y CU10: Gestión de Asociaciones Apoderado-Est
       );
       const inserts = insertsHistorial(conn);
       expect(inserts).toHaveLength(1);
-      expect(inserts[0][1]).toEqual(['5', expect.stringContaining('CU10'), 'Apoderado_Usuario_Id', 'NULL', 5, 10, null, null, 1]);
+      expect(inserts[0][1]).toEqual(['15555555 (Juan Perez)', expect.stringContaining('CU10'), 'Apoderado_Usuario_Id', '—', 5, 10, null, null, 1]);
       expect(conn.commit).toHaveBeenCalled();
     });
 

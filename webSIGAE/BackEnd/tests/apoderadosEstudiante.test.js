@@ -23,7 +23,7 @@ function mockApoderados({ titular = usuario(4, 'Pedro Fernandez'), suplentes = [
 }
 
 const apoderadoBD = (id, nombre, extra = {}) => ({
-  Usuario_Id: id, Usuario_Nombre_Completo: nombre, Es_Apoderado: 1, Usuario_Estado_Cuenta: 1, ...extra,
+  Usuario_Id: id, Usuario_RUT: `${id}-0`, Usuario_Nombre_Completo: nombre, Es_Apoderado: 1, Usuario_Estado_Cuenta: 1, ...extra,
 });
 
 describe('Pruebas Unitarias - CU90/CU91: Apoderado titular y suplentes (RF57)', () => {
@@ -131,7 +131,8 @@ describe('Pruebas Unitarias - CU90/CU91: Apoderado titular y suplentes (RF57)', 
     expect(conn.query.mock.calls[1][1]).toEqual([[[222222222, 8], [222222222, 9]]]);
     const historial = conn.query.mock.calls[2];
     expect(historial[0]).toContain('INSERT INTO historial');
-    expect(historial[1]).toEqual(['—', 'Designación de apoderados suplentes', 'apoderado_suplente', 'Luis Ramos, Sandra Vera', 222222222, 2]);
+    // Personas como "RUT sin DV (Nombre)" (utils/historial.js)
+    expect(historial[1]).toEqual(['—', 'Designación de apoderados suplentes', 'apoderado_suplente', '8 (Luis Ramos); 9 (Sandra Vera)', null, 222222222, null, null, 2]);
     expect(conn.commit).toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith({ mensaje: 'Designación de apoderados guardada correctamente' });
   });
@@ -146,8 +147,8 @@ describe('Pruebas Unitarias - CU90/CU91: Apoderado titular y suplentes (RF57)', 
     expect(conn.query.mock.calls[0]).toEqual(['UPDATE estudiante SET Apoderado_Usuario_Id = ? WHERE Estudiante_Id = ?', [8, 222222222]]);
     const historiales = conn.query.mock.calls.filter((c) => c[0].includes('INSERT INTO historial'));
     expect(historiales.map((h) => h[1].slice(0, 4))).toEqual([
-      ['Pedro Fernandez', 'Designación de apoderado titular', 'Apoderado_Usuario_Id', 'Luis Ramos'],
-      ['Luis Ramos', 'Designación de apoderados suplentes', 'apoderado_suplente', 'Pedro Fernandez'],
+      ['4 (Pedro Fernandez)', 'Designación de apoderado titular', 'Apoderado_Usuario_Id', '8 (Luis Ramos)'],
+      ['8 (Luis Ramos)', 'Designación de apoderados suplentes', 'apoderado_suplente', '4 (Pedro Fernandez)'],
     ]);
   });
 
