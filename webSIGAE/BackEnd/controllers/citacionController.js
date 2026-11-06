@@ -2,6 +2,7 @@
 // Cada función sigue los diagramas de secuencia del Incremento 3 (C_Citaciones → C_MySQL).
 const pool = require('../config/db');
 const { claseVigente } = require('../utils/clasesEliminadas');
+const { buscarClaseEnTramo, describirClase } = require('../utils/disponibilidadDocente');
 
 const ESTADO_PENDIENTE  = 'Pendiente de confirmación';
 const ESTADO_CONFIRMADA = 'Confirmada';
@@ -98,6 +99,7 @@ const SELECT_CITACION = `
     ua.Usuario_Nombre_Completo AS Apoderado_Nombre,
     c.Docente_Usuario_Id,
     ud.Usuario_Nombre_Completo AS Docente_Nombre,
+    c.Citacion_Solicitante_Rol,
     (
       SELECT h.Usuario_Responsable_Id
       FROM historial h
@@ -115,18 +117,24 @@ const SELECT_CITACION = `
 
 const ORDEN_CRONOLOGICO = 'ORDER BY c.Citacion_Fecha ASC, c.Citacion_Tramo_Horario ASC, c.Citacion_Id ASC';
 
-// CU75/CU77: por defecto confirma el apoderado; si el apoderado reprogramó, confirma quien citó
-// (el docente o el administrador que creó la citación, guardado en Docente_Usuario_Id).
+// CU75/CU77/CU89: confirma la contraparte de quien hizo el último movimiento.
+//  - Sin reprogramaciones: la contraparte de quien la originó. Si la citó el docente (o un
+//    administrador, guardado en Docente_Usuario_Id) confirma el apoderado; si la solicitó el
+//    apoderado (RF56), confirma el docente.
+//  - Tras una reprogramación: si reprogramó el apoderado confirma el docente; si reprogramó el
+//    docente o un administrador, confirma el apoderado.
 // Puede_Confirmar indica si al usuario que consulta le corresponde confirmarla.
 function formatearCitacion(fila, userId) {
   const { Ultimo_Reprogramador_Id, ...citacion } = fila;
   let requiere = null;
   if (esPendiente(citacion)) {
-    const reprogramoApoderado =
-      Ultimo_Reprogramador_Id != null &&
-      Number(Ultimo_Reprogramador_Id) === Number(citacion.Apoderado_Usuario_Id) &&
-      Number(Ultimo_Reprogramador_Id) !== Number(citacion.Docente_Usuario_Id);
-    requiere = reprogramoApoderado ? 'Docente' : 'Apoderado';
+    let ultimoMovimientoApoderado = citacion.Citacion_Solicitante_Rol === 'Apoderado';
+    if (Ultimo_Reprogramador_Id != null) {
+      ultimoMovimientoApoderado =
+        Number(Ultimo_Reprogramador_Id) === Number(citacion.Apoderado_Usuario_Id) &&
+        Number(Ultimo_Reprogramador_Id) !== Number(citacion.Docente_Usuario_Id);
+    }
+    requiere = ultimoMovimientoApoderado ? 'Docente' : 'Apoderado';
   }
   const responsableId = requiere === 'Docente' ? citacion.Docente_Usuario_Id : citacion.Apoderado_Usuario_Id;
   const puedeConfirmar =
@@ -164,6 +172,9 @@ async function hayConflictoHorario(conn, { fecha, tramo, docenteId, apoderadoId,
   );
   return rows.length > 0;
 }
+
+const mensajeChoqueClase = (clase) =>
+  `El tramo seleccionado coincide con una clase del docente: ${describirClase(clase)}`;
 
 async function registrarHistorial(conn, { citacionId, atributo, anterior, nuevo, descripcion, responsableId }) {
   await conn.query(
@@ -326,6 +337,11 @@ const crearCitacion = async (req, res) => {
     });
     if (conflicto) {
       return res.status(409).json({ mensaje: 'No existe disponibilidad para la fecha y tramo seleccionado' });
+    }
+    // C-11 (decisión D8): la citación no puede coincidir con una clase del docente
+    const clase = await buscarClaseEnTramo(pool, { docenteId, fecha: Citacion_Fecha, tramo: Citacion_Tramo_Horario });
+    if (clase) {
+      return res.status(409).json({ mensaje: mensajeChoqueClase(clase), clase });
     }
 
     // Pasos 11–14: INSERT con estado "Pendiente de confirmación"
@@ -500,6 +516,15 @@ const reprogramarCitacion = async (req, res) => {
     if (conflicto) {
       return res.status(409).json({ mensaje: 'Los nuevos datos generan conflicto de disponibilidad horaria' });
     }
+    // C-11 (decisión D8): el nuevo tramo no puede coincidir con una clase del docente citado
+    const clase = await buscarClaseEnTramo(pool, {
+      docenteId: citacion.Docente_Usuario_Id,
+      fecha: Citacion_Fecha,
+      tramo: Citacion_Tramo_Horario,
+    });
+    if (clase) {
+      return res.status(409).json({ mensaje: mensajeChoqueClase(clase), clase });
+    }
 
     // Pasos 5–8: UPDATE fecha/tramo y estado a "pendiente" hasta confirmación de la contraparte.
     // El registro en historial identifica a quién reprogramó (define quién debe confirmar).
@@ -628,7 +653,15 @@ module.exports = {
   cancelarCitacion,
   reprogramarCitacion,
   getHistorialCitaciones,
-  // Exportados para las pruebas unitarias
+  // Compartidos con la solicitud de citación del apoderado (RF56) y con las pruebas unitarias
+  ESTADO_PENDIENTE,
+  ESTADO_CANCELADA,
+  MODALIDADES,
   TRAMOS_HORARIOS,
+  esCancelada,
   validarFechaTramo,
+  validarMotivo,
+  hayConflictoHorario,
+  buscarCitacionDelUsuario,
+  mensajeChoqueClase,
 };

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getHorarioDocente, getListaDocentes } from "../../services/api";
+import { getHorarioDocente, getListaDocentes, getMiHorarioAtencion } from "../../services/api";
 import ExportMenu from "../../components/ExportMenu";
 import HorarioSemanal from "../../components/horarios/HorarioSemanal";
 import AvisoTopes from "../../components/horarios/AvisoTopes";
+import HorarioAtencionPanel from "../../components/horarios/HorarioAtencionPanel";
 import { detectarTopes } from "../../utils/horarios";
 
 function MiHorario() {
@@ -19,6 +20,25 @@ function MiHorario() {
   const [mensajeInfo, setMensajeInfo] = useState("");
   const [errorCarga, setErrorCarga] = useState("");
   const [avisoCerrado, setAvisoCerrado] = useState(false);
+
+  // RF55 / CU87–CU88: horario de atención de apoderados (solo el propio docente)
+  const [atencion, setAtencion] = useState([]);
+  const [cargandoAtencion, setCargandoAtencion] = useState(!esAdmin);
+  const [errorAtencion, setErrorAtencion] = useState("");
+  const [msgAtencion, setMsgAtencion] = useState("");
+
+  const cargarAtencion = async () => {
+    setCargandoAtencion(true);
+    setErrorAtencion("");
+    try {
+      const data = await getMiHorarioAtencion();
+      setAtencion(Array.isArray(data) ? data : data?.bloques || []);
+    } catch (error) {
+      setErrorAtencion(error.message || "No fue posible cargar tu horario de atención");
+    } finally {
+      setCargandoAtencion(false);
+    }
+  };
 
   // CU43: horario semanal a partir de sus cursos asociados
   const cargarHorario = async (id) => {
@@ -50,6 +70,7 @@ function MiHorario() {
     } else {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       cargarHorario(usuario?.id);
+      cargarAtencion();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -74,6 +95,23 @@ function MiHorario() {
     pendiente: Boolean(Number(h.pendiente)),
   }));
   const topes = detectarTopes(clases);
+
+  // Los bloques de atención se dibujan en la grilla junto a las clases, con su propio color
+  const bloquesAtencion = esAdmin ? [] : atencion.map((b) => ({
+    id: `atencion-${b.Horario_Atencion_Id}`,
+    dia: b.Horario_Atencion_Dia_Semana,
+    horaInicio: b.Horario_Atencion_Hora_Inicio,
+    horaFin: b.Horario_Atencion_Hora_Fin,
+    titulo: "Atención de apoderados",
+    lineas: [],
+    colorKey: "Atención de apoderados",
+  }));
+  const grilla = [...clases, ...bloquesAtencion];
+
+  const alCambiarAtencion = (mensaje) => {
+    setMsgAtencion(mensaje);
+    cargarAtencion();
+  };
 
   return (
     <div className="usuarios-container">
@@ -122,12 +160,29 @@ function MiHorario() {
         <div className="usuarios-empty">{mensajeInfo}</div>
       )}
 
-      {!loading && !errorCarga && !mensajeInfo && (esAdmin ? docenteId : true) && horario.length > 0 && (
-        <HorarioSemanal clases={clases} />
+      {!loading && !errorCarga && (esAdmin ? docenteId && !mensajeInfo : true) && grilla.length > 0 && (
+        <HorarioSemanal clases={grilla} />
       )}
 
       {!loading && !avisoCerrado && (
         <AvisoTopes topes={topes} onCerrar={() => setAvisoCerrado(true)} />
+      )}
+
+      {!esAdmin && (
+        <>
+          {msgAtencion && (
+            <div className="success-message cit-exito">
+              <span>{msgAtencion}</span>
+              <button type="button" className="btn-cerrar" onClick={() => setMsgAtencion("")} aria-label="Cerrar aviso">✕</button>
+            </div>
+          )}
+          <HorarioAtencionPanel
+            bloques={atencion}
+            cargando={cargandoAtencion}
+            error={errorAtencion}
+            onCambio={alCambiarAtencion}
+          />
+        </>
       )}
     </div>
   );

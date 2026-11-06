@@ -13,6 +13,7 @@ import {
 import EstadoCitacionBadge from "../../components/citaciones/EstadoCitacionBadge";
 import FormCitacionModal from "../../components/citaciones/FormCitacionModal";
 import DetalleCitacionModal from "../../components/citaciones/DetalleCitacionModal";
+import SolicitarCitacionModal from "../../components/citaciones/SolicitarCitacionModal";
 
 // Respuestas del backend: arreglo directo, o { mensaje, citaciones: [] } para las excepciones "sin registros"
 function extraerLista(data, clave = "citaciones") {
@@ -40,7 +41,7 @@ function consultarCitaciones(rol) {
 }
 
 // Módulo de citaciones para Docente, Apoderado y Administrador/Super Admin:
-//  CU74 crear (Docente/Admin) · CU75 confirmar · CU76 cancelar · CU77 reprogramar · CU78 agenda
+//  CU74 crear (Docente/Admin) · CU89 solicitar (Apoderado) · CU75 confirmar · CU76 cancelar · CU77 reprogramar · CU78 agenda
 // El administrador ve y gestiona las citaciones de toda la institución.
 function Citaciones() {
   const { usuario, rolActivo } = useAuth();
@@ -64,6 +65,7 @@ function Citaciones() {
   const [msgExito, setMsgExito] = useState("");
 
   const [formAbierto, setFormAbierto] = useState(false);
+  const [solicitudAbierta, setSolicitudAbierta] = useState(false);
   const [estudiantes, setEstudiantes] = useState([]);
   const [msgSinEstudiantes, setMsgSinEstudiantes] = useState("");
   const [detalleId, setDetalleId] = useState(null);
@@ -125,6 +127,7 @@ function Citaciones() {
 
   const alCompletarAccion = (mensaje) => {
     setFormAbierto(false);
+    setSolicitudAbierta(false);
     setDetalleId(null);
     setMsgExito(mensaje);
     recargar();
@@ -153,9 +156,13 @@ function Citaciones() {
 
   const hoy = hoyISO();
   // Quién participa en cada citación, según desde qué rol se mira la agenda
+  // CU89: en las solicitadas por el apoderado, Docente_Nombre es el docente solicitado
   const participantes = (c) => {
-    const citador = c.Docente_Nombre ? `Citado por: ${c.Docente_Nombre}` : "";
-    const apoderado = c.Apoderado_Nombre ? `Apoderado: ${c.Apoderado_Nombre}` : "";
+    const solicitada = c.Citacion_Solicitante_Rol === "Apoderado";
+    const citador = c.Docente_Nombre ? `${solicitada ? "Solicitada a" : "Citado por"}: ${c.Docente_Nombre}` : "";
+    const apoderado = c.Apoderado_Nombre
+      ? `${solicitada ? "Solicitada por" : "Apoderado"}: ${c.Apoderado_Nombre}`
+      : "";
     if (esDocente) return apoderado;
     if (esApoderado) return citador;
     return [citador, apoderado].filter(Boolean).join(" · ");
@@ -181,6 +188,18 @@ function Citaciones() {
           {(esDocente || esAdmin) && (
             <button type="button" className="btn-primario" onClick={abrirFormulario}>
               + Nueva citación
+            </button>
+          )}
+          {esApoderado && (
+            <button
+              type="button"
+              className="btn-primario"
+              onClick={() => {
+                setMsgExito("");
+                setSolicitudAbierta(true);
+              }}
+            >
+              + Solicitar citación
             </button>
           )}
         </div>
@@ -310,6 +329,13 @@ function Citaciones() {
           mensajeSinEstudiantes={msgSinEstudiantes}
           onClose={() => setFormAbierto(false)}
           onCreada={alCompletarAccion}
+        />
+      )}
+
+      {solicitudAbierta && (
+        <SolicitarCitacionModal
+          onClose={() => setSolicitudAbierta(false)}
+          onSolicitada={alCompletarAccion}
         />
       )}
 
