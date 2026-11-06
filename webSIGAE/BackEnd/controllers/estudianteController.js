@@ -5,6 +5,7 @@
 const db = require('../config/db');
 const { registrarHistorial } = require('../utils/historial');
 const { claseVigente } = require('../utils/clasesEliminadas');
+const { condicionApoderadoAsociado, rolApoderadoSQL } = require('../utils/apoderadosEstudiante');
 const {
   validarRut,
   validarNombreCompleto,
@@ -468,6 +469,11 @@ const asignarApoderado = async (req, res) => {
         'UPDATE estudiante SET Apoderado_Usuario_Id = ? WHERE Estudiante_Id = ?',
         [apoderadoId, estudianteId]
       );
+      // RF57: si era suplente del estudiante, deja de serlo al quedar como titular
+      await conn.query(
+        'DELETE FROM apoderado_suplente WHERE Estudiante_Id = ? AND Suplente_Usuario_Id = ?',
+        [estudianteId, apoderadoId]
+      );
       asignados.push(estudiante[0].Estudiante_Nombre_Completo);
     }
 
@@ -529,13 +535,18 @@ const eliminarTodasAsociacionesApoderado = async (req, res) => {
     conn = await db.getConnection();
     await conn.beginTransaction();
 
-    // 2. Excepción 1: Verificar que tenga asociaciones activas (bloqueadas hasta el commit)
-    const [asociados] = await conn.query(
+    // 2. Excepción 1: Verificar que tenga asociaciones activas, como titular o como
+    // suplente (RF57). Las filas quedan bloqueadas hasta el commit.
+    const [comoTitular] = await conn.query(
       'SELECT Estudiante_Id FROM estudiante WHERE Apoderado_Usuario_Id = ? FOR UPDATE',
       [apoderadoId]
     );
+    const [comoSuplente] = await conn.query(
+      'SELECT Estudiante_Id FROM apoderado_suplente WHERE Suplente_Usuario_Id = ? FOR UPDATE',
+      [apoderadoId]
+    );
 
-    if (asociados.length === 0) {
+    if (comoTitular.length === 0 && comoSuplente.length === 0) {
       await conn.rollback();
       return res.status(400).json({
         mensaje: 'No existen asociaciones disponibles para eliminar',
@@ -548,8 +559,15 @@ const eliminarTodasAsociacionesApoderado = async (req, res) => {
       [apoderadoId]
     );
 
+    // RF57: también deja de ser suplente de cualquier estudiante
+    const [resultadoSuplente] = await conn.query(
+      'DELETE FROM apoderado_suplente WHERE Suplente_Usuario_Id = ?',
+      [apoderadoId]
+    );
+    const suplenciasEliminadas = resultadoSuplente?.affectedRows || 0;
+
     // 4. Registra trazabilidad: una fila por estudiante desvinculado
-    for (const { Estudiante_Id } of asociados) {
+    for (const { Estudiante_Id } of comoTitular) {
       await registrarHistorial(conn, {
         atributo: 'Apoderado_Usuario_Id',
         anterior: apoderadoId,
@@ -560,12 +578,23 @@ const eliminarTodasAsociacionesApoderado = async (req, res) => {
         responsableId: req.user.id,
       });
     }
+    for (const { Estudiante_Id } of comoSuplente) {
+      await registrarHistorial(conn, {
+        atributo: 'apoderado_suplente',
+        anterior: apoderadoId,
+        nuevo: null,
+        descripcion: 'CU9: eliminación de todas las asociaciones del apoderado (suplencia)',
+        usuarioId: Number(apoderadoId),
+        estudianteId: Estudiante_Id,
+        responsableId: req.user.id,
+      });
+    }
 
     await conn.commit();
 
     return res.json({
       mensaje: 'Todas las asociaciones activas fueron eliminadas exitosamente',
-      eliminadas: resultado.affectedRows,
+      eliminadas: resultado.affectedRows + suplenciasEliminadas,
     });
   } catch (error) {
     if (conn) await conn.rollback().catch(() => {});
@@ -671,18 +700,20 @@ const getEstudiantesAsociados = async (req, res) => {
       }
     }
 
+    // RF57: incluye a los estudiantes de los que es titular o suplente
     const [estudiantes] = await db.query(
       `SELECT
         e.Estudiante_Id,
         e.Estudiante_Nombre_Completo,
         e.Estudiante_RUT,
         e.Estudiante_Estado_Academico,
-        c.Curso_Nombre
+        c.Curso_Nombre,
+        ${rolApoderadoSQL('e')} AS Rol_Apoderado
       FROM estudiante e
       JOIN curso c ON c.Curso_Id = e.Curso_Id
-      WHERE e.Apoderado_Usuario_Id = ?
+      WHERE ${condicionApoderadoAsociado('e')}
       ORDER BY e.Estudiante_Nombre_Completo ASC`,
-      [apoderadoId]
+      [apoderadoId, apoderadoId, apoderadoId]
     );
 
     // Excepción 1: el apoderado no tiene estudiantes asociados
@@ -765,10 +796,17 @@ const editarAsociaciones = async (req, res) => {
       'UPDATE estudiante SET Apoderado_Usuario_Id = ? WHERE Estudiante_Id = ? AND Apoderado_Usuario_Id <=> ?',
       [apoderadoId, estudianteId, apoderadoActual]
     );
-
     if (resultado.affectedRows === 0) {
       await conn.rollback();
       return res.status(409).json({ mensaje: 'La asociación cambió mientras se editaba. Recargue e intente nuevamente.' });
+    }
+
+    // RF57: si el nuevo titular era suplente del estudiante, deja de serlo
+    if (apoderadoId !== null) {
+      await conn.query(
+        'DELETE FROM apoderado_suplente WHERE Estudiante_Id = ? AND Suplente_Usuario_Id = ?',
+        [estudianteId, apoderadoId]
+      );
     }
 
     // Registra trazabilidad
@@ -823,8 +861,8 @@ const getDetalleEstudiante = async (req, res) => {
               e.Estudiante_Calle, e.Estudiante_Numero, e.Estudiante_Depto, e.Estudiante_Comuna
        FROM estudiante e
        JOIN curso c ON c.Curso_Id = e.Curso_Id
-       WHERE e.Estudiante_Id = ? AND e.Apoderado_Usuario_Id = ?`,
-      [estudianteId, apoderadoId]
+       WHERE e.Estudiante_Id = ? AND ${condicionApoderadoAsociado('e')}`,
+      [estudianteId, apoderadoId, apoderadoId]
     );
 
     // Excepción "Estudiante ya no se encuentra asociado"

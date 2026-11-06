@@ -3,6 +3,7 @@
 const pool = require('../config/db');
 const { claseVigente } = require('../utils/clasesEliminadas');
 const { buscarClaseEnTramo, describirClase } = require('../utils/disponibilidadDocente');
+const { esApoderadoDelEstudiante } = require('../utils/apoderadosEstudiante');
 
 const ESTADO_PENDIENTE  = 'Pendiente de confirmación';
 const ESTADO_CONFIRMADA = 'Confirmada';
@@ -585,7 +586,9 @@ const getHistorialCitaciones = async (req, res) => {
     // asociados; el docente solo a estudiantes de sus cursos.
     let autorizado = roles.includes('Administrador');
     if (!autorizado && roles.includes('Apoderado')) {
-      autorizado = Number(estudiante.Apoderado_Usuario_Id) === Number(userId);
+      // RF57: el titular y los suplentes son apoderados asociados del estudiante
+      autorizado = Number(estudiante.Apoderado_Usuario_Id) === Number(userId)
+        || await esApoderadoDelEstudiante(pool, userId, estudianteId);
     }
     if (!autorizado && roles.includes('Docente')) {
       const [cursos] = await pool.query(

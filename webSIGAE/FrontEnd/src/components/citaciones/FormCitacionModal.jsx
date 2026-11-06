@@ -7,6 +7,7 @@ import {
   hoyISO,
   validarDatosCitacion,
 } from "../../utils/citaciones";
+import ContactosApoderados from "./ContactosApoderados";
 
 const FORM_INICIAL = { estudianteId: "", fecha: "", tramo: "", motivo: "", modalidad: "" };
 
@@ -95,6 +96,9 @@ function FormCitacionModal({ estudiantes, mensajeSinEstudiantes, onClose, onCrea
               </select>
               {errores.estudianteId && <span className="pwd-error">{errores.estudianteId}</span>}
             </div>
+
+            {/* RF57 / CU91: contactos del titular y los suplentes del estudiante seleccionado */}
+            {form.estudianteId && <ContactosApoderados estudianteId={form.estudianteId} />}
 
             <div className="cit-form-fila">
               <div className="campo-pwd">

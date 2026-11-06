@@ -2467,6 +2467,15 @@ body.bloques-panel-open .main-content {
   background: #f8fafc;
 }
 .atencion-confirmacion { border-color: #fcd34d; background: #fffbeb; }
+.atencion-tabla { width: 100%; }
+.atencion-tabla th:last-child,
+.atencion-tabla td:last-child { text-align: right; }
+.atencion-tabla td:last-child .acciones-grupo { justify-content: flex-end; }
+@media (max-width: 640px) {
+  .cit-tabla-wrap .atencion-tabla th,
+  .cit-tabla-wrap .atencion-tabla td { padding: 10px 6px; }
+  .atencion-tabla td:last-child .acciones-grupo { flex-direction: column; align-items: flex-end; gap: 6px; }
+}
 .atencion-form-titulo { font-size: 0.95rem; margin: 0 0 12px; color: #1e293b; }
 .cit-form-fila.atencion-form-fila { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 640px) {
@@ -2500,3 +2509,38 @@ body.bloques-panel-open .main-content {
 .sol-tramo:hover { background: #e0e7ff; }
 .sol-tramo-activo,
 .sol-tramo-activo:hover { background: #4f46e5; border-color: #4f46e5; color: white; }
+
+/* ── Apoderado titular y suplentes (RF57 / CU90, CU91) ── */
+.suplentes-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.suplente-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 0.9rem;
+  color: #1e293b;
+}
+.suplente-agregar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.suplente-agregar .usuarios-select { flex: 1 1 200px; }
+
+.contactos-apoderados {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #6366f1;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+.contactos-titulo { font-size: 0.9rem; margin: 0 0 8px; color: #1e293b; }
+.contacto-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.contacto-nombre { font-weight: 600; font-size: 0.88rem; color: #1e293b; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.contacto-rol { font-size: 0.7rem; font-weight: 700; border-radius: 999px; padding: 1px 8px; }
+.contacto-rol-titular { background: #e0e7ff; color: #4338ca; }
+.contacto-rol-suplente { background: #f1f5f9; color: #475569; }
+.contacto-datos { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.84rem; margin-top: 2px; }
+.contacto-datos a { color: #2563eb; overflow-wrap: anywhere; }

@@ -43,8 +43,10 @@ describe('Pruebas Unitarias - CU9 y CU10: Gestión de Asociaciones Apoderado-Est
         [{ Usuario_Id: 5, Usuario_Nombre_Completo: 'Juan Perez', Usuario_Estado_Cuenta: 1, Es_Apoderado: 1 }]
       ]);
       conn.query
-        .mockResolvedValueOnce([[{ Estudiante_Id: 1 }, { Estudiante_Id: 2 }]]) // SELECT ... FOR UPDATE
+        .mockResolvedValueOnce([[{ Estudiante_Id: 1 }, { Estudiante_Id: 2 }]]) // titular: SELECT ... FOR UPDATE
+        .mockResolvedValueOnce([[]]) // suplente: SELECT ... FOR UPDATE
         .mockResolvedValueOnce([{ affectedRows: 2 }]) // UPDATE
+        .mockResolvedValueOnce([{ affectedRows: 0 }]) // DELETE suplencias
         .mockResolvedValue([{ affectedRows: 1 }]); // INSERT historial
 
       await estudianteController.eliminarTodasAsociacionesApoderado(req, res);
@@ -66,7 +68,9 @@ describe('Pruebas Unitarias - CU9 y CU10: Gestión de Asociaciones Apoderado-Est
       ]);
       conn.query
         .mockResolvedValueOnce([[{ Estudiante_Id: 1 }, { Estudiante_Id: 2 }]])
+        .mockResolvedValueOnce([[]])
         .mockResolvedValueOnce([{ affectedRows: 2 }])
+        .mockResolvedValueOnce([{ affectedRows: 0 }])
         .mockResolvedValue([{ affectedRows: 1 }]);
 
       await estudianteController.eliminarTodasAsociacionesApoderado(req, res);
@@ -85,7 +89,9 @@ describe('Pruebas Unitarias - CU9 y CU10: Gestión de Asociaciones Apoderado-Est
       ]);
       conn.query
         .mockResolvedValueOnce([[{ Estudiante_Id: 1 }]])
+        .mockResolvedValueOnce([[]])
         .mockResolvedValueOnce([{ affectedRows: 1 }])
+        .mockResolvedValueOnce([{ affectedRows: 0 }])
         .mockRejectedValueOnce(new Error('Fallo al insertar historial'));
       jest.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -104,7 +110,7 @@ describe('Pruebas Unitarias - CU9 y CU10: Gestión de Asociaciones Apoderado-Est
       db.query.mockResolvedValueOnce([
         [{ Usuario_Id: 5, Usuario_Nombre_Completo: 'Juan Perez', Usuario_Estado_Cuenta: 1, Es_Apoderado: 1 }]
       ]);
-      conn.query.mockResolvedValueOnce([[]]);
+      conn.query.mockResolvedValueOnce([[]]).mockResolvedValueOnce([[]]);
 
       await estudianteController.eliminarTodasAsociacionesApoderado(req, res);
 

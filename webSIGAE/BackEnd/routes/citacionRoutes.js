@@ -16,6 +16,7 @@ const {
   getDisponibilidadSolicitud,
   solicitarCitacion,
 } = require('../controllers/solicitudCitacionController');
+const { getContactosApoderados } = require('../controllers/apoderadosEstudianteController');
 
 const router = express.Router();
 
@@ -32,6 +33,8 @@ router.get('/solicitud/estudiantes', getEstudiantesSolicitud);
 router.get('/solicitud/estudiante/:estudianteId/docentes', getDocentesSolicitud);
 router.get('/solicitud/disponibilidad', getDisponibilidadSolicitud);
 router.post('/solicitud', solicitarCitacion);
+// CU91 (RF57): contactos del apoderado titular y suplentes (Docente de sus cursos, Admin)
+router.get('/estudiante/:estudianteId/contactos', getContactosApoderados);
 // CU79: historial completo de citaciones de un estudiante (también Admin/Super Admin)
 router.get('/estudiante/:estudianteId/historial', getHistorialCitaciones);
 // CU76 / CU77: detalle de una citación
