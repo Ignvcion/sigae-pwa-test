@@ -4,7 +4,7 @@
 // y los suplentes, hasta MAX_SUPLENTES, se guardan en apoderado_suplente.
 const pool = require('../config/db');
 const { claseVigente } = require('../utils/clasesEliminadas');
-const { MAX_SUPLENTES, obtenerApoderadosEstudiante } = require('../utils/apoderadosEstudiante');
+const { MAX_SUPLENTES, obtenerApoderadosEstudiante, puedeAsociarse, reactivarApoderados } = require('../utils/apoderadosEstudiante');
 const { registrarHistorial, refPersona, refPersonas } = require('../utils/historial');
 
 const esAdministrador = (user) => (user?.roles || []).includes('Administrador');
@@ -75,7 +75,8 @@ const designarApoderados = async (req, res) => {
     // Todos deben ser apoderados con cuenta activa
     const ids = [titularId, ...suplenteIds];
     const [usuarios] = await pool.query(
-      `SELECT Usuario_Id, Usuario_RUT, Usuario_Nombre_Completo, Es_Apoderado, Usuario_Estado_Cuenta
+      `SELECT Usuario_Id, Usuario_RUT, Usuario_Nombre_Completo, Es_Apoderado, Usuario_Estado_Cuenta,
+              Apoderado_Sin_Asociaciones_Desde
          FROM usuario WHERE Usuario_Id IN (?)`,
       [ids]
     );
@@ -86,7 +87,8 @@ const designarApoderados = async (req, res) => {
     if (noApoderado) {
       return res.status(400).json({ mensaje: `${noApoderado.Usuario_Nombre_Completo} no tiene rol de apoderado` });
     }
-    const inactivo = ids.map((id) => porId.get(id)).find((u) => !u.Usuario_Estado_Cuenta);
+    // Un apoderado inactivo por haber quedado sin estudiantes sí puede asociarse (se reactiva)
+    const inactivo = ids.map((id) => porId.get(id)).find((u) => !puedeAsociarse(u));
     if (inactivo) {
       return res.status(400).json({ mensaje: `La cuenta de ${inactivo.Usuario_Nombre_Completo} está inactiva` });
     }
@@ -133,6 +135,7 @@ const designarApoderados = async (req, res) => {
       });
     }
 
+    await reactivarApoderados(conn, ids.map((id) => porId.get(id)));
     await conn.commit();
     return res.json({ mensaje: 'Designación de apoderados guardada correctamente' });
   } catch (error) {

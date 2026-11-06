@@ -69,8 +69,29 @@ async function obtenerApoderadosEstudiante(conn, estudianteId) {
   return { estudiante, titular, suplentes };
 }
 
+// Un apoderado que quedó sin estudiantes queda inactivo y marcado con el período
+// (usuario.Apoderado_Sin_Asociaciones_Desde, al iniciar un nuevo período). Una nueva
+// asociación lo reactiva. Una cuenta desactivada a mano (sin marca) no se reactiva.
+const inactivoPorFaltaDeAsociacion = (u) => Boolean(u && !u.Usuario_Estado_Cuenta && u.Apoderado_Sin_Asociaciones_Desde);
+const puedeAsociarse = (u) => Boolean(u && (u.Usuario_Estado_Cuenta || inactivoPorFaltaDeAsociacion(u)));
+
+/** Reactiva (dentro de la transacción) a los apoderados marcados por falta de asociaciones. */
+async function reactivarApoderados(conn, usuarios) {
+  const ids = usuarios.filter(inactivoPorFaltaDeAsociacion).map((u) => Number(u.Usuario_Id));
+  if (ids.length === 0) return 0;
+  await conn.query(
+    `UPDATE usuario SET Usuario_Estado_Cuenta = 1, Apoderado_Sin_Asociaciones_Desde = NULL
+      WHERE Usuario_Id IN (?) AND Apoderado_Sin_Asociaciones_Desde IS NOT NULL`,
+    [ids]
+  );
+  return ids.length;
+}
+
 module.exports = {
   MAX_SUPLENTES,
+  inactivoPorFaltaDeAsociacion,
+  puedeAsociarse,
+  reactivarApoderados,
   condicionApoderadoAsociado,
   rolApoderadoSQL,
   esApoderadoDelEstudiante,

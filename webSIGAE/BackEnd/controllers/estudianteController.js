@@ -5,7 +5,7 @@
 const db = require('../config/db');
 const { registrarHistorial, refPersona, buscarPersonas } = require('../utils/historial');
 const { claseVigente } = require('../utils/clasesEliminadas');
-const { condicionApoderadoAsociado, rolApoderadoSQL } = require('../utils/apoderadosEstudiante');
+const { condicionApoderadoAsociado, rolApoderadoSQL, puedeAsociarse, reactivarApoderados } = require('../utils/apoderadosEstudiante');
 const {
   validarRut,
   validarNombreCompleto,
@@ -431,7 +431,7 @@ const asignarApoderado = async (req, res) => {
   const conn = await db.getConnection();
   try {
     const [apoderado] = await conn.query(
-      `SELECT Usuario_Id, Usuario_Nombre_Completo, Es_Apoderado, Usuario_Estado_Cuenta
+      `SELECT Usuario_Id, Usuario_Nombre_Completo, Es_Apoderado, Usuario_Estado_Cuenta, Apoderado_Sin_Asociaciones_Desde
        FROM usuario WHERE Usuario_Id = ?`,
       [apoderadoId]
     );
@@ -440,7 +440,8 @@ const asignarApoderado = async (req, res) => {
       return res.status(404).json({ mensaje: 'Apoderado no encontrado' });
     if (!apoderado[0].Es_Apoderado)
       return res.status(400).json({ mensaje: 'El usuario seleccionado no tiene rol de apoderado' });
-    if (!apoderado[0].Usuario_Estado_Cuenta)
+    // Inactivo por haber quedado sin estudiantes: se puede asociar y se reactiva
+    if (!puedeAsociarse(apoderado[0]))
       return res.status(400).json({ mensaje: 'El apoderado seleccionado está inactivo' });
 
     await conn.beginTransaction();
@@ -477,6 +478,7 @@ const asignarApoderado = async (req, res) => {
       asignados.push(estudiante[0].Estudiante_Nombre_Completo);
     }
 
+    if (asignados.length > 0) await reactivarApoderados(conn, [apoderado[0]]);
     await conn.commit();
     res.json({
       mensaje      : 'Proceso completado',
@@ -747,6 +749,7 @@ const editarAsociaciones = async (req, res) => {
   // Normaliza a Number o null para comparar de forma confiable contra el valor almacenado
   const apoderadoId = apoderadoIdBody === null ? null : Number(apoderadoIdBody);
   let conn;
+  let nuevoApoderado = null;
 
   try {
     const [estudiante] = await db.query(
@@ -778,13 +781,15 @@ const editarAsociaciones = async (req, res) => {
     // Si se asigna un nuevo apoderado (no se está eliminando), validar que exista y esté activo
     if (apoderadoId !== null) {
       const [apoderado] = await db.query(
-        'SELECT Usuario_Id, Usuario_Estado_Cuenta FROM usuario WHERE Usuario_Id = ? AND Es_Apoderado = 1',
+        'SELECT Usuario_Id, Usuario_Estado_Cuenta, Apoderado_Sin_Asociaciones_Desde FROM usuario WHERE Usuario_Id = ? AND Es_Apoderado = 1',
         [apoderadoId]
       );
       if (apoderado.length === 0) {
         return res.status(404).json({ mensaje: 'Apoderado no encontrado' });
       }
-      if (!apoderado[0].Usuario_Estado_Cuenta) {
+      nuevoApoderado = apoderado[0];
+      // Inactivo por haber quedado sin estudiantes: se puede asociar y se reactiva
+      if (!puedeAsociarse(apoderado[0])) {
         return res.status(400).json({ mensaje: 'El apoderado seleccionado está inactivo' });
       }
     }
@@ -808,6 +813,7 @@ const editarAsociaciones = async (req, res) => {
         'DELETE FROM apoderado_suplente WHERE Estudiante_Id = ? AND Suplente_Usuario_Id = ?',
         [estudianteId, apoderadoId]
       );
+      if (nuevoApoderado) await reactivarApoderados(conn, [nuevoApoderado]);
     }
 
     // Registra trazabilidad
