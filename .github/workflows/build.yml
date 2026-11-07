@@ -1,0 +1,56 @@
+name: Build Backend and Frontend
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-backend:
+    name: Build Backend (Node.js)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: webSIGAE/BackEnd/package-lock.json
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: webSIGAE/BackEnd
+
+      - name: Verify server starts
+        run: node -e "require('./server.js')" &
+        working-directory: webSIGAE/BackEnd
+
+  build-frontend:
+    name: Build Frontend (React + Vite)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: webSIGAE/FrontEnd/package-lock.json
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: webSIGAE/FrontEnd
+
+      - name: Build
+        run: npm run build
+        working-directory: webSIGAE/FrontEnd

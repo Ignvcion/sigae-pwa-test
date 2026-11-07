@@ -1,0 +1,6 @@
+{
+    "terminal.integrated.defaultProfile.linux": "bash",
+    "terminal.integrated.defaultProfile.windows": "Git Bash",
+    "debug.node.autoAttach": "disabled",
+    "nodejs.executable": "/usr/local/bin/node"
+}

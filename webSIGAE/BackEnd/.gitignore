@@ -1,0 +1,4 @@
+node_modules/
+
+# CU20: archivos subidos por los usuarios (fotografías de perfil)
+uploads/

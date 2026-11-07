@@ -1,0 +1,85 @@
+# ─────────────────────────────────────────────────────────────
+# SIGAE — .gitignore (Node.js + Express / Vite + React)
+# ─────────────────────────────────────────────────────────────
+
+# ── Secretos ─────────────────────────────────────────────────
+# El .env real nunca se sube. La plantilla (.env.example) sí.
+.env
+.env.*
+!.env.example
+*.bak
+*.pem
+*.ppk
+*.key
+*.crt
+*.pfx
+*.p12
+id_rsa*
+id_ed25519*
+.aws/
+
+# ── Respaldos y datos ────────────────────────────────────────
+# OJO: no se ignora *.sql en general (SIGAE.sql y schema_base.sql
+# van versionados); solo los respaldos y volcados.
+backups/
+respaldo*.sql
+backup*.sql
+dump*.sql
+*.sql.gz
+*.dump
+Database/dumps/
+Database/import/
+*.csv
+*.xls
+*.xlsx
+
+# ── Archivos subidos por los usuarios (CU20: fotos de perfil) ─
+# En producción viven fuera del repo (UPLOADS_DIR=/var/sigae/uploads).
+uploads/
+
+# ── Dependencias y builds ────────────────────────────────────
+# package-lock.json SÍ se versiona.
+node_modules/
+dist/
+build/
+.vite/
+.cache/
+coverage/
+
+# ── Logs y temporales ────────────────────────────────────────
+*.log
+logs/
+.pm2/
+*.pid
+tmp/
+*.swp
+
+# ── Editor y sistema operativo ───────────────────────────────
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# ── Restos de herramientas de desarrollo ─────────────────────
+# Visual Studio / dotnet generan estos archivos al abrir el proyecto como
+# si fuera .NET. SIGAE es Node: no deben llegar al servidor.
+appsettings*.json
+**/Properties/launchSettings.json
+bin/
+obj/
+*.csproj.user
+# Un "npm install <paquete>" corrido por error en la raíz del repo crea
+# estos archivos. Solo se ignoran en la RAÍZ: los package.json y
+# package-lock.json de BackEnd y FrontEnd sí se versionan.
+/package.json
+/package-lock.json
+# Archivos vacíos que deja una redirección de shell mal escrita
+# (p. ej. "... > userRoles.Es_Docente,").
+userRoles.*
+
+# ── Otros ────────────────────────────────────────────────────
+rutas_completas.txt

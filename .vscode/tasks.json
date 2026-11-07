@@ -1,0 +1,38 @@
+{
+    "version": "0.2.0",
+    "compounds": [
+        {
+            "name": "Run All",
+            "configurations": ["BackEnd", "FrontEnd"],
+            "stopAll": true,
+            "presentation": {
+                "group": "maingroup",
+                "order": 1
+            }
+        }
+    ],
+    "configurations": [
+        {
+            "name": "BackEnd",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "node",
+            "program": "${workspaceFolder}/webSIGAE/BackEnd/server.js",
+            "cwd": "${workspaceFolder}/webSIGAE/BackEnd",
+            "console": "integratedTerminal",
+            "restart": true,
+            "skipFiles": ["<node_internals>/**"],
+            "envFile": "${workspaceFolder}/webSIGAE/BackEnd/.env"
+        },
+        {
+            "name": "FrontEnd",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run", "dev"],
+            "cwd": "${workspaceFolder}/webSIGAE/FrontEnd",
+            "console": "integratedTerminal",
+            "skipFiles": ["<node_internals>/**"]
+        }
+    ]
+}
