@@ -1,5 +1,5 @@
 // src/services/api.js
-const BASE_URL = '/api';
+export const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 function getToken() {
   return localStorage.getItem('token');
@@ -16,7 +16,8 @@ function clearSessionAndRedirect() {
   localStorage.removeItem('usuario');
   localStorage.removeItem('token');
   localStorage.removeItem('rolActivo');
-  window.location.href = '/session-expired';
+  const basePath = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/');
+  window.location.href = `${basePath}session-expired`;
 }
 
 export async function apiFetch(url, options = {}) {

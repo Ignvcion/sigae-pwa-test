@@ -15,3 +15,18 @@ ReactDOM.createRoot(
     </AuthProvider>
   </React.StrictMode>
 );
+
+// Registro de Service Worker para PWA en producción
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    const swUrl = `${import.meta.env.BASE_URL}sw.js`;
+    navigator.serviceWorker
+      .register(swUrl)
+      .then((reg) => {
+        console.log('SIGAE PWA Service Worker registrado con éxito:', reg.scope);
+      })
+      .catch((err) => {
+        console.error('Error al registrar Service Worker de SIGAE:', err);
+      });
+  });
+}

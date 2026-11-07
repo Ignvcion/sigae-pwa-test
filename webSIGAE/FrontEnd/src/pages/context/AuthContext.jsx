@@ -29,7 +29,8 @@ function redirectToSessionExpired() {
   localStorage.removeItem("usuario");
   localStorage.removeItem("token");
   localStorage.removeItem("rolActivo");
-  window.location.href = "/session-expired";
+  const basePath = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/');
+  window.location.href = `${basePath}session-expired`;
 }
 
 export function AuthProvider({ children }) {

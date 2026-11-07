@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { validarRut, normalizarRut } from "../../utils/validaciones";
+import { BASE_URL } from "../../services/api";
 
 function Login() {
 
@@ -34,7 +35,7 @@ function Login() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(`${BASE_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rut, password }),

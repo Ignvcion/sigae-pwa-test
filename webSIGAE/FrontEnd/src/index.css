@@ -2556,3 +2556,102 @@ body.bloques-panel-open .main-content {
 .form-card input[type="file"] {
   max-width: 100%;
 }
+
+
+/* ==========================================================================
+   DIRECTRICES RESPONSIVE & PWA MOBILE (SIGAE)
+   ========================================================================== */
+
+/* 1. Viewport & Safe Areas para Celulares (iPhone Notch & Barra de Gestos) */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+html, body {
+  min-height: 100dvh;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  padding-top: var(--sat);
+  padding-bottom: var(--sab);
+}
+
+/* 2. Prevención de zoom forzado en iOS Safari al interactuar con inputs */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* 3. Área táctil accesible en celulares (WCAG 2.1 / Apple HIG >= 44px) */
+@media screen and (max-width: 768px) {
+  button, 
+  .btn,
+  .role-button,
+  .mobile-menu-toggle {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+}
+
+/* 4. Envoltorio universal responsivo para tablas académicas en móvil */
+table {
+  max-width: 100%;
+}
+
+.table-responsive,
+.cit-tabla-wrap,
+.tabla-contenedor,
+.layout-content table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 5. Ajustes para vista de Login en móvil */
+@media screen and (max-width: 480px) {
+  .login-container {
+    padding: 16px;
+    min-height: 100dvh;
+    align-items: center;
+  }
+
+  .login-form {
+    padding: 24px 18px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    border-radius: 12px;
+  }
+
+  .login-logo-img {
+    max-width: 220px;
+  }
+
+  .login-form h1 {
+    font-size: 1.35rem;
+  }
+}
+
+/* 6. Ajustes para modales en pantallas pequeñas */
+@media screen and (max-width: 640px) {
+  .modal-overlay {
+    padding: 12px;
+  }
+
+  .modal-card,
+  .modal-card.modal-card-ancho {
+    width: 100%;
+    max-height: 90dvh;
+  }
+}
