@@ -647,14 +647,14 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
 
   return (
     <div style={s.seccion}>
-      <div style={{ ...s.seccionHeader, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <div style={{ ...s.seccionHeader, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
         <div>
           <h2 style={s.seccionTitulo}>Bloques horarios</h2>
           <p style={s.seccionDesc}>
             Registra los bloques de tiempo de la jornada escolar: Clase y Recreo.
           </p>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ display: "flex", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
             <button onClick={() => setVista("calendario")}
               style={{ padding: "0.35rem 0.75rem", border: "none", cursor: "pointer",
@@ -1094,7 +1094,7 @@ function TabEventos() {
 
   return (
     <div style={s.seccion}>
-      <div style={{ ...s.seccionHeader, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <div style={{ ...s.seccionHeader, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
         <div>
           <h2 style={s.seccionTitulo}>Eventos institucionales</h2>
           <p style={s.seccionDesc}>
@@ -1102,7 +1102,7 @@ function TabEventos() {
             suspensiones parciales o totales de jornada.
           </p>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ display: "flex", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
             <button onClick={() => setVista("calendario")}
               style={{ padding: "0.35rem 0.75rem", border: "none", cursor: "pointer",

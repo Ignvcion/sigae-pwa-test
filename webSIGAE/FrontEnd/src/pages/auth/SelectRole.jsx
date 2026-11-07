@@ -35,7 +35,7 @@ function SelectRole() {
 
       <div className="select-role-card">
 
-        <img src="/logo-colegio.png" alt="Logo Colegio Jacques Cousteau" className="select-role-logo" />
+        <img src={`${import.meta.env.BASE_URL}logo-colegio.png`} alt="Logo Colegio Jacques Cousteau" className="select-role-logo" />
 
         <h1>Seleccionar perfil</h1>
 

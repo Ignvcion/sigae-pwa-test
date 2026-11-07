@@ -178,6 +178,7 @@ const cambiarEstadoCuenta = async (u) => {
       {!errorCarga && !mensajeInfo && usuariosFiltrados.length === 0 ? (
         <div className="usuarios-empty">No se encontraron usuarios</div>
       ) : !errorCarga && !mensajeInfo && (
+        <div className="tabla-responsive-container">
         <table className="tabla-usuarios">
           <thead>
             <tr>
@@ -242,6 +243,7 @@ const cambiarEstadoCuenta = async (u) => {
             })}
           </tbody>
         </table>
+        </div>
       )}
 
     </div>

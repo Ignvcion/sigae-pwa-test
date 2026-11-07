@@ -76,15 +76,15 @@ function SelectorAsignaturas({ disponibles, busqueda, onBuscar, onAgregar, maxHe
 
 function FilaAsignatura({ asig, onChange, onRemove }) {
   return (
-    <div className="asignatura-item" style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-      <span className="asig-nombre" style={{ flex: "1 1 180px" }}>{asig.Asignatura_Nombre}</span>
+    <div className="asignatura-item" style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap", padding: "0.5rem", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", marginBottom: "0.5rem" }}>
+      <span className="asig-nombre" style={{ width: "100%", fontWeight: 600 }}>{asig.Asignatura_Nombre}</span>
       <span className="asig-tipo" style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
         {asig.Asignatura_Prioridad_Academica}
       </span>
       <select
         value={asig.tipo}
         onChange={(e) => onChange(asig.Asignatura_Id, "tipo", e.target.value)}
-        style={{ width: "140px" }}
+        style={{ flex: "1 1 130px", minWidth: "120px" }}
       >
         <option value="Obligatorio">Obligatorio</option>
         <option value="Complementario">Complementario</option>
@@ -99,7 +99,7 @@ function FilaAsignatura({ asig, onChange, onRemove }) {
         style={{ width: "70px" }}
       />
       <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>h/sem</span>
-      <button type="button" className="btn-cerrar" onClick={() => onRemove(asig.Asignatura_Id)} title="Quitar">✕</button>
+      <button type="button" className="btn-cerrar" onClick={() => onRemove(asig.Asignatura_Id)} title="Quitar" style={{ minWidth: "32px", minHeight: "32px", display: "inline-flex", alignItems: "center", justifyContent: "center", marginLeft: "auto" }}>✕</button>
     </div>
   );
 }
@@ -232,7 +232,7 @@ function FormCrearPlan({ onExito, onCancelar, periodoPropuesto }) {
     <form onSubmit={handleSubmit} className="form-card">
       <h2>Nuevo Plan Educativo</h2>
       {error && <p className="msg-error">{error}</p>}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
         <div>
           <label>Periodo Lectivo</label>
           <input
@@ -395,7 +395,7 @@ function FormEditarPlan({ planId, onExito, onCancelar }) {
     <form onSubmit={handleSubmit} className="form-card">
       <h2>Editar Plan Educativo</h2>
       {error && <p className="msg-error">{error}</p>}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
         <div>
           <label>Periodo Lectivo</label>
           <input
@@ -575,7 +575,7 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
         ))}
       </select>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginTop: "1rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginTop: "1rem" }}>
         <div>
           <label>Nuevo Periodo Lectivo</label>
           <input

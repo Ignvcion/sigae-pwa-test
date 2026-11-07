@@ -117,6 +117,7 @@ function Docentes() {
       )}
 
       {!errorCarga && !mensajeInfo && (
+        <div className="tabla-responsive-container">
         <table className="tabla-usuarios">
           <thead>
             <tr>
@@ -157,6 +158,7 @@ function Docentes() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

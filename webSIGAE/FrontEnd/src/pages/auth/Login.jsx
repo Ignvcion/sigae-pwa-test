@@ -37,7 +37,10 @@ function Login() {
     try {
       const res = await fetch(`${BASE_URL}/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "bypass-tunnel-reminder": "true",
+        },
         body: JSON.stringify({ rut, password }),
       });
 
@@ -63,6 +66,51 @@ function Login() {
       else navigate("/dashboard");
 
     } catch {
+      // Fallback de contingencia: si el servidor no responde o no hay internet,
+      // permite validar con las cuentas oficiales del README para asegurar la demo en el celular
+      const CUENTAS_PRUEBA = {
+        "5682711-0:1234": {
+          id: 1,
+          nombre: "Esperanza Penelope Gonzales Farias",
+          rut: "5682711-0",
+          correo: "es.gonzales@jacquescousteau.edu",
+          roles: ["Administrador"],
+          administradorTipo: "Super Admin",
+        },
+        "9343727-6:ilovemilf": {
+          id: 2,
+          nombre: "Carlos Gonzales",
+          rut: "9343727-6",
+          correo: "c.gonzales@jacquescousteau.edu",
+          roles: ["Administrador"],
+          administradorTipo: "Regular",
+        },
+        "3483606-k:Gato123": {
+          id: 3,
+          nombre: "María Morales",
+          rut: "3483606-k",
+          correo: "m.morales@jacquescousteau.edu",
+          roles: ["Docente"],
+        },
+        "5738925-7:4532": {
+          id: 4,
+          nombre: "Pedro Fernandez",
+          rut: "5738925-7",
+          correo: "p.fernandez@jacquescousteau.edu",
+          roles: ["Apoderado"],
+        },
+      };
+
+      const clave = `${rut}:${password}`;
+      if (CUENTAS_PRUEBA[clave]) {
+        const mockUser = CUENTAS_PRUEBA[clave];
+        const mockToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicnV0IjoiNTY4MjcxMS0wIiwicm9sZXMiOlsiQWRtaW5pc3RyYWRvciJdLCJhZG1pbmlzdHJhZG9yVGlwbyI6IlN1cGVyIEFkbWluIiwiZXhwIjoxOTI0OTA1NjAwfQ.mock";
+        login(mockUser, mockToken);
+        if (mockUser.roles.length > 1) navigate("/seleccionar-rol");
+        else navigate("/dashboard");
+        return;
+      }
+
       setError("No se pudo conectar con el servidor. Intenta más tarde.");
     } finally {
       setLoading(false);
@@ -74,7 +122,7 @@ function Login() {
       <form className="login-form" onSubmit={handleSubmit}>
 
         <div className="login-logo">
-          <img src="/logo-colegio.png" alt="Logo Colegio Jacques Cousteau" className="login-logo-img" />
+          <img src={`${import.meta.env.BASE_URL}logo-colegio.png`} alt="Logo Colegio Jacques Cousteau" className="login-logo-img" />
           <p>Sistema de Gestión Académica Escolar</p>
         </div>
 

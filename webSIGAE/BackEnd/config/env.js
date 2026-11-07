@@ -19,7 +19,7 @@ const UPLOADS_DIR = path.resolve(process.env.UPLOADS_DIR || path.join(__dirname,
 // Orígenes permitidos por CORS, separados por coma. Si no se define, se usa
 // FRONTEND_URL; en desarrollo, el servidor de Vite.
 function origenesCors() {
-  const valor = process.env.CORS_ORIGINS || process.env.FRONTEND_URL || (esProduccion ? '' : 'http://localhost:5173');
+  const valor = process.env.CORS_ORIGINS || process.env.FRONTEND_URL || (esProduccion ? '' : 'http://localhost:5173,https://ignvcion.github.io');
   return valor.split(',').map((o) => o.trim().replace(/\/+$/, '')).filter(Boolean);
 }
 

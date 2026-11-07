@@ -6,7 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig(({ command }) => {
   // Permite sobreescribir el nombre del repositorio fácilmente con una variable de entorno
   // Ejemplo: $env:VITE_REPO_NAME="sigae-pwa-test"
-  const repoName = process.env.VITE_REPO_NAME || "web-dev-SIGAE";
+  const repoName = process.env.VITE_REPO_NAME || "sigae-pwa-test";
 
   return {
     plugins: [react(), tailwindcss()],

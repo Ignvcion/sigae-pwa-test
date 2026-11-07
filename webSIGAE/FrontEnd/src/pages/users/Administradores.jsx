@@ -126,6 +126,7 @@ function Administradores() {
       )}
 
       {!errorCarga && !mensajeInfo && (
+        <div className="tabla-responsive-container">
         <table className="tabla-usuarios">
           <thead>
             <tr>
@@ -162,6 +163,7 @@ function Administradores() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {/* Modal de edición — CU3 */}

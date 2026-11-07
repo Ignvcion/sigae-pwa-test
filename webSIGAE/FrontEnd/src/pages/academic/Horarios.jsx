@@ -641,7 +641,7 @@ export default function Horarios() {
 
       {/* Main content */}
       {(cursoSeleccionado || esDocente) && !loading && (
-        <div style={esAdmin && cursoSeleccionado ? s.mainLayout : {}}>
+        <div style={esAdmin && cursoSeleccionado ? s.mainLayout : {}} className={esAdmin && cursoSeleccionado ? "horarios-main-layout" : ""}>
           {/* Left: asignatura list (admin only) */}
           {esAdmin && cursoSeleccionado && (
             <div style={s.asigPanel}>
@@ -722,7 +722,8 @@ export default function Horarios() {
                             background: "#e5e7eb",
                             borderRadius: "4px",
                             height: "4px",
-                            overflow: "hidden",
+                            overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
                           }}
                         >
                           <div
@@ -964,7 +965,8 @@ function VistaBloqueGrid({
       style={{
         border: "1px solid #e5e7eb",
         borderRadius: "10px",
-        overflow: "hidden",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
         background: "#fff",
       }}
     >
@@ -1167,7 +1169,8 @@ function VistaBloqueGrid({
                           fontWeight: 700,
                           textAlign: "center",
                           padding: "0 2px",
-                          overflow: "hidden",
+                          overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
                           maxWidth: "90%",
@@ -1219,7 +1222,8 @@ function VistaBloqueGrid({
                             ? COLOR_PENDIENTE.text
                             : h.estado === "Suspendido" ? "#9b1c1c" : asigColor?.text || "#1e40af",
                           lineHeight: 1.3,
-                          overflow: "hidden",
+                          overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
                         }}
@@ -1232,7 +1236,8 @@ function VistaBloqueGrid({
                             fontSize: "0.62rem",
                             color: "#6b7280",
                             lineHeight: 1.2,
-                            overflow: "hidden",
+                            overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
                           }}
@@ -2427,7 +2432,7 @@ const s = {
 
   mainLayout: {
     display: "grid",
-    gridTemplateColumns: "220px 1fr",
+    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
     gap: "1.25rem",
     alignItems: "start",
   },

@@ -49,7 +49,7 @@ function MainLayout() {
         </button>
 
         <img
-          src="/logo-colegio.png"
+          src={`${import.meta.env.BASE_URL}logo-colegio.png`}
           alt="Logo Colegio Jacques Cousteau"
           className="mobile-topbar-logo"
         />
@@ -80,7 +80,7 @@ function MainLayout() {
         <div>
           <div className="logo-row">
             <img
-              src="/logo-colegio.png"
+              src={`${import.meta.env.BASE_URL}logo-colegio.png`}
               alt="Logo Colegio Jacques Cousteau"
               className="sidebar-logo-img"
             />

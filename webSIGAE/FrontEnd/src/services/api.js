@@ -1,5 +1,5 @@
 // src/services/api.js
-export const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+export const BASE_URL = import.meta.env.VITE_API_URL || 'https://sigae-ignacio.loca.lt/api';
 
 function getToken() {
   return localStorage.getItem('token');
@@ -9,6 +9,7 @@ function authHeaders() {
   return {
     'Content-Type' : 'application/json',
     'Authorization': `Bearer ${getToken()}`,
+    'bypass-tunnel-reminder': 'true',
   };
 }
 
@@ -25,6 +26,7 @@ export async function apiFetch(url, options = {}) {
   const res = await fetch(url, {
     ...options,
     headers: {
+      'bypass-tunnel-reminder': 'true',
       Authorization: `Bearer ${token}`,
       ...(options.headers || {}),
     },

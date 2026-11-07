@@ -10,7 +10,8 @@ const BADGE_PRIORIDAD = {
 };
 
 function BadgePrioridad({ valor }) {
-  const estilo = BADGE_PRIORIDAD[valor] || { background: "#f1f5f9", color: "#475569" };
+  const v = valor || "Media";
+  const estilo = BADGE_PRIORIDAD[v] || { background: "#f1f5f9", color: "#475569" };
   return (
     <span style={{
       ...estilo,
@@ -19,7 +20,7 @@ function BadgePrioridad({ valor }) {
       fontSize: "0.8rem",
       fontWeight: 600,
     }}>
-      {valor}
+      {v}
     </span>
   );
 }
@@ -247,6 +248,7 @@ function Asignaturas() {
           <p>{asignaturas.length === 0 ? "No hay asignaturas registradas aún." : "Sin resultados para la búsqueda."}</p>
         </div>
       ) : (
+        <div className="tabla-responsive-container">
         <table className="tabla-asignaturas">
           <thead>
             <tr>
@@ -277,6 +279,7 @@ function Asignaturas() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       <p style={{ marginTop: "1rem", fontSize: "0.85rem", color: "#94a3b8" }}>
