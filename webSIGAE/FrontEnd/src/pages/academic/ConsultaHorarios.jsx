@@ -238,7 +238,7 @@ function ConsultaHorarios() {
                 filtros.nivel_educativo_id,
                 cambiarFiltro("nivel_educativo_id"),
                 opciones.niveles.map((n) => (
-                  <option key={n.Nivel_Educativo_Id} value={n.Nivel_Educativo_Id}>{n.Nivel_Educativo_Nombre}</option>
+                  <option key={n.Nivel_Educativo_Id || n.Nivel_Id} value={n.Nivel_Educativo_Id || n.Nivel_Id}>{n.Nivel_Educativo_Nombre || n.Nivel_Nombre}</option>
                 )),
                 "Todos los niveles"
               )}
@@ -282,7 +282,7 @@ function ConsultaHorarios() {
           {horarios.length > 0 && (
             <>
               <p style={{ color: "#64748b", fontSize: "0.85rem" }}>{horarios.length} bloque(s) encontrado(s)</p>
-              <div style={{ overflowX: "auto" }}>
+              <div className="tabla-responsive-container">
                 <table className="tabla-usuarios">
                   <thead>
                     <tr>

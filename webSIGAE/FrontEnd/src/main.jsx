@@ -30,10 +30,10 @@ function getMockResponseForUrl(urlStr) {
 
   if (p.includes("/cursos/niveles")) {
     return [
-      { Nivel_Id: 1, Nivel_Nombre: "1° Básico" },
-      { Nivel_Id: 2, Nivel_Nombre: "2° Básico" },
-      { Nivel_Id: 3, Nivel_Nombre: "3° Básico" },
-      { Nivel_Id: 4, Nivel_Nombre: "4° Básico" },
+      { Nivel_Id: 1, Nivel_Nombre: "1° Básico", Nivel_Educativo_Id: 1, Nivel_Educativo_Nombre: "1° Básico" },
+      { Nivel_Id: 2, Nivel_Nombre: "2° Básico", Nivel_Educativo_Id: 2, Nivel_Educativo_Nombre: "2° Básico" },
+      { Nivel_Id: 3, Nivel_Nombre: "3° Básico", Nivel_Educativo_Id: 3, Nivel_Educativo_Nombre: "3° Básico" },
+      { Nivel_Id: 4, Nivel_Nombre: "4° Básico", Nivel_Educativo_Id: 4, Nivel_Educativo_Nombre: "4° Básico" },
     ];
   }
 
@@ -239,10 +239,81 @@ function getMockResponseForUrl(urlStr) {
 
   if (p.includes("/parametros")) {
     return {
+      Parametro_Institucional_Inicio_Jornada: "08:00:00",
+      Parametro_Institucional_Fin_Jornada: "16:00:00",
+      Parametro_Institucional_Duracion_Bloque: 45,
+      Parametro_Institucional_Duracion_Recreo: 15,
       jornada: "Completa",
       horaInicio: "08:00",
       horaFin: "16:00",
       duracionBloque: 45,
+    };
+  }
+
+  if (p.includes("/horarios/docente/") && p.includes("/horario")) {
+    return [
+      { id: 1, cursoId: 1, asignaturaId: 1, curso: "1° Básico A", asignatura: "Lenguaje y Comunicación", dia: "Lunes", horaInicio: "08:00:00", horaFin: "08:45:00", estado: "Activo", pendiente: 0 },
+      { id: 2, cursoId: 1, asignaturaId: 1, curso: "1° Básico A", asignatura: "Lenguaje y Comunicación", dia: "Lunes", horaInicio: "08:45:00", horaFin: "09:30:00", estado: "Activo", pendiente: 0 },
+      { id: 3, cursoId: 2, asignaturaId: 2, curso: "2° Básico A", asignatura: "Matemáticas", dia: "Martes", horaInicio: "08:00:00", horaFin: "08:45:00", estado: "Activo", pendiente: 0 },
+      { id: 4, cursoId: 2, asignaturaId: 2, curso: "2° Básico A", asignatura: "Matemáticas", dia: "Miércoles", horaInicio: "09:45:00", horaFin: "10:30:00", estado: "Activo", pendiente: 0 },
+      { id: 5, cursoId: 1, asignaturaId: 1, curso: "1° Básico A", asignatura: "Lenguaje y Comunicación", dia: "Jueves", horaInicio: "10:30:00", horaFin: "11:15:00", estado: "Activo", pendiente: 0 },
+    ];
+  }
+
+  if (p.includes("/horarios/filtrar")) {
+    return [
+      { Horario_Asignatura_Id: 1, dia: "Lunes", horaInicio: "08:00:00", horaFin: "08:45:00", jornada: "Mañana", curso: "1° Básico A", asignatura: "Lenguaje y Comunicación", docente: "Ana Torres", estado: "Activo", nivelEducativo: "1° Básico" },
+      { Horario_Asignatura_Id: 2, dia: "Lunes", horaInicio: "08:45:00", horaFin: "09:30:00", jornada: "Mañana", curso: "1° Básico A", asignatura: "Lenguaje y Comunicación", docente: "Ana Torres", estado: "Activo", nivelEducativo: "1° Básico" },
+      { Horario_Asignatura_Id: 3, dia: "Martes", horaInicio: "08:00:00", horaFin: "08:45:00", jornada: "Mañana", curso: "2° Básico A", asignatura: "Matemáticas", docente: "María Morales", estado: "Activo", nivelEducativo: "2° Básico" },
+      { Horario_Asignatura_Id: 4, dia: "Miércoles", horaInicio: "09:45:00", horaFin: "10:30:00", jornada: "Mañana", curso: "2° Básico A", asignatura: "Matemáticas", docente: "María Morales", estado: "Activo", nivelEducativo: "2° Básico" },
+      { Horario_Asignatura_Id: 5, dia: "Jueves", horaInicio: "10:30:00", horaFin: "11:15:00", jornada: "Mañana", curso: "1° Básico A", asignatura: "Ciencias Naturales", docente: "Roberto Silva", estado: "Activo", nivelEducativo: "1° Básico" },
+    ];
+  }
+
+  if (p.includes("/horarios/bloques-libres")) {
+    return [
+      { Bloque_Horario_Id: 1, dia: "Lunes", fecha: "2026-11-09", Bloque_Horario_Hora_Inicio: "11:30:00", Bloque_Horario_Hora_Fin: "12:15:00", jornada: "Mañana" },
+      { Bloque_Horario_Id: 2, dia: "Martes", fecha: "2026-11-10", Bloque_Horario_Hora_Inicio: "10:30:00", Bloque_Horario_Hora_Fin: "11:15:00", jornada: "Mañana" },
+      { Bloque_Horario_Id: 3, dia: "Miércoles", fecha: "2026-11-11", Bloque_Horario_Hora_Inicio: "08:00:00", Bloque_Horario_Hora_Fin: "08:45:00", jornada: "Mañana" },
+      { Bloque_Horario_Id: 4, dia: "Jueves", fecha: "2026-11-12", Bloque_Horario_Hora_Inicio: "14:00:00", Bloque_Horario_Hora_Fin: "14:45:00", jornada: "Tarde" },
+      { Bloque_Horario_Id: 5, dia: "Viernes", fecha: "2026-11-13", Bloque_Horario_Hora_Inicio: "09:45:00", Bloque_Horario_Hora_Fin: "10:30:00", jornada: "Mañana" },
+    ];
+  }
+
+  if (p.includes("/detalle")) {
+    return {
+      curso: "1° Básico A",
+      nivelEducativo: "1° Básico",
+      dia: "Lunes",
+      horaInicio: "08:00:00",
+      horaFin: "08:45:00",
+      jornada: "Mañana",
+      asignatura: "Lenguaje y Comunicación",
+      docente: "Ana Torres",
+      estado: "Activo",
+      observaciones: "Clase regular planificada en jornada mañana.",
+    };
+  }
+
+  if (p.includes("/horarios/asignaturas") && !p.includes("/asignaturas-curso")) {
+    return [
+      { Asignatura_Id: 1, Asignatura_Nombre: "Lenguaje y Comunicación" },
+      { Asignatura_Id: 2, Asignatura_Nombre: "Matemáticas" },
+      { Asignatura_Id: 3, Asignatura_Nombre: "Ciencias Naturales" },
+      { Asignatura_Id: 4, Asignatura_Nombre: "Historia y Geografía" },
+    ];
+  }
+
+  if (p.includes("/horario-atencion") || p.includes("/atencion")) {
+    return {
+      bloques: [
+        {
+          Horario_Atencion_Id: 1,
+          Horario_Atencion_Dia_Semana: "Viernes",
+          Horario_Atencion_Hora_Inicio: "14:00:00",
+          Horario_Atencion_Hora_Fin: "15:00:00",
+        },
+      ],
     };
   }
 
@@ -329,6 +400,181 @@ function getMockResponseForUrl(urlStr) {
   return [];
 }
 
+function createValidPdfDocument(title, lines) {
+  const content = [
+    'BT',
+    '/F1 16 Tf',
+    '50 780 Td',
+    '(' + title.replace(/[()\\\\]/g, '') + ') Tj',
+    '/F1 11 Tf',
+    '0 -25 Td',
+    '(Colegio Jacques Cousteau - Sistema de Gestion Academica Escolar) Tj',
+    '0 -15 Td',
+    '(Fecha de emision: ' + new Date().toLocaleDateString('es-CL') + ') Tj',
+    '0 -20 Td',
+    '(------------------------------------------------------------------------------------) Tj',
+  ];
+  lines.forEach((line) => {
+    content.push('0 -18 Td');
+    content.push('(' + line.replace(/[()\\\\]/g, '') + ') Tj');
+  });
+  content.push('0 -30 Td');
+  content.push('(Documento oficial generado por SIGAE - Valido para fines academicos) Tj');
+  content.push('ET');
+  const stream = content.join('\n');
+
+  const objects = [];
+  objects.push('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj');
+  objects.push('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj');
+  objects.push('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj');
+  objects.push('4 0 obj\n<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream\nendobj');
+  objects.push('5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj');
+
+  let pdf = '%PDF-1.4\n';
+  const xref = [0];
+  objects.forEach((obj) => {
+    xref.push(pdf.length);
+    pdf += obj + '\n';
+  });
+  const xrefStart = pdf.length;
+  pdf += 'xref\n0 ' + (objects.length + 1) + '\n0000000000 65535 f \n';
+  xref.slice(1).forEach((pos) => {
+    pdf += String(pos).padStart(10, '0') + ' 00000 n \n';
+  });
+  pdf += 'trailer\n<< /Size ' + (objects.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + xrefStart + '\n%%EOF\n';
+  return new TextEncoder().encode(pdf);
+}
+
+function generateMockExportResponse(urlStr) {
+  const isCsv = urlStr.includes("formato=csv");
+  const isExcel = urlStr.includes("formato=excel");
+  const isPng = urlStr.includes("formato=png");
+
+  if (isCsv) {
+    const csvContent = "\uFEFFDía,Horario,Asignatura,Curso,Docente,Estado\n" +
+      "Lunes,08:00 - 08:45,Lenguaje y Comunicación,1° Básico A,Ana Torres,Activo\n" +
+      "Lunes,08:45 - 09:30,Lenguaje y Comunicación,1° Básico A,Ana Torres,Activo\n" +
+      "Martes,08:00 - 08:45,Matemáticas,2° Básico A,María Morales,Activo\n" +
+      "Miércoles,09:45 - 10:30,Matemáticas,2° Básico A,María Morales,Activo\n" +
+      "Jueves,10:30 - 11:15,Lenguaje y Comunicación,1° Básico A,Ana Torres,Activo\n" +
+      "Viernes,14:00 - 15:00,Atención de Apoderados,-,María Morales,Activo\n";
+    return new Response(csvContent, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": "attachment; filename=horario.csv",
+      },
+    });
+  }
+
+  if (isExcel) {
+    const excelHtml = `\uFEFF<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"/></head>
+<body>
+<table border="1">
+  <tr><th colspan="6" style="background:#1e3a5f;color:#ffffff;font-size:16px;height:35px;">COLEGIO JACQUES COUSTEAU - HORARIO SEMANAL</th></tr>
+  <tr style="background:#f1f5f9;font-weight:bold;"><th>Día</th><th>Horario</th><th>Asignatura</th><th>Curso</th><th>Docente</th><th>Estado</th></tr>
+  <tr><td>Lunes</td><td>08:00 - 08:45</td><td>Lenguaje y Comunicación</td><td>1° Básico A</td><td>Ana Torres</td><td>Activo</td></tr>
+  <tr><td>Lunes</td><td>08:45 - 09:30</td><td>Lenguaje y Comunicación</td><td>1° Básico A</td><td>Ana Torres</td><td>Activo</td></tr>
+  <tr><td>Martes</td><td>08:00 - 08:45</td><td>Matemáticas</td><td>2° Básico A</td><td>María Morales</td><td>Activo</td></tr>
+  <tr><td>Miércoles</td><td>09:45 - 10:30</td><td>Matemáticas</td><td>2° Básico A</td><td>María Morales</td><td>Activo</td></tr>
+  <tr><td>Jueves</td><td>10:30 - 11:15</td><td>Lenguaje y Comunicación</td><td>1° Básico A</td><td>Ana Torres</td><td>Activo</td></tr>
+  <tr><td>Viernes</td><td>14:00 - 15:00</td><td>Atención de Apoderados</td><td>-</td><td>María Morales</td><td>Activo</td></tr>
+</table>
+</body>
+</html>`;
+    return new Response(excelHtml, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/vnd.ms-excel; charset=utf-8",
+        "Content-Disposition": "attachment; filename=horario.xls",
+      },
+    });
+  }
+
+  if (isPng) {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 900;
+      canvas.height = 420;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, 900, 420);
+      ctx.fillStyle = "#1e3a5f";
+      ctx.fillRect(0, 0, 900, 60);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 20px sans-serif";
+      ctx.fillText("COLEGIO JACQUES COUSTEAU - HORARIO SEMANAL", 30, 38);
+
+      ctx.fillStyle = "#1e293b";
+      ctx.font = "bold 14px sans-serif";
+      let y = 110;
+      ctx.fillText("DÍA", 30, y);
+      ctx.fillText("HORARIO", 160, y);
+      ctx.fillText("ASIGNATURA", 330, y);
+      ctx.fillText("CURSO", 580, y);
+      ctx.fillText("DOCENTE", 720, y);
+      y += 10;
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.beginPath(); ctx.moveTo(30, y); ctx.lineTo(870, y); ctx.stroke();
+      y += 25;
+
+      const rows = [
+        ["Lunes", "08:00 - 08:45", "Lenguaje y Comunicación", "1° Básico A", "Ana Torres"],
+        ["Lunes", "08:45 - 09:30", "Lenguaje y Comunicación", "1° Básico A", "Ana Torres"],
+        ["Martes", "08:00 - 08:45", "Matemáticas", "2° Básico A", "María Morales"],
+        ["Miércoles", "09:45 - 10:30", "Matemáticas", "2° Básico A", "María Morales"],
+        ["Jueves", "10:30 - 11:15", "Lenguaje y Comunicación", "1° Básico A", "Ana Torres"],
+        ["Viernes", "14:00 - 15:00", "Atención de Apoderados", "-", "María Morales"],
+      ];
+      ctx.font = "14px sans-serif";
+      rows.forEach((r) => {
+        ctx.fillText(r[0], 30, y);
+        ctx.fillText(r[1], 160, y);
+        ctx.fillText(r[2], 330, y);
+        ctx.fillText(r[3], 580, y);
+        ctx.fillText(r[4], 720, y);
+        y += 35;
+      });
+
+      const dataUrl = canvas.toDataURL("image/png");
+      const binStr = atob(dataUrl.split(",")[1]);
+      const bytes = new Uint8Array(binStr.length);
+      for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+      return new Response(bytes, {
+        status: 200,
+        headers: {
+          "Content-Type": "image/png",
+          "Content-Disposition": "attachment; filename=horario.png",
+        },
+      });
+    } catch {
+      // fallback
+    }
+  }
+
+  const pdfBytes = createValidPdfDocument(
+    "COLEGIO JACQUES COUSTEAU - HORARIO SEMANAL",
+    [
+      "Periodo Academico: 2026",
+      "------------------------------------------------------------------------------------",
+      "Lunes      08:00 - 08:45   Lenguaje y Comunicacion   (1 Basico A)   - Ana Torres",
+      "Lunes      08:45 - 09:30   Lenguaje y Comunicacion   (1 Basico A)   - Ana Torres",
+      "Martes     08:00 - 08:45   Matematicas               (2 Basico A)   - Maria Morales",
+      "Miercoles  09:45 - 10:30   Matematicas               (2 Basico A)   - Maria Morales",
+      "Jueves     10:30 - 11:15   Lenguaje y Comunicacion   (1 Basico A)   - Ana Torres",
+      "Viernes    14:00 - 15:00   Atencion de Apoderados    (-)            - Maria Morales",
+    ]
+  );
+  return new Response(pdfBytes, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "attachment; filename=horario.pdf",
+    },
+  });
+}
+
 window.fetch = async function (input, init = {}) {
   let url = input;
   let isApiCall = false;
@@ -362,6 +608,9 @@ window.fetch = async function (input, init = {}) {
     // Si una llamada de API devolvió 404/502/504 o devolvió HTML (404.html de GitHub Pages)
     if (isApiCall && (!response.ok || response.headers.get("content-type")?.includes("text/html"))) {
       const urlStr = typeof url === "string" ? url : (url.url || "");
+      if (urlStr.includes("/exportar")) {
+        return generateMockExportResponse(urlStr);
+      }
       const mockData = getMockResponseForUrl(urlStr);
       if (mockData !== null) {
         return new Response(JSON.stringify(mockData), {
@@ -375,6 +624,9 @@ window.fetch = async function (input, init = {}) {
     // Si la llamada falló por error de red (Failed to fetch, túnel offline)
     if (isApiCall) {
       const urlStr = typeof url === "string" ? url : (url.url || "");
+      if (urlStr.includes("/exportar")) {
+        return generateMockExportResponse(urlStr);
+      }
       const mockData = getMockResponseForUrl(urlStr);
       if (mockData !== null) {
         return new Response(JSON.stringify(mockData), {

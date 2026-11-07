@@ -859,7 +859,7 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
                     borderRadius: "8px",
                     background: yaUsaSugerida ? "#f0fdf4" : "#fff7ed",
                     border: `1px solid ${yaUsaSugerida ? "#bbf7d0" : "#fed7aa"}`,
-                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem",
+                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap",
                   }}>
                     <span style={{ fontSize: "0.8rem", color: yaUsaSugerida ? "#15803d" : "#9a3412" }}>
                       {yaUsaSugerida
@@ -1982,8 +1982,8 @@ const s = {
 
   /* Panel lateral */
   panel: {
-    position: "fixed", top: 0, right: 0, width: 440, height: "100vh",
-    background: "#fff", boxShadow: "-6px 0 32px rgba(0,0,0,0.18)",
+    position: "fixed", top: 0, right: 0, width: "100%", maxWidth: 440, height: "100vh",
+    background: "#fff", boxShadow: "-6px 0 32px rgba(0,0,0,0.18), 0 0 0 100vmax rgba(0,0,0,0.45)",
     zIndex: 990, display: "flex", flexDirection: "column",
     animation: "slideInRight 0.22s ease",
   },

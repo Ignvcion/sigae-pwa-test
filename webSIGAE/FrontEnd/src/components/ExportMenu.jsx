@@ -12,6 +12,17 @@ async function descargarArchivo(url, nombreArchivo) {
     throw new Error(data.error || "Error al exportar el horario");
   }
   const blob = await res.blob();
+  if (blob.type && blob.type.includes("json")) {
+    const text = await blob.text();
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.error || parsed.mensaje) {
+        throw new Error(parsed.error || parsed.mensaje);
+      }
+    } catch (err) {
+      if (err.message && err.message !== "Unexpected end of JSON input") throw err;
+    }
+  }
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = nombreArchivo;
