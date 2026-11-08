@@ -117,46 +117,48 @@ function Docentes() {
       )}
 
       {!errorCarga && !mensajeInfo && (
-        <table className="tabla-usuarios">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Usuario_Nombre_Completo")}>
-                Nombre{flechaOrden("Usuario_Nombre_Completo")}
-              </th>
-              <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Usuario_RUT")}>
-                RUT{flechaOrden("Usuario_RUT")}
-              </th>
-              <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Docente_Especialidad")}>
-                Especialidad{flechaOrden("Docente_Especialidad")}
-              </th>
-              <th>Correo institucional</th>
-              <th>Teléfono</th>
-              <th>Carga horaria máxima</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {docentesOrdenados.map((d, idx) => (
-              <tr key={d.Usuario_Id}>
-                <td>{idx + 1}</td>
-                <td>{d.Usuario_Nombre_Completo}</td>
-                <td>{d.Usuario_RUT}</td>
-                <td>{renderDato(d.Docente_Especialidad, "Sin especialidad registrada")}</td>
-                <td>{renderDato(d.Docente_Correo_Institucional, "Sin correo institucional registrado")}</td>
-                <td>{renderDato(d.Usuario_Telefono, "Sin teléfono registrado")}</td>
-                <td>{renderDato(d.Docente_Carga_Horaria_Maxima, "Sin carga horaria registrada")}</td>
-                <td>
-                  {d.Usuario_Estado_Cuenta ? (
-                    <span className="badge-activo">Activo</span>
-                  ) : (
-                    <span className="badge-inactivo">Inactivo</span>
-                  )}
-                </td>
+        <div className="tabla-usuarios-wrap">
+          <table className="tabla-usuarios">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Usuario_Nombre_Completo")}>
+                  Nombre{flechaOrden("Usuario_Nombre_Completo")}
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Usuario_RUT")}>
+                  RUT{flechaOrden("Usuario_RUT")}
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Docente_Especialidad")}>
+                  Especialidad{flechaOrden("Docente_Especialidad")}
+                </th>
+                <th>Correo institucional</th>
+                <th>Teléfono</th>
+                <th>Carga horaria máxima</th>
+                <th>Estado</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {docentesOrdenados.map((d, idx) => (
+                <tr key={d.Usuario_Id}>
+                  <td>{idx + 1}</td>
+                  <td>{d.Usuario_Nombre_Completo}</td>
+                  <td>{d.Usuario_RUT}</td>
+                  <td>{renderDato(d.Docente_Especialidad, "Sin especialidad registrada")}</td>
+                  <td className="celda-correo">{renderDato(d.Docente_Correo_Institucional, "Sin correo institucional registrado")}</td>
+                  <td>{renderDato(d.Usuario_Telefono, "Sin teléfono registrado")}</td>
+                  <td>{renderDato(d.Docente_Carga_Horaria_Maxima, "Sin carga horaria registrada")}</td>
+                  <td>
+                    {d.Usuario_Estado_Cuenta ? (
+                      <span className="badge-activo">Activo</span>
+                    ) : (
+                      <span className="badge-inactivo">Inactivo</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

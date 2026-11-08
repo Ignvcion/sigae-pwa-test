@@ -178,7 +178,8 @@ const cambiarEstadoCuenta = async (u) => {
       {!errorCarga && !mensajeInfo && usuariosFiltrados.length === 0 ? (
         <div className="usuarios-empty">No se encontraron usuarios</div>
       ) : !errorCarga && !mensajeInfo && (
-        <table className="tabla-usuarios">
+        <div className="tabla-usuarios-wrap">
+          <table className="tabla-usuarios">
           <thead>
             <tr>
               <th>#</th>
@@ -206,7 +207,7 @@ const cambiarEstadoCuenta = async (u) => {
                       {getBadgesRoles(u)}
                     </div>
                   </td>
-                  <td>{getCorreoPrincipal(u)}</td>
+                  <td className="celda-correo">{getCorreoPrincipal(u)}</td>
                   <td>
                     {u.Usuario_Estado_Cuenta
                       ? <span className="badge-activo">Activo</span>
@@ -242,6 +243,7 @@ const cambiarEstadoCuenta = async (u) => {
             })}
           </tbody>
         </table>
+        </div>
       )}
 
     </div>

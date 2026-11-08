@@ -126,42 +126,44 @@ function Administradores() {
       )}
 
       {!errorCarga && !mensajeInfo && (
-        <table className="tabla-usuarios">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Nombre</th>
-              <th>Correo</th>
-              <th>Teléfono</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {administradores.map((a, idx) => (
-              <tr key={a.Usuario_Id}>
-                <td>{idx + 1}</td>
-                <td>{a.Usuario_Nombre_Completo}</td>
-                <td>{a.Administrador_Correo_Institucional || "—"}</td>
-                <td>{a.Usuario_Telefono || "—"}</td>
-                <td>
-                  {a.Usuario_Estado_Cuenta ? (
-                    <span className="badge-activo">Activo</span>
-                  ) : (
-                    <span className="badge-inactivo">Inactivo</span>
-                  )}
-                </td>
-                <td>
-                  {a.Administrador_Tipo !== "Super Admin" && (
-                    <button className="btn-roles" onClick={() => abrirEdicion(a)}>
-                      Editar
-                    </button>
-                  )}
-                </td>
+        <div className="tabla-usuarios-wrap">
+          <table className="tabla-usuarios">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Nombre</th>
+                <th>Correo</th>
+                <th>Teléfono</th>
+                <th>Estado</th>
+                <th>Acciones</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {administradores.map((a, idx) => (
+                <tr key={a.Usuario_Id}>
+                  <td>{idx + 1}</td>
+                  <td>{a.Usuario_Nombre_Completo}</td>
+                  <td className="celda-correo">{a.Administrador_Correo_Institucional || "—"}</td>
+                  <td>{a.Usuario_Telefono || "—"}</td>
+                  <td>
+                    {a.Usuario_Estado_Cuenta ? (
+                      <span className="badge-activo">Activo</span>
+                    ) : (
+                      <span className="badge-inactivo">Inactivo</span>
+                    )}
+                  </td>
+                  <td>
+                    {a.Administrador_Tipo !== "Super Admin" && (
+                      <button className="btn-roles" onClick={() => abrirEdicion(a)}>
+                        Editar
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* Modal de edición — CU3 */}

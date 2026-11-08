@@ -65,6 +65,11 @@ function SelectorAsignaturas({ disponibles, busqueda, onBuscar, onAgregar, maxHe
             >
               <span className="asig-nombre">{a.Asignatura_Nombre}</span>
               <span className="asig-tipo">{a.Asignatura_Prioridad_Academica}</span>
+              {a.Horas_Semanales_Requeridas ? (
+                <span className="asig-tipo" style={{ background: "#e0f2fe", color: "#0369a1" }}>
+                  {a.Horas_Semanales_Requeridas}h/sem
+                </span>
+              ) : null}
               <span style={{ color: "#6366f1", fontWeight: 600 }}>＋</span>
             </div>
           ))}

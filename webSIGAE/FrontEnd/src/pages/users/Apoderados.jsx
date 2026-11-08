@@ -292,12 +292,12 @@ function Apoderados() {
           value={operadorFiltro}
           onChange={(e) => setOperadorFiltro(e.target.value)}
         >
-          <option value="=">=</option>
-          <option value="!=">≠</option>
-          <option value=">">&gt;</option>
-          <option value="<">&lt;</option>
-          <option value=">=">&gt;=</option>
-          <option value="<=">&lt;=</option>
+          <option value="=">Igual a</option>
+          <option value="!=">Distinto de</option>
+          <option value=">">Mayor que</option>
+          <option value="<">Menor que</option>
+          <option value=">=">Mayor o igual que</option>
+          <option value="<=">Menor o igual que</option>
         </select>
         <input
           type="text"
@@ -326,51 +326,53 @@ function Apoderados() {
       {!errorCarga && !mensajeInfo && apoderadosFiltrados.length === 0 ? (
         <div className="usuarios-empty">No se encontraron apoderados registrados</div>
       ) : !errorCarga && !mensajeInfo && (
-        <table className="tabla-usuarios">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Nombre</th>
-              <th>RUT</th>
-              <th>Correo</th>
-              <th>Teléfono</th>
-              <th>Estado</th>
-              <th>Roles</th>
-              <th>Estudiantes vinculados</th>
-              {esAdmin && <th>Acciones</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {apoderadosFiltrados.map((u, idx) => (
-              <tr key={u.Usuario_Id}>
-                <td>{idx + 1}</td>
-                <td>{u.Usuario_Nombre_Completo}</td>
-                <td>{u.Usuario_RUT}</td>
-                <td>{u.Apoderado_Correo_Natural || "—"}</td>
-                <td>{u.Usuario_Telefono || "—"}</td>
-                <td>
-                  {u.Usuario_Estado_Cuenta ? (
-                    <span className="badge-activo">Activo</span>
-                  ) : (
-                    <span className="badge-inactivo">Inactivo</span>
-                  )}
-                </td>
-                <td>{getBadgesRoles(u)}</td>
-                <td>{u.Total_Estudiantes_Asociados ?? 0}</td>
-                {esAdmin && (
-                  <td>
-                    <button
-                      className="btn-roles"
-                      onClick={() => abrirModal(u)}
-                    >
-                      Asignar Estudiantes
-                    </button>
-                  </td>
-                )}
+        <div className="tabla-usuarios-wrap">
+          <table className="tabla-usuarios">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Nombre</th>
+                <th>RUT</th>
+                <th>Correo</th>
+                <th>Teléfono</th>
+                <th>Estado</th>
+                <th>Roles</th>
+                <th>Estudiantes vinculados</th>
+                {esAdmin && <th>Acciones</th>}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {apoderadosFiltrados.map((u, idx) => (
+                <tr key={u.Usuario_Id}>
+                  <td>{idx + 1}</td>
+                  <td>{u.Usuario_Nombre_Completo}</td>
+                  <td>{u.Usuario_RUT}</td>
+                  <td className="celda-correo">{u.Apoderado_Correo_Natural || "—"}</td>
+                  <td>{u.Usuario_Telefono || "—"}</td>
+                  <td>
+                    {u.Usuario_Estado_Cuenta ? (
+                      <span className="badge-activo">Activo</span>
+                    ) : (
+                      <span className="badge-inactivo">Inactivo</span>
+                    )}
+                  </td>
+                  <td>{getBadgesRoles(u)}</td>
+                  <td>{u.Total_Estudiantes_Asociados ?? 0}</td>
+                  {esAdmin && (
+                    <td>
+                      <button
+                        className="btn-roles"
+                        onClick={() => abrirModal(u)}
+                      >
+                        Asignar Estudiantes
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* ── MODAL ── */}

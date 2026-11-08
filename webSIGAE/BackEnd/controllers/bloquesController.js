@@ -251,7 +251,7 @@ const updateBloque = async (req, res) => {
        WHERE b.Bloque_Horario_Hora_Inicio < ? AND b.Bloque_Horario_Hora_Fin > ?
          AND b.Bloque_Horario_Jornada = ? AND b.Bloque_Horario_Id != ?
          AND NOT ${condicionDesajustado('b')}`,
-      [Bloque_Horario_Hora_Fin, Bloque_Horario_Hora_Inicio, Bloque_Horario_Jornada, id]
+      [horaCompleta(Bloque_Horario_Hora_Fin), horaCompleta(Bloque_Horario_Hora_Inicio), Bloque_Horario_Jornada, Number(id)]
     );
     if (conflicto.length > 0) return res.status(409).json({ error: 'Conflicto con bloque existente' });
 
@@ -262,7 +262,7 @@ const updateBloque = async (req, res) => {
          Bloque_Horario_Jornada     = ?,
          Bloque_Horario_Tipo        = ?
        WHERE Bloque_Horario_Id = ?`,
-      [Bloque_Horario_Hora_Inicio, Bloque_Horario_Hora_Fin, Bloque_Horario_Jornada, Bloque_Horario_Tipo, id]
+      [horaCompleta(Bloque_Horario_Hora_Inicio), horaCompleta(Bloque_Horario_Hora_Fin), Bloque_Horario_Jornada, Bloque_Horario_Tipo, Number(id)]
     );
     res.json({ mensaje: 'Bloque actualizado correctamente' });
   } catch (err) {
@@ -272,7 +272,8 @@ const updateBloque = async (req, res) => {
 };
 
 const deleteBloque = async (req, res) => {
-  const { id } = req.params;
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Identificador de bloque no válido' });
   try {
     // CU50 - Excepción "Bloque posee asignaciones": el panel de avisos permite
     // migrar o eliminar esas clases antes de quitar el bloque.

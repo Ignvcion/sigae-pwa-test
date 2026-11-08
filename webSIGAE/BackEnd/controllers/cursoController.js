@@ -108,9 +108,13 @@ const getAsignaturasDeCurso = async (req, res) => {
   try {
     const [rows] = await pool.execute(`
       SELECT ta.tieneasig_Id, ta.Estado_Asignacion,
-             a.Asignatura_Id, a.Asignatura_Nombre, a.Asignatura_Prioridad_Academica
+             a.Asignatura_Id, a.Asignatura_Nombre, a.Asignatura_Prioridad_Academica,
+             ia.Horas_Semanales_Requeridas, ia.Tipo
       FROM tieneasig ta
       JOIN asignatura a ON ta.Asignatura_Id = a.Asignatura_Id
+      JOIN curso c ON ta.Curso_Id = c.Curso_Id
+      LEFT JOIN plan_educativo pe ON pe.Nivel_Educativo_Id = c.Nivel_Educativo_Id
+      LEFT JOIN incluyeasig ia ON ia.Plan_Educativo_Id = pe.Plan_Educativo_Id AND ia.Asignatura_Id = a.Asignatura_Id
       WHERE ta.Curso_Id = ?
       ORDER BY a.Asignatura_Nombre
     `, [id]);

@@ -33,18 +33,36 @@ function BuscarUsuarios() {
   // CU28: buscar usuarios por nombre completo, RUT o correo electrónico
   const buscar = async (e) => {
     e.preventDefault();
+    const rutTrim = rut.trim();
+    const nombreTrim = nombre.trim();
+    const correoTrim = correo.trim();
+
+    if (!rutTrim && !nombreTrim && !correoTrim) {
+      setMensajeInfo("Ingresa al menos un criterio de búsqueda (nombre, RUT o correo)");
+      setUsuarios([]);
+      setBuscado(true);
+      return;
+    }
+
     setLoading(true);
     setBuscado(true);
     setErrorCarga("");
     setMensajeInfo("");
     try {
-      const data = await buscarUsuarioExistente({ rut, nombre, correo });
+      const data = await buscarUsuarioExistente({ rut: rutTrim, nombre: nombreTrim, correo: correoTrim });
       if (Array.isArray(data)) {
         setUsuarios(data);
+        if (data.length === 0) {
+          setMensajeInfo("No se encontraron usuarios");
+        }
+      } else if (data && Array.isArray(data.usuarios)) {
+        setUsuarios(data.usuarios);
+        if (data.usuarios.length === 0) {
+          setMensajeInfo(data.mensaje || "No se encontraron usuarios");
+        }
       } else {
-        // CU28 - Excepción "Sin coincidencias"
-        setUsuarios(data.usuarios || []);
-        setMensajeInfo(data.mensaje || "No se encontraron usuarios");
+        setUsuarios([]);
+        setMensajeInfo(data?.mensaje || "No se encontraron usuarios");
       }
     } catch (error) {
       // CU28 - Excepción "Campos inválidos o incompletos", "Búsqueda fuera de alcance" o "Problema técnico"
@@ -106,7 +124,7 @@ function BuscarUsuarios() {
         </div>
       )}
 
-      {!errorCarga && mensajeInfo && (
+      {!errorCarga && mensajeInfo && usuarios.length === 0 && (
         <div className="usuarios-empty">{mensajeInfo}</div>
       )}
 
@@ -114,46 +132,48 @@ function BuscarUsuarios() {
         <div className="usuarios-empty">No se encontraron usuarios</div>
       )}
 
-      {!errorCarga && !mensajeInfo && usuarios.length > 0 && (
-        <table className="tabla-usuarios">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Nombre</th>
-              <th>RUT</th>
-              <th>Roles</th>
-              <th>Correo</th>
-              <th>Estado</th>
-              <th>Perfil</th>
-            </tr>
-          </thead>
-          <tbody>
-            {usuarios.map((u, idx) => (
-              <tr key={u.Usuario_Id}>
-                <td>{idx + 1}</td>
-                <td>{u.Usuario_Nombre_Completo}</td>
-                <td>{u.Usuario_RUT}</td>
-                <td>
-                  <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                    {getBadgesRoles(u)}
-                  </div>
-                </td>
-                <td>{getCorreoPrincipal(u)}</td>
-                <td>
-                  {u.Usuario_Estado_Cuenta
-                    ? <span className="badge-activo">Activo</span>
-                    : <span className="badge-inactivo">Inactivo</span>}
-                </td>
-                <td>
-                  {/* CU18: seleccionar el usuario cuyo perfil desea visualizar */}
-                  <button className="btn-roles" onClick={() => navigate(`/perfil/${u.Usuario_Id}`)}>
-                    Ver Perfil
-                  </button>
-                </td>
+      {!errorCarga && usuarios.length > 0 && (
+        <div className="tabla-usuarios-wrap">
+          <table className="tabla-usuarios">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Nombre</th>
+                <th>RUT</th>
+                <th>Roles</th>
+                <th>Correo</th>
+                <th>Estado</th>
+                <th>Perfil</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {usuarios.map((u, idx) => (
+                <tr key={u.Usuario_Id}>
+                  <td>{idx + 1}</td>
+                  <td>{u.Usuario_Nombre_Completo}</td>
+                  <td>{u.Usuario_RUT}</td>
+                  <td>
+                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                      {getBadgesRoles(u)}
+                    </div>
+                  </td>
+                  <td className="celda-correo">{getCorreoPrincipal(u)}</td>
+                  <td>
+                    {u.Usuario_Estado_Cuenta
+                      ? <span className="badge-activo">Activo</span>
+                      : <span className="badge-inactivo">Inactivo</span>}
+                  </td>
+                  <td>
+                    {/* CU18: seleccionar el usuario cuyo perfil desea visualizar */}
+                    <button className="btn-roles" onClick={() => navigate(`/perfil/${u.Usuario_Id}`)}>
+                      Ver Perfil
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

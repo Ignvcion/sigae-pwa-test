@@ -565,15 +565,16 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
       const data = await res.json();
       // Quitar un bloque con clases: el panel de avisos permite reubicarlas primero
       if (!res.ok && data.codigo === "TIENE_CLASES") {
-        const b = bloques.find((x) => x.Bloque_Horario_Id === id);
+        const b = bloques.find((x) => Number(x.Bloque_Horario_Id) === Number(id));
         onQuitarBloqueConClases?.({
           id,
           etiqueta: b ? `${hhmm(b.Bloque_Horario_Hora_Inicio)}–${hhmm(b.Bloque_Horario_Hora_Fin)}` : "",
         });
+        setError(`El bloque posee ${data.clases} clase(s) asignada(s). Reubícalas en el panel de conflictos.`);
         return;
       }
-      if (!res.ok) throw new Error(data.error);
-      cargar();
+      if (!res.ok) throw new Error(data.error || "No fue posible eliminar el bloque");
+      await cargar();
       // CU50: confirmar al usuario que el bloque fue eliminado
       setExito(data.mensaje || "Bloque eliminado exitosamente");
       setTimeout(() => setExito(""), 3500);
@@ -1816,7 +1817,7 @@ function VistaCalendarioBloques({ bloques, onEditar, onEliminar, eliminando, pre
               const sMin   = toMin(b.Bloque_Horario_Hora_Inicio);
               const eMin   = toMin(b.Bloque_Horario_Hora_Fin);
               const top    = (sMin - rangoMin) * PX_POR_MIN;
-              const h      = Math.max((eMin - sMin) * PX_POR_MIN - 3, 22);
+              const h      = Math.max((eMin - sMin) * PX_POR_MIN - 3, 26);
               const desajustado = Number(b.desajustado) === 1;
               const col    = desajustado ? COLOR_DESAJUSTADO : TIPO_COLORES[b.Bloque_Horario_Tipo] || TIPO_COLORES["Clase"];
               const dur    = eMin - sMin;
@@ -1840,16 +1841,32 @@ function VistaCalendarioBloques({ bloques, onEditar, onEliminar, eliminando, pre
                   }}>
                   <div style={{ display: "flex", height: "100%", justifyContent: "space-between" }}>
                     <div style={{ flex: 1, overflow: "hidden", minWidth: 0 }} onClick={() => onEditar(b)}>
-                      <div style={{ fontWeight: 700, fontSize: "0.7rem", color: col.acento,
-                        lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden" }}>
-                        {hhmm(b.Bloque_Horario_Hora_Inicio)}–{hhmm(b.Bloque_Horario_Hora_Fin)}
-                      </div>
-                      {h > 32 && (
-                        <div style={{ fontSize: "0.65rem", color: col.acento, opacity: 0.8 }}>
-                          {desajustado
-                            ? `⚠ ${b.clases} clase(s) por reubicar`
-                            : `${col.icono} ${b.Bloque_Horario_Tipo} · ${dur} min`}
+                      {h < 48 ? (
+                        <div style={{
+                          fontWeight: 700, fontSize: "0.68rem", color: col.acento,
+                          lineHeight: "1.2", whiteSpace: "nowrap", overflow: "hidden",
+                          textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: "4px"
+                        }}>
+                          <span>{hhmm(b.Bloque_Horario_Hora_Inicio)}–{hhmm(b.Bloque_Horario_Hora_Fin)}</span>
+                          <span style={{ opacity: 0.85, fontWeight: 600 }}>· {col.icono} {b.Bloque_Horario_Tipo}</span>
                         </div>
+                      ) : (
+                        <>
+                          <div style={{
+                            fontWeight: 700, fontSize: "0.7rem", color: col.acento,
+                            lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden"
+                          }}>
+                            {hhmm(b.Bloque_Horario_Hora_Inicio)}–{hhmm(b.Bloque_Horario_Hora_Fin)}
+                          </div>
+                          <div style={{
+                            fontSize: "0.65rem", color: col.acento, opacity: 0.85,
+                            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+                          }}>
+                            {desajustado
+                              ? `⚠ ${b.clases} clase(s) por reubicar`
+                              : `${col.icono} ${b.Bloque_Horario_Tipo} · ${dur} min`}
+                          </div>
+                        </>
                       )}
                     </div>
                     {isHov && (

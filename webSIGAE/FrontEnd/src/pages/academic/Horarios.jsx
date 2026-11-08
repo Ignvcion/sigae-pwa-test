@@ -858,7 +858,7 @@ export default function Horarios() {
           onSubmit={handleGuardar}
           onClose={cerrarPanel}
           onEliminar={() => {
-            const h = horarios.find((x) => x.Horario_Asignatura_Id === idEditando);
+            const h = horarios.find((x) => Number(x.Horario_Asignatura_Id) === Number(idEditando));
             if (h) handleEliminarClase(h);
           }}
         />

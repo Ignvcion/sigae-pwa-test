@@ -742,7 +742,9 @@ const asignarRol = async (req, res) => {
 
 // CU28: Buscar usuarios por nombre completo, RUT o correo electrónico
 const buscarUsuario = async (req, res) => {
-  const { rut, nombre, correo } = req.body;
+  const rut = typeof req.body.rut === 'string' ? req.body.rut.trim() : '';
+  const nombre = typeof req.body.nombre === 'string' ? req.body.nombre.trim() : '';
+  const correo = typeof req.body.correo === 'string' ? req.body.correo.trim() : '';
   const solicitante = req.user;
 
   // CU28 - Excepción "Campos inválidos o incompletos"

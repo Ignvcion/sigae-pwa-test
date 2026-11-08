@@ -210,6 +210,7 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
             <tr>
               <th>Asignatura</th>
               <th>Prioridad</th>
+              <th>Horas / sem</th>
               <th>Estado</th>
             </tr>
           </thead>
@@ -218,6 +219,7 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
               <tr key={a.tieneasig_Id}>
                 <td>{a.Asignatura_Nombre}</td>
                 <td>{a.Asignatura_Prioridad_Academica}</td>
+                <td>{a.Horas_Semanales_Requeridas ? `${a.Horas_Semanales_Requeridas}h / sem` : "—"}</td>
                 <td>
                   <span className={`badge-estado ${a.Estado_Asignacion === "Activa" ? "badge-vigente" : "badge-inactiva"}`}>
                     {a.Estado_Asignacion}
