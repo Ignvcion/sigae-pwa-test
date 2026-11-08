@@ -51,11 +51,11 @@ function HorarioMaestro() {
     const docentesMap = new Map();
     const asigMap = new Map();
     horario.forEach((h) => {
-      cursosMap.set(h.Curso_Id, h.curso);
-      if (h.Usuario_Id) docentesMap.set(h.Usuario_Id, h.docente);
-      asigMap.set(h.Asignatura_Id, h.asignatura);
+      if (h.Curso_Id) cursosMap.set(h.Curso_Id, h.curso || h.Curso_Nombre || ("Curso " + h.Curso_Id));
+      if (h.Usuario_Id) docentesMap.set(h.Usuario_Id, h.docente || h.Docente_Nombre || ("Docente " + h.Usuario_Id));
+      if (h.Asignatura_Id) asigMap.set(h.Asignatura_Id, h.asignatura || h.Asignatura_Nombre || ("Asignatura " + h.Asignatura_Id));
     });
-    const porNombre = (a, b) => a[1].localeCompare(b[1], "es");
+    const porNombre = (a, b) => String(a?.[1] || "").localeCompare(String(b?.[1] || ""), "es");
     const asigOrdenadas = [...asigMap.entries()].sort(porNombre);
     return {
       cursos: [...cursosMap.entries()].sort(porNombre).map(([id, nombre]) => ({ id, nombre })),
@@ -77,7 +77,7 @@ function HorarioMaestro() {
   const conClases = new Set(horario.map((h) => h.Bloque_Horario_Id));
   const filas = bloques
     .filter((b) => Number(b.desajustado) !== 1 || conClases.has(b.Bloque_Horario_Id))
-    .sort((a, b) => aMinutos(a.Bloque_Horario_Hora_Inicio) - aMinutos(b.Bloque_Horario_Hora_Inicio));
+    .sort((a, b) => aMinutos(a.Bloque_Horario_Hora_Inicio || a.Bloque_Hora_Inicio) - aMinutos(b.Bloque_Horario_Hora_Inicio || b.Bloque_Hora_Inicio));
 
   const columnasCurso = filtroCurso ? cursos.filter((c) => String(c.id) === filtroCurso) : cursos;
   const clasesPorDia = (d) => filtradas.filter((h) => h.dia === d).length;
@@ -171,7 +171,7 @@ function HorarioMaestro() {
                     return (
                       <tr key={b.Bloque_Horario_Id}>
                         <td style={{ ...s.tdBloque, ...s.recreo }}>
-                          <div style={s.horaBloque}>{hhmm(b.Bloque_Horario_Hora_Inicio)} – {hhmm(b.Bloque_Horario_Hora_Fin)}</div>
+                          <div style={s.horaBloque}>{hhmm(b.Bloque_Horario_Hora_Inicio || b.Bloque_Hora_Inicio)} – {hhmm(b.Bloque_Horario_Hora_Fin || b.Bloque_Hora_Fin)}</div>
                         </td>
                         <td colSpan={columnas} style={{ ...s.recreo, ...s.recreoBanda }}>⛹ Recreo</td>
                       </tr>
@@ -184,7 +184,7 @@ function HorarioMaestro() {
                   return (
                     <tr key={b.Bloque_Horario_Id}>
                       <td style={{ ...s.tdBloque, ...(desajustado ? { background: COLOR_PENDIENTE.bg } : {}) }}>
-                        <div style={s.horaBloque}>{hhmm(b.Bloque_Horario_Hora_Inicio)} – {hhmm(b.Bloque_Horario_Hora_Fin)}</div>
+                        <div style={s.horaBloque}>{hhmm(b.Bloque_Horario_Hora_Inicio || b.Bloque_Hora_Inicio)} – {hhmm(b.Bloque_Horario_Hora_Fin || b.Bloque_Hora_Fin)}</div>
                         <div style={s.jornada}>{b.Bloque_Horario_Jornada}</div>
                         {desajustado && (
                           <div style={{ fontSize: "0.62rem", fontWeight: 700, color: COLOR_PENDIENTE.text }}>⚠ {b.motivo_desajuste}</div>
@@ -203,7 +203,7 @@ function HorarioMaestro() {
                         : DIAS_SEMANA.map((d) => {
                             const delDia = clasesBloque
                               .filter((h) => h.dia === d)
-                              .sort((x, y) => x.curso.localeCompare(y.curso, "es"));
+                              .sort((x, y) => String(x.curso || x.Curso_Nombre || "").localeCompare(String(y.curso || y.Curso_Nombre || ""), "es"));
                             return (
                               <td key={d} style={{ ...s.td, minWidth: 0 }}>
                                 {delDia.length === 0 ? (

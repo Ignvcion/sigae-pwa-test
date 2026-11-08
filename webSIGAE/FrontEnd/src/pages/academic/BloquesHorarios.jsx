@@ -794,7 +794,8 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
 
       {/* Panel lateral derecho */}
       {panelAbierto && (
-        <div style={s.panel}>
+        <div style={s.panelOverlay} onClick={cerrarPanel}>
+          <div style={s.panel} onClick={(e) => e.stopPropagation()}>
             <div style={s.panelHeader}>
               <div>
                 <h2 style={{ margin: 0, color: "#fff", fontSize: "1.05rem", fontWeight: 700 }}>
@@ -950,6 +951,7 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
               </form>
             </div>
           </div>
+        </div>
       )}
     </div>
   );
@@ -1054,8 +1056,25 @@ function TabEventos() {
       const url    = editando ? `${API}/eventos/${editando}` : `${API}/eventos`;
       const method = editando ? "PUT" : "POST";
       const res    = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(form) });
-      const data   = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const data   = await res.json().catch(() => ({}));
+      if (editando) {
+        setEventos((prev) =>
+          prev.map((ev) =>
+            ev.Evento_Institucional_Id === editando
+              ? { ...ev, ...form }
+              : ev
+          )
+        );
+      } else {
+        setEventos((prev) => [
+          ...prev,
+          {
+            Evento_Institucional_Id: data.id || Date.now(),
+            ...form,
+            bloques_afectados_count: 0,
+          },
+        ]);
+      }
       cerrarPanel();
       cargar();
       // CU70/71: confirmar al usuario que el evento quedó registrado/actualizado
@@ -1073,8 +1092,8 @@ function TabEventos() {
     setError("");
     try {
       const res  = await fetch(`${API}/eventos/${id}`, { method: "DELETE", headers: authHeaders() });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const data = await res.json().catch(() => ({}));
+      setEventos((prev) => prev.filter((ev) => ev.Evento_Institucional_Id !== id));
       cargar();
       // CU72: confirmar al usuario que el evento fue eliminado
       setExito(data.mensaje || "Evento eliminado correctamente");
@@ -1206,7 +1225,8 @@ function TabEventos() {
 
       {/* Panel lateral derecho */}
       {panelAbierto && (
-        <div style={s.panel}>
+        <div style={s.panelOverlay} onClick={cerrarPanel}>
+          <div style={s.panel} onClick={(e) => e.stopPropagation()}>
             <div style={s.panelHeader}>
               <div>
                 <h2 style={{ margin: 0, color: "#fff", fontSize: "1.05rem", fontWeight: 700 }}>
@@ -1345,6 +1365,7 @@ function TabEventos() {
               </form>
             </div>
           </div>
+        </div>
       )}
 
       {detalleId && (
@@ -1937,7 +1958,7 @@ const s = {
   tabBtn:      { padding: "0.6rem 1.1rem", border: "none", background: "transparent",
     cursor: "pointer", fontSize: "0.9rem", color: "#6b7280", borderRadius: "8px 8px 0 0",
     fontWeight: 500, transition: "all .15s" },
-  tabBtnActive:{ background: "#1e3a5f", color: "#fff", fontWeight: 700 },
+  tabBtnActive:{ background: "#1e3a5f", color: "#fff", fontWeight: 700, boxShadow: "0 4px 14px rgba(30, 58, 95, 0.4)", borderRadius: "8px 8px 0 0" },
   tabContent:  { },
 
   seccion:       { },
@@ -1980,11 +2001,15 @@ const s = {
   accessDenied:{ display: "flex", flexDirection: "column", alignItems: "center",
     justifyContent: "center", padding: "4rem 2rem", textAlign: "center" },
 
-  /* Panel lateral */
+  /* Panel lateral y overlay */
+  panelOverlay: {
+    position: "fixed", inset: 0, background: "rgba(0, 0, 0, 0.55)",
+    zIndex: 10000, display: "flex", justifyContent: "flex-end",
+  },
   panel: {
-    position: "fixed", top: 0, right: 0, width: "100%", maxWidth: 440, height: "100vh",
-    background: "#fff", boxShadow: "-6px 0 32px rgba(0,0,0,0.18), 0 0 0 100vmax rgba(0,0,0,0.45)",
-    zIndex: 990, display: "flex", flexDirection: "column",
+    position: "relative", width: "100%", maxWidth: 440, height: "100vh",
+    background: "#fff", boxShadow: "-6px 0 32px rgba(0,0,0,0.18)",
+    zIndex: 10001, display: "flex", flexDirection: "column",
     animation: "slideInRight 0.22s ease",
   },
   panelHeader: {
@@ -1992,9 +2017,9 @@ const s = {
     display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
   },
   panelBtnClose: {
-    background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)",
-    color: "#fff", borderRadius: "6px", width: 32, height: 32,
-    cursor: "pointer", fontSize: "0.9rem", display: "flex",
+    background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)",
+    color: "#fff", borderRadius: "8px", width: 44, height: 44, minWidth: 44, minHeight: 44,
+    cursor: "pointer", fontSize: "1.2rem", display: "flex",
     alignItems: "center", justifyContent: "center",
   },
   panelBody: { flex: 1, overflowY: "auto", padding: "1.25rem" },

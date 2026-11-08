@@ -92,6 +92,21 @@ function Administradores() {
         Usuario_Estado_Cuenta: form.estado ? 1 : 0,
       });
       setMsgExitoForm("Cambios guardados correctamente");
+      setAdministradores((prev) =>
+        prev.map((adm) =>
+          adm.Usuario_Id === editando.Usuario_Id
+            ? {
+                ...adm,
+                Administrador_Correo_Institucional: form.correo,
+                Usuario_Telefono: form.telefono,
+                Usuario_Estado_Cuenta: form.estado ? 1 : 0,
+              }
+            : adm
+        )
+      );
+      setTimeout(() => {
+        cerrarEdicion();
+      }, 800);
       await cargarAdministradores();
     } catch (error) {
       setMsgErrorForm(error.message || "Error al guardar cambios");
@@ -143,8 +158,8 @@ function Administradores() {
               <tr key={a.Usuario_Id}>
                 <td>{idx + 1}</td>
                 <td>{a.Usuario_Nombre_Completo}</td>
-                <td>{a.Administrador_Correo_Institucional || "—"}</td>
-                <td>{a.Usuario_Telefono || "—"}</td>
+                <td style={{ minWidth: "170px", wordBreak: "break-all", whiteSpace: "normal" }}>{a.Administrador_Correo_Institucional || "—"}</td>
+                <td style={{ minWidth: "150px", whiteSpace: "nowrap" }}>{a.Usuario_Telefono || "—"}</td>
                 <td>
                   {a.Usuario_Estado_Cuenta ? (
                     <span className="badge-activo">Activo</span>
@@ -168,19 +183,12 @@ function Administradores() {
 
       {/* Modal de edición — CU3 */}
       {editando && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div className="form-card" style={{ width: "460px", maxWidth: "95vw" }}>
-            <h2 style={{ marginBottom: "4px" }}>Editar administrador</h2>
+        <div className="modal-overlay" onClick={cerrarEdicion}>
+          <div className="modal-card" style={{ width: "480px", maxWidth: "95vw" }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 id="titulo-editar-admin">Editar administrador</h2>
+              <button type="button" className="btn-cerrar" onClick={cerrarEdicion} aria-label="Cerrar">✕</button>
+            </div>
             <p style={{ color: "#64748b", marginBottom: "20px" }}>
               <strong>{editando.Usuario_Nombre_Completo}</strong>
             </p>

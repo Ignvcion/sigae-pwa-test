@@ -123,11 +123,21 @@ function Asignaturas() {
         },
         body: JSON.stringify({ nombre, prioridad }),
       });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error); return; }
-      mostrarExito(data.mensaje);
-      setMostrarForm(false);
-      cargar();
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setAsignaturas((prev) => [
+          ...prev,
+          {
+            Asignatura_Id: data.id || Date.now(),
+            Asignatura_Nombre: nombre,
+            Asignatura_Prioridad_Academica: prioridad,
+          },
+        ]);
+        mostrarExito(data.mensaje || "Asignatura registrada correctamente");
+        setMostrarForm(false);
+      } else {
+        setError(data.error || "Error al registrar asignatura");
+      }
     } catch {
       setError("Error al conectar con el servidor");
     } finally {
@@ -147,11 +157,20 @@ function Asignaturas() {
         },
         body: JSON.stringify({ nombre, prioridad }),
       });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error); return; }
-      mostrarExito(data.mensaje);
-      setEditando(null);
-      cargar();
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setAsignaturas((prev) =>
+          prev.map((a) =>
+            a.Asignatura_Id === editando.id
+              ? { ...a, Asignatura_Nombre: nombre, Asignatura_Prioridad_Academica: prioridad }
+              : a
+          )
+        );
+        mostrarExito(data.mensaje || "Cambios guardados correctamente");
+        setEditando(null);
+      } else {
+        setError(data.error || "Error al actualizar asignatura");
+      }
     } catch {
       setError("Error al conectar con el servidor");
     } finally {

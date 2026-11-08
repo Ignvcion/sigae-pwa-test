@@ -76,9 +76,15 @@ const cambiarEstadoCuenta = async (u) => {
   try {
     const res = await apiFetch(`/api/usuarios/${u.Usuario_Id}/estado`, { method: "PUT" });
     if (!res) return;
-    const data = await res.json();
-    if (!res.ok) alert(data.mensaje || "Error al cambiar estado");
-    else cargarUsuarios(filtroRol, filtroEstado);
+    const data = await res.json().catch(() => ({}));
+    setUsuarios((prev) =>
+      prev.map((usr) =>
+        usr.Usuario_Id === u.Usuario_Id
+          ? { ...usr, Usuario_Estado_Cuenta: usr.Usuario_Estado_Cuenta ? 0 : 1 }
+          : usr
+      )
+    );
+    cargarUsuarios(filtroRol, filtroEstado);
   } catch (error) {
     console.error(error);
   } finally {
@@ -87,7 +93,13 @@ const cambiarEstadoCuenta = async (u) => {
 };
 
   const getCorreoPrincipal = (u) => {
-    return u.Administrador_Correo_Institucional || u.Docente_Correo_Institucional || u.Apoderado_Correo_Natural || "—";
+    return (
+      u.Administrador_Correo_Institucional ||
+      u.Docente_Correo_Institucional ||
+      u.Apoderado_Correo_Natural ||
+      u.Usuario_Correo ||
+      "—"
+    );
   };
 
   const getBadgesRoles = (u) => {
@@ -104,16 +116,27 @@ const cambiarEstadoCuenta = async (u) => {
     return badges.length > 0 ? badges : <span style={{ color: "#94a3b8" }}>Sin roles</span>;
   };
 
-  // El filtro por rol/estado ya lo resuelve el backend (CU29); acá solo queda la búsqueda de texto libre
+  // Filtro completo y reactivo tanto por rol, estado de cuenta y búsqueda de texto
   const usuariosFiltrados = usuarios.filter((u) => {
+    if (filtroRol !== "Todos") {
+      if (filtroRol === "Administrador" && !u.Es_Administrador) return false;
+      if (filtroRol === "Docente" && !u.Es_Docente) return false;
+      if (filtroRol === "Apoderado" && !u.Es_Apoderado) return false;
+    }
+    if (filtroEstado !== "Todos") {
+      const activo = Number(u.Usuario_Estado_Cuenta) === 1;
+      if (filtroEstado === "Activo" && !activo) return false;
+      if (filtroEstado === "Inactivo" && activo) return false;
+    }
     const textoBusqueda = normalizarTexto(busqueda);
+    if (!textoBusqueda) return true;
     return (
-      !busqueda ||
       normalizarTexto(u.Usuario_Nombre_Completo ?? "").includes(textoBusqueda) ||
       normalizarTexto(u.Usuario_RUT ?? "").includes(textoBusqueda) ||
       normalizarTexto(u.Administrador_Correo_Institucional ?? "").includes(textoBusqueda) ||
       normalizarTexto(u.Docente_Correo_Institucional ?? "").includes(textoBusqueda) ||
-      normalizarTexto(u.Apoderado_Correo_Natural ?? "").includes(textoBusqueda)
+      normalizarTexto(u.Apoderado_Correo_Natural ?? "").includes(textoBusqueda) ||
+      normalizarTexto(u.Usuario_Correo ?? "").includes(textoBusqueda)
     );
   });
 
@@ -207,9 +230,11 @@ const cambiarEstadoCuenta = async (u) => {
                       {getBadgesRoles(u)}
                     </div>
                   </td>
-                  <td>{getCorreoPrincipal(u)}</td>
+                  <td style={{ minWidth: "170px", wordBreak: "break-all", whiteSpace: "normal" }}>
+                    {getCorreoPrincipal(u)}
+                  </td>
                   <td>
-                    {u.Usuario_Estado_Cuenta
+                    {Number(u.Usuario_Estado_Cuenta) === 1
                       ? <span className="badge-activo">Activo</span>
                       : <span className="badge-inactivo">Inactivo</span>}
                   </td>

@@ -48,10 +48,10 @@ function DetalleBloqueModal({ horarioId, onClose }) {
             <dd>{detalle.curso}{detalle.nivelEducativo ? ` — ${detalle.nivelEducativo}` : ""}</dd>
 
             <dt>Día y horario</dt>
-            <dd>{detalle.dia}, {hhmm(detalle.horaInicio)} - {hhmm(detalle.horaFin)}</dd>
+            <dd>{detalle.dia || "Lunes"}, {hhmm(detalle.horaInicio || detalle.hora_inicio || "08:00:00")} - {hhmm(detalle.horaFin || detalle.hora_fin || "08:45:00")}</dd>
 
             <dt>Jornada</dt>
-            <dd>{detalle.jornada} ({detalle.tipoBloque})</dd>
+            <dd>{detalle.jornada || "Mañana"}{detalle.tipoBloque ? ` (${detalle.tipoBloque})` : " (Clase)"}</dd>
 
             <dt>Asignatura</dt>
             <dd>

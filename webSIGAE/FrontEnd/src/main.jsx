@@ -15,16 +15,37 @@ import "./index.css";
 //    "Failed to fetch", "Unexpected token '<'...", etc.
 const originalFetch = window.fetch;
 
-function getMockResponseForUrl(urlStr) {
+function getMockResponseForUrl(urlStr, method = "GET") {
   const p = (urlStr || "").toLowerCase();
+  const m = (method || "GET").toUpperCase();
 
+  // Para cualquier mutación (POST / PUT / PATCH / DELETE) en modo fallback
+  if (m !== "GET" && m !== "HEAD") {
+    return {
+      ok: true,
+      status: 200,
+      success: true,
+      mensaje: "Operación realizada con éxito",
+      id: Math.floor(Math.random() * 1000) + 1,
+    };
+  }
+
+  // Dashboard Estadísticas: soporta ambos esquemas de propiedades
   if (p.includes("/dashboard/stats")) {
     return {
-      totalUsuarios: 10,
-      totalEstudiantes: 24,
+      usuarios: 14,
+      docentes: 8,
+      apoderados: 12,
+      estudiantes: 24,
+      cursos: 6,
+      citaciones: 5,
+      totalUsuarios: 14,
       totalDocentes: 8,
+      totalApoderados: 12,
+      totalEstudiantes: 24,
       totalCursos: 6,
-      activos: 10,
+      totalCitaciones: 5,
+      activos: 14,
     };
   }
 
@@ -67,12 +88,12 @@ function getMockResponseForUrl(urlStr) {
       total_complementarias: 2,
       total_horas_semanales: 28,
       asignaturas: [
-        { Asignatura_Id: 1, Asignatura_Nombre: "Lenguaje y Comunicación", Plan_Asignatura_Tipo: "Obligatorio", Plan_Asignatura_Horas_Semanales: 8, tipo: "Obligatorio", horas_semanales: 8, Asignatura_Prioridad_Academica: "Alta" },
-        { Asignatura_Id: 2, Asignatura_Nombre: "Matemáticas", Plan_Asignatura_Tipo: "Obligatorio", Plan_Asignatura_Horas_Semanales: 8, tipo: "Obligatorio", horas_semanales: 8, Asignatura_Prioridad_Academica: "Alta" },
-        { Asignatura_Id: 3, Asignatura_Nombre: "Ciencias Naturales", Plan_Asignatura_Tipo: "Obligatorio", Plan_Asignatura_Horas_Semanales: 4, tipo: "Obligatorio", horas_semanales: 4, Asignatura_Prioridad_Academica: "Media" },
-        { Asignatura_Id: 4, Asignatura_Nombre: "Historia y Geografía", Plan_Asignatura_Tipo: "Obligatorio", Plan_Asignatura_Horas_Semanales: 4, tipo: "Obligatorio", horas_semanales: 4, Asignatura_Prioridad_Academica: "Media" },
-        { Asignatura_Id: 7, Asignatura_Nombre: "Artes Visuales", Plan_Asignatura_Tipo: "Complementario", Plan_Asignatura_Horas_Semanales: 2, tipo: "Complementario", horas_semanales: 2, Asignatura_Prioridad_Academica: "Baja" },
-        { Asignatura_Id: 8, Asignatura_Nombre: "Música", Plan_Asignatura_Tipo: "Complementario", Plan_Asignatura_Horas_Semanales: 2, tipo: "Complementario", horas_semanales: 2, Asignatura_Prioridad_Academica: "Baja" },
+        { Asignatura_Id: 1, Asignatura_Nombre: "Lenguaje y Comunicación", Plan_Asignatura_Tipo: "Obligatorio", Tipo: "Obligatorio", tipo: "Obligatorio", Plan_Asignatura_Horas_Semanales: 8, Horas_Semanales_Requeridas: 8, horas_semanales: 8, Asignatura_Prioridad_Academica: "Alta" },
+        { Asignatura_Id: 2, Asignatura_Nombre: "Matemáticas", Plan_Asignatura_Tipo: "Obligatorio", Tipo: "Obligatorio", tipo: "Obligatorio", Plan_Asignatura_Horas_Semanales: 8, Horas_Semanales_Requeridas: 8, horas_semanales: 8, Asignatura_Prioridad_Academica: "Alta" },
+        { Asignatura_Id: 3, Asignatura_Nombre: "Ciencias Naturales", Plan_Asignatura_Tipo: "Obligatorio", Tipo: "Obligatorio", tipo: "Obligatorio", Plan_Asignatura_Horas_Semanales: 4, Horas_Semanales_Requeridas: 4, horas_semanales: 4, Asignatura_Prioridad_Academica: "Media" },
+        { Asignatura_Id: 4, Asignatura_Nombre: "Historia y Geografía", Plan_Asignatura_Tipo: "Obligatorio", Tipo: "Obligatorio", tipo: "Obligatorio", Plan_Asignatura_Horas_Semanales: 4, Horas_Semanales_Requeridas: 4, horas_semanales: 4, Asignatura_Prioridad_Academica: "Media" },
+        { Asignatura_Id: 7, Asignatura_Nombre: "Artes Visuales", Plan_Asignatura_Tipo: "Complementario", Tipo: "Complementario", tipo: "Complementario", Plan_Asignatura_Horas_Semanales: 2, Horas_Semanales_Requeridas: 2, horas_semanales: 2, Asignatura_Prioridad_Academica: "Baja" },
+        { Asignatura_Id: 8, Asignatura_Nombre: "Música", Plan_Asignatura_Tipo: "Complementario", Tipo: "Complementario", tipo: "Complementario", Plan_Asignatura_Horas_Semanales: 2, Horas_Semanales_Requeridas: 2, horas_semanales: 2, Asignatura_Prioridad_Academica: "Baja" },
       ],
     };
   }
@@ -109,15 +130,17 @@ function getMockResponseForUrl(urlStr) {
         Usuario_Nombre_Completo: "Esperanza Penelope Gonzales Farias",
         Usuario_RUT: "5682711-0",
         Administrador_Correo_Institucional: "es.gonzales@jacquescousteau.edu",
+        Usuario_Correo: "es.gonzales@jacquescousteau.edu",
         Usuario_Telefono: "+56 9 8765 4321",
         Usuario_Estado_Cuenta: 1,
         Administrador_Tipo: "Super Admin",
       },
       {
         Usuario_Id: 2,
-        Usuario_Nombre_Completo: "Carlos Gonzales",
+        Usuario_Nombre_Completo: "Carlos Gonzales Farias",
         Usuario_RUT: "9343727-6",
         Administrador_Correo_Institucional: "c.gonzales@jacquescousteau.edu",
+        Usuario_Correo: "c.gonzales@jacquescousteau.edu",
         Usuario_Telefono: "+56 9 1234 5678",
         Usuario_Estado_Cuenta: 1,
         Administrador_Tipo: "Administrador Normal",
@@ -160,31 +183,59 @@ function getMockResponseForUrl(urlStr) {
     ];
   }
 
-  if (p.includes("/estudiantes")) {
+  // Estudiantes con su respectivo apoderado titular asignado (crucial para CU74 / crear citación)
+  if (p.includes("/estudiantes") || p.includes("/citaciones/estudiantes")) {
     return [
       {
         Estudiante_Id: 1,
         Estudiante_Nombre_Completo: "Lucas Mateo Fernandez Vera",
         Estudiante_RUT: "24111222-3",
         Curso_Nombre: "1° Básico A",
+        Curso_Id: 1,
+        Apoderado_Usuario_Id: 4,
+        Apoderado_Nombre: "Pedro Fernandez",
+        Usuario_Telefono: "+56 9 8765 4321",
+        Usuario_Correo: "p.fernandez@email.cl",
       },
       {
         Estudiante_Id: 2,
         Estudiante_Nombre_Completo: "Sofia Valentina Gonzalez Morales",
         Estudiante_RUT: "24333444-5",
         Curso_Nombre: "2° Básico A",
+        Curso_Id: 2,
+        Apoderado_Usuario_Id: 4,
+        Apoderado_Nombre: "Pedro Fernandez",
+        Usuario_Telefono: "+56 9 8765 4321",
+        Usuario_Correo: "p.fernandez@email.cl",
       },
       {
         Estudiante_Id: 3,
         Estudiante_Nombre_Completo: "Martín Ignacio Silva Torres",
         Estudiante_RUT: "24555666-7",
         Curso_Nombre: "1° Básico A",
+        Curso_Id: 1,
+        Apoderado_Usuario_Id: 4,
+        Apoderado_Nombre: "Pedro Fernandez",
+        Usuario_Telefono: "+56 9 8765 4321",
+        Usuario_Correo: "p.fernandez@email.cl",
       },
     ];
   }
 
+  if (p.includes("/citaciones/estudiante/") && p.includes("/contactos")) {
+    return {
+      titular: {
+        Usuario_Id: 4,
+        Usuario_Nombre_Completo: "Pedro Fernandez",
+        Usuario_Correo: "p.fernandez@email.cl",
+        Usuario_Telefono: "+56 9 8765 4321",
+      },
+      suplentes: [],
+    };
+  }
+
   if (p.includes("/usuarios")) {
-    return [
+    const todos = [
       {
         Usuario_Id: 1,
         Usuario_Nombre_Completo: "Esperanza Penelope Gonzales Farias",
@@ -194,17 +245,21 @@ function getMockResponseForUrl(urlStr) {
         Es_Apoderado: 0,
         Administrador_Tipo: "Super Admin",
         Administrador_Correo_Institucional: "es.gonzales@jacquescousteau.edu",
+        Usuario_Correo: "es.gonzales@jacquescousteau.edu",
+        Usuario_Telefono: "+56 9 8765 4321",
         Usuario_Estado_Cuenta: 1,
       },
       {
         Usuario_Id: 2,
-        Usuario_Nombre_Completo: "Carlos Gonzales",
+        Usuario_Nombre_Completo: "Carlos Gonzales Farias",
         Usuario_RUT: "9343727-6",
         Es_Administrador: 1,
         Es_Docente: 0,
         Es_Apoderado: 0,
         Administrador_Tipo: "Administrador Normal",
         Administrador_Correo_Institucional: "c.gonzales@jacquescousteau.edu",
+        Usuario_Correo: "c.gonzales@jacquescousteau.edu",
+        Usuario_Telefono: "+56 9 1234 5678",
         Usuario_Estado_Cuenta: 1,
       },
       {
@@ -215,7 +270,9 @@ function getMockResponseForUrl(urlStr) {
         Es_Docente: 1,
         Es_Apoderado: 0,
         Docente_Correo_Institucional: "m.morales@jacquescousteau.edu",
+        Usuario_Correo: "m.morales@jacquescousteau.edu",
         Docente_Especialidad: "Matemáticas",
+        Usuario_Telefono: "+56 9 7654 3210",
         Usuario_Estado_Cuenta: 1,
       },
       {
@@ -225,9 +282,74 @@ function getMockResponseForUrl(urlStr) {
         Es_Administrador: 0,
         Es_Docente: 0,
         Es_Apoderado: 1,
+        Apoderado_Correo_Natural: "p.fernandez@email.cl",
+        Usuario_Correo: "p.fernandez@email.cl",
+        Usuario_Telefono: "+56 9 8765 4321",
         Usuario_Estado_Cuenta: 1,
       },
+      {
+        Usuario_Id: 5,
+        Usuario_Nombre_Completo: "Ana Torres",
+        Usuario_RUT: "3890710-7",
+        Es_Administrador: 0,
+        Es_Docente: 1,
+        Es_Apoderado: 0,
+        Docente_Correo_Institucional: "a.torres@jacquescousteau.edu",
+        Usuario_Correo: "a.torres@jacquescousteau.edu",
+        Docente_Especialidad: "Lenguaje y Comunicación",
+        Usuario_Telefono: "+56 9 6543 2109",
+        Usuario_Estado_Cuenta: 1,
+      },
+      {
+        Usuario_Id: 6,
+        Usuario_Nombre_Completo: "Roberto Silva",
+        Usuario_RUT: "7135657-4",
+        Es_Administrador: 0,
+        Es_Docente: 1,
+        Es_Apoderado: 0,
+        Docente_Correo_Institucional: "r.silva@jacquescousteau.edu",
+        Usuario_Correo: "r.silva@jacquescousteau.edu",
+        Docente_Especialidad: "Historia y Geografía",
+        Usuario_Telefono: "+56 9 5432 1098",
+        Usuario_Estado_Cuenta: 1,
+      },
+      {
+        Usuario_Id: 7,
+        Usuario_Nombre_Completo: "Luis Ramos",
+        Usuario_RUT: "8636451-4",
+        Es_Administrador: 0,
+        Es_Docente: 0,
+        Es_Apoderado: 1,
+        Apoderado_Correo_Natural: "l.ramos@email.cl",
+        Usuario_Correo: "l.ramos@email.cl",
+        Usuario_Telefono: "+56 9 4321 0987",
+        Usuario_Estado_Cuenta: 0, // Inactivo para pruebas
+      },
+      {
+        Usuario_Id: 8,
+        Usuario_Nombre_Completo: "Carmen Díaz",
+        Usuario_RUT: "2258000-0",
+        Es_Administrador: 0,
+        Es_Docente: 1,
+        Es_Apoderado: 0,
+        Docente_Correo_Institucional: "c.diaz@jacquescousteau.edu",
+        Usuario_Correo: "c.diaz@jacquescousteau.edu",
+        Docente_Especialidad: "Inglés",
+        Usuario_Telefono: "+56 9 3210 9876",
+        Usuario_Estado_Cuenta: 0, // Inactivo para pruebas
+      },
     ];
+
+    // Soporte para parámetros de filtro en URL
+    let filtrados = [...todos];
+    if (p.includes("rol=administrador")) filtrados = filtrados.filter((u) => u.Es_Administrador);
+    else if (p.includes("rol=docente")) filtrados = filtrados.filter((u) => u.Es_Docente);
+    else if (p.includes("rol=apoderado")) filtrados = filtrados.filter((u) => u.Es_Apoderado);
+
+    if (p.includes("estado=1")) filtrados = filtrados.filter((u) => u.Usuario_Estado_Cuenta === 1);
+    else if (p.includes("estado=0")) filtrados = filtrados.filter((u) => u.Usuario_Estado_Cuenta === 0);
+
+    return filtrados;
   }
 
   if (p.includes("/horarios/cursos") || p.includes("/cursos")) {
@@ -250,13 +372,116 @@ function getMockResponseForUrl(urlStr) {
     };
   }
 
+  // Horario de Docente (Mi Horario)
   if (p.includes("/horarios/docente/") && p.includes("/horario")) {
     return [
-      { id: 1, cursoId: 1, asignaturaId: 1, curso: "1° Básico A", asignatura: "Lenguaje y Comunicación", dia: "Lunes", horaInicio: "08:00:00", horaFin: "08:45:00", estado: "Activo", pendiente: 0 },
-      { id: 2, cursoId: 1, asignaturaId: 1, curso: "1° Básico A", asignatura: "Lenguaje y Comunicación", dia: "Lunes", horaInicio: "08:45:00", horaFin: "09:30:00", estado: "Activo", pendiente: 0 },
-      { id: 3, cursoId: 2, asignaturaId: 2, curso: "2° Básico A", asignatura: "Matemáticas", dia: "Martes", horaInicio: "08:00:00", horaFin: "08:45:00", estado: "Activo", pendiente: 0 },
-      { id: 4, cursoId: 2, asignaturaId: 2, curso: "2° Básico A", asignatura: "Matemáticas", dia: "Miércoles", horaInicio: "09:45:00", horaFin: "10:30:00", estado: "Activo", pendiente: 0 },
-      { id: 5, cursoId: 1, asignaturaId: 1, curso: "1° Básico A", asignatura: "Lenguaje y Comunicación", dia: "Jueves", horaInicio: "10:30:00", horaFin: "11:15:00", estado: "Activo", pendiente: 0 },
+      { id: 1, cursoId: 1, asignaturaId: 1, curso: "1° Básico A", asignatura: "Lenguaje y Comunicación", dia: "Lunes", horaInicio: "08:00:00", horaFin: "08:45:00", hora_inicio: "08:00:00", hora_fin: "08:45:00", estado: "Activo", pendiente: 0 },
+      { id: 2, cursoId: 1, asignaturaId: 1, curso: "1° Básico A", asignatura: "Lenguaje y Comunicación", dia: "Lunes", horaInicio: "08:45:00", horaFin: "09:30:00", hora_inicio: "08:45:00", hora_fin: "09:30:00", estado: "Activo", pendiente: 0 },
+      { id: 3, cursoId: 2, asignaturaId: 2, curso: "2° Básico A", asignatura: "Matemáticas", dia: "Martes", horaInicio: "08:00:00", horaFin: "08:45:00", hora_inicio: "08:00:00", hora_fin: "08:45:00", estado: "Activo", pendiente: 0 },
+      { id: 4, cursoId: 2, asignaturaId: 2, curso: "2° Básico A", asignatura: "Matemáticas", dia: "Miércoles", horaInicio: "09:45:00", horaFin: "10:30:00", hora_inicio: "09:45:00", hora_fin: "10:30:00", estado: "Activo", pendiente: 0 },
+      { id: 5, cursoId: 1, asignaturaId: 1, curso: "1° Básico A", asignatura: "Lenguaje y Comunicación", dia: "Jueves", horaInicio: "10:30:00", horaFin: "11:15:00", hora_inicio: "10:30:00", hora_fin: "11:15:00", estado: "Activo", pendiente: 0 },
+    ];
+  }
+
+  // Horario Maestro: vista consolidada de todos los cursos y docentes
+  if (p.includes("/horarios/maestro")) {
+    return [
+      {
+        Horario_Asignatura_Id: 1,
+        Curso_Id: 1,
+        curso: "1° Básico A",
+        Usuario_Id: 5,
+        docente: "Ana Torres",
+        Asignatura_Id: 1,
+        asignatura: "Lenguaje y Comunicación",
+        Bloque_Horario_Id: 1,
+        dia: "Lunes",
+        horaInicio: "08:00:00",
+        horaFin: "08:45:00",
+        hora_inicio: "08:00:00",
+        hora_fin: "08:45:00",
+        estado: "Activo",
+      },
+      {
+        Horario_Asignatura_Id: 2,
+        Curso_Id: 1,
+        curso: "1° Básico A",
+        Usuario_Id: 5,
+        docente: "Ana Torres",
+        Asignatura_Id: 1,
+        asignatura: "Lenguaje y Comunicación",
+        Bloque_Horario_Id: 2,
+        dia: "Lunes",
+        horaInicio: "08:45:00",
+        horaFin: "09:30:00",
+        hora_inicio: "08:45:00",
+        hora_fin: "09:30:00",
+        estado: "Activo",
+      },
+      {
+        Horario_Asignatura_Id: 3,
+        Curso_Id: 2,
+        curso: "2° Básico A",
+        Usuario_Id: 3,
+        docente: "María Morales",
+        Asignatura_Id: 2,
+        asignatura: "Matemáticas",
+        Bloque_Horario_Id: 1,
+        dia: "Martes",
+        horaInicio: "08:00:00",
+        horaFin: "08:45:00",
+        hora_inicio: "08:00:00",
+        hora_fin: "08:45:00",
+        estado: "Activo",
+      },
+      {
+        Horario_Asignatura_Id: 4,
+        Curso_Id: 2,
+        curso: "2° Básico A",
+        Usuario_Id: 3,
+        docente: "María Morales",
+        Asignatura_Id: 2,
+        asignatura: "Matemáticas",
+        Bloque_Horario_Id: 4,
+        dia: "Miércoles",
+        horaInicio: "09:45:00",
+        horaFin: "10:30:00",
+        hora_inicio: "09:45:00",
+        hora_fin: "10:30:00",
+        estado: "Activo",
+      },
+      {
+        Horario_Asignatura_Id: 5,
+        Curso_Id: 1,
+        curso: "1° Básico A",
+        Usuario_Id: 6,
+        docente: "Roberto Silva",
+        Asignatura_Id: 3,
+        asignatura: "Ciencias Naturales",
+        Bloque_Horario_Id: 4,
+        dia: "Jueves",
+        horaInicio: "09:45:00",
+        horaFin: "10:30:00",
+        hora_inicio: "09:45:00",
+        hora_fin: "10:30:00",
+        estado: "Activo",
+      },
+      {
+        Horario_Asignatura_Id: 6,
+        Curso_Id: 1,
+        curso: "1° Básico A",
+        Usuario_Id: 6,
+        docente: "Roberto Silva",
+        Asignatura_Id: 4,
+        asignatura: "Historia y Geografía",
+        Bloque_Horario_Id: 5,
+        dia: "Viernes",
+        horaInicio: "10:30:00",
+        horaFin: "11:15:00",
+        hora_inicio: "10:30:00",
+        hora_fin: "11:15:00",
+        estado: "Activo",
+      },
     ];
   }
 
@@ -280,18 +505,23 @@ function getMockResponseForUrl(urlStr) {
     ];
   }
 
-  if (p.includes("/detalle")) {
+  if (p.includes("detalle")) {
     return {
       curso: "1° Básico A",
       nivelEducativo: "1° Básico",
       dia: "Lunes",
       horaInicio: "08:00:00",
       horaFin: "08:45:00",
+      hora_inicio: "08:00:00",
+      hora_fin: "08:45:00",
       jornada: "Mañana",
+      tipoBloque: "Clase",
       asignatura: "Lenguaje y Comunicación",
+      prioridadAcademica: "Alta",
       docente: "Ana Torres",
+      especialidadDocente: "Lenguaje y Comunicación",
       estado: "Activo",
-      observaciones: "Clase regular planificada en jornada mañana.",
+      observaciones: ["Clase regular planificada en jornada mañana."],
     };
   }
 
@@ -326,13 +556,14 @@ function getMockResponseForUrl(urlStr) {
     ];
   }
 
+  // Bloques horarios institucionales: provee todas las variantes de nombres de propiedades
   if (p.includes("/horarios/bloques") || p.includes("/bloques")) {
     return [
-      { Bloque_Horario_Id: 1, Bloque_Numero: 1, Bloque_Hora_Inicio: "08:00:00", Bloque_Hora_Fin: "08:45:00", Bloque_Es_Recreo: 0, Bloque_Tipo: "Pedagógico", desajustado: 0 },
-      { Bloque_Horario_Id: 2, Bloque_Numero: 2, Bloque_Hora_Inicio: "08:45:00", Bloque_Hora_Fin: "09:30:00", Bloque_Es_Recreo: 0, Bloque_Tipo: "Pedagógico", desajustado: 0 },
-      { Bloque_Horario_Id: 3, Bloque_Numero: 3, Bloque_Hora_Inicio: "09:30:00", Bloque_Hora_Fin: "09:45:00", Bloque_Es_Recreo: 1, Bloque_Tipo: "Recreo", desajustado: 0 },
-      { Bloque_Horario_Id: 4, Bloque_Numero: 4, Bloque_Hora_Inicio: "09:45:00", Bloque_Hora_Fin: "10:30:00", Bloque_Es_Recreo: 0, Bloque_Tipo: "Pedagógico", desajustado: 0 },
-      { Bloque_Horario_Id: 5, Bloque_Numero: 5, Bloque_Hora_Inicio: "10:30:00", Bloque_Hora_Fin: "11:15:00", Bloque_Es_Recreo: 0, Bloque_Tipo: "Pedagógico", desajustado: 0 },
+      { Bloque_Horario_Id: 1, Bloque_Numero: 1, Bloque_Horario_Numero: 1, Bloque_Hora_Inicio: "08:00:00", Bloque_Horario_Hora_Inicio: "08:00:00", Bloque_Hora_Fin: "08:45:00", Bloque_Horario_Hora_Fin: "08:45:00", Bloque_Es_Recreo: 0, Bloque_Tipo: "Clase", Bloque_Horario_Tipo: "Clase", Bloque_Horario_Jornada: "Mañana", desajustado: 0 },
+      { Bloque_Horario_Id: 2, Bloque_Numero: 2, Bloque_Horario_Numero: 2, Bloque_Hora_Inicio: "08:45:00", Bloque_Horario_Hora_Inicio: "08:45:00", Bloque_Hora_Fin: "09:30:00", Bloque_Horario_Hora_Fin: "09:30:00", Bloque_Es_Recreo: 0, Bloque_Tipo: "Clase", Bloque_Horario_Tipo: "Clase", Bloque_Horario_Jornada: "Mañana", desajustado: 0 },
+      { Bloque_Horario_Id: 3, Bloque_Numero: 3, Bloque_Horario_Numero: 3, Bloque_Hora_Inicio: "09:30:00", Bloque_Horario_Hora_Inicio: "09:30:00", Bloque_Hora_Fin: "09:45:00", Bloque_Horario_Hora_Fin: "09:45:00", Bloque_Es_Recreo: 1, Bloque_Tipo: "Recreo", Bloque_Horario_Tipo: "Recreo", Bloque_Horario_Jornada: "Mañana", desajustado: 0 },
+      { Bloque_Horario_Id: 4, Bloque_Numero: 4, Bloque_Horario_Numero: 4, Bloque_Hora_Inicio: "09:45:00", Bloque_Horario_Hora_Inicio: "09:45:00", Bloque_Hora_Fin: "10:30:00", Bloque_Horario_Hora_Fin: "10:30:00", Bloque_Es_Recreo: 0, Bloque_Tipo: "Clase", Bloque_Horario_Tipo: "Clase", Bloque_Horario_Jornada: "Mañana", desajustado: 0 },
+      { Bloque_Horario_Id: 5, Bloque_Numero: 5, Bloque_Horario_Numero: 5, Bloque_Hora_Inicio: "10:30:00", Bloque_Horario_Hora_Inicio: "10:30:00", Bloque_Hora_Fin: "11:15:00", Bloque_Horario_Hora_Fin: "11:15:00", Bloque_Es_Recreo: 0, Bloque_Tipo: "Clase", Bloque_Horario_Tipo: "Clase", Bloque_Horario_Jornada: "Mañana", desajustado: 0 },
     ];
   }
 
@@ -343,37 +574,184 @@ function getMockResponseForUrl(urlStr) {
     ];
   }
 
-  if (p.includes("/horarios") && !p.includes("/cursos") && !p.includes("/bloques") && !p.includes("/asignaturas-curso") && !p.includes("/docentes") && !p.includes("/resumen")) {
+  // Horarios de curso (usado en Horarios.jsx creador y ListadoClases)
+  if (p.includes("/horarios") && !p.includes("/cursos") && !p.includes("/bloques") && !p.includes("/asignaturas-curso") && !p.includes("/docentes") && !p.includes("/resumen") && !p.includes("/exportar")) {
     return [
       {
         Horario_Asignatura_Id: 1,
-        dia: 1,
+        dia: "Lunes",
+        diaNumero: 1,
         Bloque_Horario_Id: 1,
+        hora_inicio: "08:00:00",
+        hora_fin: "08:45:00",
+        horaInicio: "08:00:00",
+        horaFin: "08:45:00",
         Asignatura_Id: 1,
+        asignatura: "Lenguaje y Comunicación",
         Asignatura_Nombre: "Lenguaje y Comunicación",
+        docente: "Ana Torres",
         Docente_Nombre: "Ana Torres",
+        Usuario_Id: 5,
+        Curso_Id: 1,
+        curso: "1° Básico A",
+        Curso_Nombre: "1° Básico A",
         Horario_Estado: "Activo",
+        estado: "Activo",
         activo: 1,
       },
       {
         Horario_Asignatura_Id: 2,
-        dia: 1,
+        dia: "Lunes",
+        diaNumero: 1,
         Bloque_Horario_Id: 2,
+        hora_inicio: "08:45:00",
+        hora_fin: "09:30:00",
+        horaInicio: "08:45:00",
+        horaFin: "09:30:00",
         Asignatura_Id: 1,
+        asignatura: "Lenguaje y Comunicación",
         Asignatura_Nombre: "Lenguaje y Comunicación",
+        docente: "Ana Torres",
         Docente_Nombre: "Ana Torres",
+        Usuario_Id: 5,
+        Curso_Id: 1,
+        curso: "1° Básico A",
+        Curso_Nombre: "1° Básico A",
         Horario_Estado: "Activo",
+        estado: "Activo",
         activo: 1,
       },
       {
         Horario_Asignatura_Id: 3,
-        dia: 2,
+        dia: "Martes",
+        diaNumero: 2,
         Bloque_Horario_Id: 1,
+        hora_inicio: "08:00:00",
+        hora_fin: "08:45:00",
+        horaInicio: "08:00:00",
+        horaFin: "08:45:00",
         Asignatura_Id: 2,
+        asignatura: "Matemáticas",
         Asignatura_Nombre: "Matemáticas",
+        docente: "María Morales",
         Docente_Nombre: "María Morales",
+        Usuario_Id: 3,
+        Curso_Id: 1,
+        curso: "1° Básico A",
+        Curso_Nombre: "1° Básico A",
         Horario_Estado: "Activo",
+        estado: "Activo",
         activo: 1,
+      },
+      {
+        Horario_Asignatura_Id: 4,
+        dia: "Miércoles",
+        diaNumero: 3,
+        Bloque_Horario_Id: 4,
+        hora_inicio: "09:45:00",
+        hora_fin: "10:30:00",
+        horaInicio: "09:45:00",
+        horaFin: "10:30:00",
+        Asignatura_Id: 2,
+        asignatura: "Matemáticas",
+        Asignatura_Nombre: "Matemáticas",
+        docente: "María Morales",
+        Docente_Nombre: "María Morales",
+        Usuario_Id: 3,
+        Curso_Id: 1,
+        curso: "1° Básico A",
+        Curso_Nombre: "1° Básico A",
+        Horario_Estado: "Activo",
+        estado: "Activo",
+        activo: 1,
+      },
+      {
+        Horario_Asignatura_Id: 5,
+        dia: "Jueves",
+        diaNumero: 4,
+        Bloque_Horario_Id: 5,
+        hora_inicio: "10:30:00",
+        hora_fin: "11:15:00",
+        horaInicio: "10:30:00",
+        horaFin: "11:15:00",
+        Asignatura_Id: 3,
+        asignatura: "Ciencias Naturales",
+        Asignatura_Nombre: "Ciencias Naturales",
+        docente: "Roberto Silva",
+        Docente_Nombre: "Roberto Silva",
+        Usuario_Id: 6,
+        Curso_Id: 1,
+        curso: "1° Básico A",
+        Curso_Nombre: "1° Básico A",
+        Horario_Estado: "Activo",
+        estado: "Activo",
+        activo: 1,
+      },
+    ];
+  }
+
+  // Eventos Institucionales: pestaña de BloquesHorarios
+  if (p.includes("/eventos")) {
+    return [
+      {
+        Evento_Institucional_Id: 1,
+        Evento_Institucional_Nombre: "Jornada Pedagógica Institucional",
+        Evento_Institucional_Fecha: "2026-11-20T08:00:00",
+        Evento_Institucional_Impacto_Clases: "Suspensión de jornada",
+        Evento_Institucional_Descripcion: "Jornada de evaluación docente y planificación curricular segundo semestre.",
+        bloques_afectados_count: 5,
+      },
+      {
+        Evento_Institucional_Id: 2,
+        Evento_Institucional_Nombre: "Aniversario del Colegio Jacques Cousteau",
+        Evento_Institucional_Fecha: "2026-12-04T08:00:00",
+        Evento_Institucional_Impacto_Clases: "Retiro temprano",
+        Evento_Institucional_Descripcion: "Acto cívico conmemorativo y premiación de estudiantes destacados.",
+        bloques_afectados_count: 3,
+      },
+      {
+        Evento_Institucional_Id: 3,
+        Evento_Institucional_Nombre: "Día de la Ciencia y la Tecnología",
+        Evento_Institucional_Fecha: "2026-10-15T08:00:00",
+        Evento_Institucional_Impacto_Clases: "Sin impacto",
+        Evento_Institucional_Descripcion: "Feria científica escolar realizada en el patio central.",
+        bloques_afectados_count: 0,
+      },
+    ];
+  }
+
+  // Citaciones activas
+  if (p.includes("/citaciones") && !p.includes("/historial")) {
+    return [
+      {
+        Citacion_Id: 1,
+        Citacion_Fecha: "2026-11-12",
+        Citacion_Hora_Inicio: "10:00:00",
+        Citacion_Hora_Fin: "10:45:00",
+        Citacion_Tramo: "10:00 - 10:45",
+        Citacion_Modalidad: "Presencial",
+        Citacion_Motivo: "Revisión de rendimiento académico y apoyo en lenguaje.",
+        Citacion_Estado: "Confirmada",
+        Estudiante_Id: 1,
+        Estudiante_Nombre_Completo: "Lucas Mateo Fernandez Vera",
+        Curso_Nombre: "1° Básico A",
+        Docente_Nombre: "María Morales",
+        Apoderado_Nombre: "Pedro Fernandez",
+      },
+      {
+        Citacion_Id: 2,
+        Citacion_Fecha: "2026-11-16",
+        Citacion_Hora_Inicio: "11:30:00",
+        Citacion_Hora_Fin: "12:15:00",
+        Citacion_Tramo: "11:30 - 12:15",
+        Citacion_Modalidad: "Online",
+        Citacion_Motivo: "Coordinación de plan de apoyo pedagógico.",
+        Citacion_Estado: "Pendiente",
+        Estudiante_Id: 2,
+        Estudiante_Nombre_Completo: "Sofia Valentina Gonzalez Morales",
+        Curso_Nombre: "2° Básico A",
+        Docente_Nombre: "María Morales",
+        Apoderado_Nombre: "Pedro Fernandez",
       },
     ];
   }
@@ -602,6 +980,8 @@ window.fetch = async function (input, init = {}) {
     },
   };
 
+  const method = (init.method || (input instanceof Request ? input.method : "GET") || "GET").toUpperCase();
+
   try {
     const response = await originalFetch.call(this, url, modifiedInit);
 
@@ -611,7 +991,7 @@ window.fetch = async function (input, init = {}) {
       if (urlStr.includes("/exportar")) {
         return generateMockExportResponse(urlStr);
       }
-      const mockData = getMockResponseForUrl(urlStr);
+      const mockData = getMockResponseForUrl(urlStr, method);
       if (mockData !== null) {
         return new Response(JSON.stringify(mockData), {
           status: 200,
@@ -627,7 +1007,7 @@ window.fetch = async function (input, init = {}) {
       if (urlStr.includes("/exportar")) {
         return generateMockExportResponse(urlStr);
       }
-      const mockData = getMockResponseForUrl(urlStr);
+      const mockData = getMockResponseForUrl(urlStr, method);
       if (mockData !== null) {
         return new Response(JSON.stringify(mockData), {
           status: 200,

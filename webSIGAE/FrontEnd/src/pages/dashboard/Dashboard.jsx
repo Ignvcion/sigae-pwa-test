@@ -118,7 +118,18 @@ function DashboardAdmin({ esSuperAdmin }) {
         if (!r || !r.ok) throw new Error();
         return r.json();
       })
-      .then(setStats)
+      .then((data) => {
+        if (data) {
+          setStats({
+            usuarios: data.usuarios ?? data.totalUsuarios ?? 0,
+            docentes: data.docentes ?? data.totalDocentes ?? 0,
+            apoderados: data.apoderados ?? data.totalApoderados ?? 0,
+            estudiantes: data.estudiantes ?? data.totalEstudiantes ?? 0,
+            cursos: data.cursos ?? data.totalCursos ?? 0,
+            citaciones: data.citaciones ?? data.totalCitaciones ?? 0,
+          });
+        }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);

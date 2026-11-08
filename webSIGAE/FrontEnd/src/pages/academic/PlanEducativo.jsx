@@ -19,18 +19,22 @@ function TablaAsignaturas({ asignaturas }) {
         </tr>
       </thead>
       <tbody>
-        {asignaturas.map((a) => (
-          <tr key={a.IncluyeAsig_Id}>
-            <td>{a.Asignatura_Nombre}</td>
-            <td>{a.Asignatura_Prioridad_Academica}</td>
-            <td>
-              <span className={`badge-estado ${a.Tipo === "Obligatorio" ? "badge-vigente" : "badge-inactiva"}`}>
-                {a.Tipo}
-              </span>
-            </td>
-            <td>{a.Horas_Semanales_Requeridas}h</td>
-          </tr>
-        ))}
+        {asignaturas.map((a) => {
+          const tipo = a.Tipo || a.tipo || a.Plan_Asignatura_Tipo || "Obligatorio";
+          const horas = a.Horas_Semanales_Requeridas ?? a.horas_semanales ?? a.Plan_Asignatura_Horas_Semanales ?? a.horas ?? 0;
+          return (
+            <tr key={a.IncluyeAsig_Id || a.Asignatura_Id}>
+              <td>{a.Asignatura_Nombre}</td>
+              <td>{a.Asignatura_Prioridad_Academica || "Media"}</td>
+              <td>
+                <span className={`badge-estado ${tipo === "Obligatorio" ? "badge-vigente" : "badge-inactiva"}`}>
+                  {tipo}
+                </span>
+              </td>
+              <td>{horas}h</td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );

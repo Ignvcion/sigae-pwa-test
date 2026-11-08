@@ -1120,11 +1120,16 @@ select {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.45);
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1100;
+  padding: 20px;
+  padding-top: max(72px, env(safe-area-inset-top));
+  padding-bottom: 24px;
+  z-index: 10000 !important;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-card {
@@ -1154,10 +1159,19 @@ select {
 .btn-cerrar {
   background: none;
   border: none;
-  font-size: 1.1rem;
+  font-size: 1.3rem;
+  line-height: 1;
   cursor: pointer;
-  color: #94a3b8;
-  padding: 0 4px;
+  color: #64748b;
+  padding: 8px 12px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  z-index: 10002;
+  touch-action: manipulation;
 }
 
 .btn-cerrar:hover {
@@ -2647,12 +2661,18 @@ table {
 @media screen and (max-width: 640px) {
   .modal-overlay {
     padding: 12px;
+    padding-top: max(72px, env(safe-area-inset-top));
+    padding-bottom: 24px;
+    align-items: flex-start;
   }
 
   .modal-card,
   .modal-card.modal-card-ancho {
     width: 100%;
-    max-height: 90dvh;
+    max-height: calc(100dvh - 96px);
+    overflow-y: auto;
+    margin-top: auto;
+    margin-bottom: auto;
   }
 }
 

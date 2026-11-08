@@ -447,11 +447,17 @@ export default function Horarios() {
     try {
       const res = await fetch(`${API}/horarios/${h.Horario_Asignatura_Id}`, { method: "DELETE", headers: authHeaders() });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error);
       if (idEditando === h.Horario_Asignatura_Id) cerrarPanel();
+      setHorarios((prev) =>
+        prev.map((c) =>
+          c.Horario_Asignatura_Id === h.Horario_Asignatura_Id
+            ? { ...c, estado: ESTADO_ELIMINADO, Horario_Estado: ESTADO_ELIMINADO }
+            : c
+        )
+      );
       cargarHorarios(cursoSeleccionado);
       cargarAsignaturas(cursoSeleccionado);
-      setExito(data.mensaje || "Clase eliminada");
+      setExito(data.mensaje || "Clase eliminada exitosamente");
       setTimeout(() => setExito(""), 3500);
     } catch (e) {
       setError(e.message || "Error al eliminar la clase");
@@ -462,10 +468,16 @@ export default function Horarios() {
     try {
       const res = await fetch(`${API}/horarios/${h.Horario_Asignatura_Id}/restaurar`, { method: "PATCH", headers: authHeaders() });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error);
+      setHorarios((prev) =>
+        prev.map((c) =>
+          c.Horario_Asignatura_Id === h.Horario_Asignatura_Id
+            ? { ...c, estado: "Activo", Horario_Estado: "Activo" }
+            : c
+        )
+      );
       cargarHorarios(cursoSeleccionado);
       cargarAsignaturas(cursoSeleccionado);
-      setExito(data.mensaje || "Clase restaurada");
+      setExito(data.mensaje || "Clase restaurada exitosamente");
       setTimeout(() => setExito(""), 3500);
     } catch (e) {
       setError(e.message || "Error al restaurar la clase");
@@ -1450,15 +1462,15 @@ function ListadoClases({ clases, onEliminar, onRestaurar, onVerDetalle }) {
                 const eliminada = esEliminada(h);
                 return (
                   <tr key={h.Horario_Asignatura_Id} style={{ borderTop: "1px solid #f1f5f9", color: eliminada ? "#9ca3af" : "#111827" }}>
-                    <td style={s.listadoTd}>{h.dia}</td>
+                    <td style={s.listadoTd}>{h.dia || "Lunes"}</td>
                     <td style={{ ...s.listadoTd, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                      {h.hora_inicio?.slice(0, 5)} – {h.hora_fin?.slice(0, 5)}
+                      {(h.hora_inicio || h.horaInicio || h.Bloque_Horario_Hora_Inicio || "08:00")?.slice(0, 5)} – {(h.hora_fin || h.horaFin || h.Bloque_Horario_Hora_Fin || "08:45")?.slice(0, 5)}
                     </td>
                     <td style={{ ...s.listadoTd, fontWeight: 600, textDecoration: eliminada ? "line-through" : "none" }}>
-                      {h.asignatura}
+                      {h.asignatura || h.Asignatura_Nombre || "Asignatura"}
                     </td>
-                    <td style={s.listadoTd}>{h.docente || <span style={{ color: "#9ca3af" }}>Sin asignar</span>}</td>
-                    <td style={s.listadoTd}>{estadoChip(h.estado)}</td>
+                    <td style={s.listadoTd}>{h.docente || h.Docente_Nombre || <span style={{ color: "#9ca3af" }}>Sin asignar</span>}</td>
+                    <td style={s.listadoTd}>{estadoChip(h.estado || h.Horario_Estado || "Activo")}</td>
                     <td style={{ ...s.listadoTd, textAlign: "right", whiteSpace: "nowrap" }}>
                       <button type="button" style={s.btnListado} onClick={() => onVerDetalle(h)}>Detalle</button>
                       {eliminada ? (

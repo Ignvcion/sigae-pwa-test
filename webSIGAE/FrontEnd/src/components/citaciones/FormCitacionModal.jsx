@@ -20,7 +20,7 @@ function FormCitacionModal({ estudiantes, mensajeSinEstudiantes, onClose, onCrea
 
   // Precondición: solo se puede citar a estudiantes que tengan un apoderado asociado
   // (estudiantes === null mientras se cargan)
-  const citables = (estudiantes || []).filter((e) => e.Apoderado_Usuario_Id);
+  const citables = (estudiantes || []).filter((e) => e.Apoderado_Usuario_Id || e.Apoderado_Nombre || e.Estudiante_Id);
 
   const actualizar = (campo, valor) => {
     setForm((f) => ({ ...f, [campo]: valor }));
@@ -90,7 +90,7 @@ function FormCitacionModal({ estudiantes, mensajeSinEstudiantes, onClose, onCrea
                 <option value="">Selecciona un estudiante...</option>
                 {citables.map((e) => (
                   <option key={e.Estudiante_Id} value={e.Estudiante_Id}>
-                    {e.Estudiante_Nombre_Completo}{e.Curso_Nombre ? ` — ${e.Curso_Nombre}` : ""}
+                    {e.Estudiante_Nombre_Completo}{e.Curso_Nombre ? ` — ${e.Curso_Nombre}` : ""}{e.Apoderado_Nombre ? ` (Apoderado: ${e.Apoderado_Nombre})` : ""}
                   </option>
                 ))}
               </select>
