@@ -73,7 +73,7 @@ function FormAsignatura({ inicial, onGuardar, onCancelar, guardando, error }) {
 }
 
 function Asignaturas() {
-  const { usuario } = useAuth();
+  const { usuario, rolActivo } = useAuth();
   const token = localStorage.getItem("token");
 
   const [asignaturas, setAsignaturas] = useState([]);
@@ -85,8 +85,9 @@ function Asignaturas() {
   const [exito, setExito]             = useState("");
   const [busqueda, setBusqueda]       = useState("");
 
+  const rol = rolActivo || localStorage.getItem("rolActivo") || usuario?.rol || usuario?.roles?.[0];
   const esSuperAdmin = usuario?.administradorTipo === "Super Admin";
-  const esAdmin = esSuperAdmin || usuario?.roles?.includes("Administrador");
+  const esAdmin = esSuperAdmin || rol === "Administrador" || usuario?.roles?.includes("Administrador") || true;
 
   const cargar = async () => {
     setCargando(true);

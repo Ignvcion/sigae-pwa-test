@@ -544,6 +544,19 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
         return;
       }
       if (!res.ok) throw new Error(data.error);
+      if (editando) {
+        setBloques((prev) =>
+          prev.map((b) => (b.Bloque_Horario_Id === editando ? { ...b, ...form } : b))
+        );
+      } else {
+        const nuevo = {
+          Bloque_Horario_Id: data.id || Date.now(),
+          ...form,
+          clases: 0,
+          eventos: 0,
+        };
+        setBloques((prev) => [...prev, nuevo]);
+      }
       cerrarPanel();
       cargar();
       if (data.clasesPendientes > 0) onConflictos?.();
@@ -1004,7 +1017,17 @@ function TabEventos() {
       const res  = await fetch(`${API}/eventos`, { headers: authHeaders() });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setEventos(data);
+      const lista = Array.isArray(data) ? data : [];
+      const normalizados = lista.map((ev, i) => ({
+        ...ev,
+        Evento_Institucional_Id: ev.Evento_Institucional_Id || ev.id || (i + 1),
+        Evento_Institucional_Nombre: ev.Evento_Institucional_Nombre || ev.nombre || "Evento Institucional",
+        Evento_Institucional_Fecha: String(ev.Evento_Institucional_Fecha || ev.fecha || ev.Evento_Fecha || "2026-11-20").slice(0, 10),
+        Evento_Institucional_Impacto_Clases: ev.Evento_Institucional_Impacto_Clases || ev.impacto || "Sin impacto",
+        Evento_Institucional_Descripcion: ev.Evento_Institucional_Descripcion || ev.descripcion || "",
+        bloques_afectados_count: ev.bloques_afectados_count ?? ev.bloquesAfectados ?? 0,
+      }));
+      setEventos(normalizados);
     } catch (e) {
       setError(e.message || "Error al cargar eventos");
     } finally {
@@ -1105,9 +1128,16 @@ function TabEventos() {
     }
   };
 
-  const hoy      = toISODate(new Date());
-  const proximos = eventos.filter((ev) => ev.Evento_Institucional_Fecha?.slice(0, 10) >= hoy);
-  const pasados  = eventos.filter((ev) => ev.Evento_Institucional_Fecha?.slice(0, 10)  < hoy);
+  const hoy = toISODate(new Date());
+  const getFecha = (ev) => String(ev.Evento_Institucional_Fecha || ev.fecha || ev.Evento_Fecha || "").slice(0, 10);
+  const proximos = eventos.filter((ev) => {
+    const f = getFecha(ev);
+    return !f || f >= hoy;
+  });
+  const pasados = eventos.filter((ev) => {
+    const f = getFecha(ev);
+    return Boolean(f && f < hoy);
+  });
 
   const impactoActivo = IMPACTO_COLORES[form.Evento_Institucional_Impacto_Clases] || IMPACTO_COLORES["Sin impacto"];
 
@@ -1740,7 +1770,7 @@ function VistaCalendarioEventos({ eventos, onVerDetalle, onEditar, onEliminar, e
 /* ══════════════════════════════════════════════════════════════════
    Vista Calendario de Bloques (Google Calendar-style, eje de tiempo)
 ══════════════════════════════════════════════════════════════════ */
-const PX_POR_MIN = 1.5;
+const PX_POR_MIN = 1.8;
 
 const TIPO_COLORES = {
   "Clase":  { bg: "#eff6ff", borde: "#3b82f6", acento: "#1e40af", icono: "📚" },
@@ -1783,9 +1813,11 @@ function VistaCalendarioBloques({ bloques, onEditar, onEliminar, eliminando, pre
   const diasAbr = ["Lun", "Mar", "Mié", "Jue", "Vie"];
 
   return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
-      {/* Encabezados */}
-      <div style={{ display: "flex", borderBottom: "2px solid #e5e7eb" }}>
+    <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", background: "#fff", width: "100%" }}>
+      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", width: "100%" }}>
+        <div style={{ minWidth: 680 }}>
+          {/* Encabezados */}
+          <div style={{ display: "flex", borderBottom: "2px solid #e5e7eb" }}>
         <div style={{ width: 56, flexShrink: 0, borderRight: "1px solid #e5e7eb" }} />
         {diasAbr.map((d, i) => (
           <div key={d} style={{
@@ -1927,6 +1959,8 @@ function VistaCalendarioBloques({ bloques, onEditar, onEliminar, eliminando, pre
             })()}
           </div>
         ))}
+          </div>
+        </div>
       </div>
     </div>
   );

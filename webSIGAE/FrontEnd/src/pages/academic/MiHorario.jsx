@@ -160,8 +160,14 @@ function MiHorario() {
         <div className="usuarios-empty">{mensajeInfo}</div>
       )}
 
-      {!loading && !errorCarga && (esAdmin ? docenteId && !mensajeInfo : true) && grilla.length > 0 && (
-        <HorarioSemanal clases={grilla} />
+      {!loading && !errorCarga && (esAdmin ? docenteId && !mensajeInfo : true) && (
+        grilla.length > 0 ? (
+          <HorarioSemanal clases={grilla} />
+        ) : (
+          <div className="usuarios-empty" style={{ margin: "1rem 0" }}>
+            No hay clases asignadas para este docente en la planificación actual.
+          </div>
+        )
       )}
 
       {!loading && !avisoCerrado && (

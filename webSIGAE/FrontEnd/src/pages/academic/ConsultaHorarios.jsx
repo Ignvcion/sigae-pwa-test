@@ -187,10 +187,13 @@ function ConsultaHorarios() {
   });
 
   const selector = (etiqueta, valor, onChange, opcionesSelect, textoVacio) => (
-    <select className="usuarios-select" style={{ width: "100%" }} aria-label={etiqueta} value={valor} onChange={onChange}>
-      <option value="">{textoVacio}</option>
-      {opcionesSelect}
-    </select>
+    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+      <label style={{ fontSize: "0.82rem", fontWeight: 600, color: "#374151" }}>{etiqueta}:</label>
+      <select className="usuarios-select" style={{ width: "100%" }} aria-label={etiqueta} value={valor} onChange={onChange}>
+        <option value="">{textoVacio}</option>
+        {opcionesSelect}
+      </select>
+    </div>
   );
 
   const opcionesDocentes = opciones.docentes.map((d) => (
@@ -232,9 +235,9 @@ function ConsultaHorarios() {
           ) : (
             <form style={ESTILO_FORM} onSubmit={buscarHorarios}>
               {selector("Docente", filtros.docente_id, cambiarFiltro("docente_id"), opcionesDocentes, "Todos los docentes")}
-              {selector("Curso", filtros.curso_id, cambiarFiltro("curso_id"), opcionesCursos, "Todos los cursos")}
+              {selector("Curso específico", filtros.curso_id, cambiarFiltro("curso_id"), opcionesCursos, "Todos los cursos (ej: 1° Básico A)")}
               {selector(
-                "Nivel educativo",
+                "Nivel educativo general",
                 filtros.nivel_educativo_id,
                 cambiarFiltro("nivel_educativo_id"),
                 opciones.niveles.map((n) => (
@@ -305,7 +308,13 @@ function ConsultaHorarios() {
                         <td>{h.curso}</td>
                         <td>{h.asignatura}</td>
                         <td>{h.docente}</td>
-                        <td style={{ color: h.estado === "Suspendido" ? "#b91c1c" : undefined }}>{h.estado}</td>
+                        <td>
+      {h.estado === "Inactivo" || h.estado === "Suspendido" ? (
+        <span className="badge-inactivo">{h.estado}</span>
+      ) : (
+        <span className="badge-activo">Activo</span>
+      )}
+    </td>
                         <td>
                           <button
                             type="button"

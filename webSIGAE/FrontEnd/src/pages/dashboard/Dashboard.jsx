@@ -140,7 +140,8 @@ function DashboardAdmin({ esSuperAdmin }) {
 
   return (
     <div className="dashboard-container">
-      <h1>Dashboard SIGAE</h1>
+      <h1>Colegio Jacques Cousteau</h1>
+      <p style={{ margin: "2px 0 6px", fontSize: "1.1rem", fontWeight: 700, color: "#1e3a5f" }}>Dashboard Institucional — SIGAE</p>
       <p>
         Bienvenido al Sistema de Gestión Académica Escolar
         {esSuperAdmin ? " — Super Administrador" : " — Administrador"}
@@ -353,7 +354,7 @@ function DashboardDocente({ nombre, docenteId }) {
   return (
     <div className="dashboard-container">
       <h1>Bienvenido, {nombre}</h1>
-      <p>Panel del Docente — SIGAE</p>
+      <p>Colegio Jacques Cousteau · Panel del Docente — SIGAE</p>
 
       <div className="quick-actions">
         <h2>Accesos Rápidos</h2>
@@ -379,7 +380,7 @@ function DashboardApoderado({ nombre }) {
   return (
     <div className="dashboard-container">
       <h1>Bienvenido, {nombre}</h1>
-      <p>Panel del Apoderado — SIGAE</p>
+      <p>Colegio Jacques Cousteau · Panel del Apoderado — SIGAE</p>
 
       <div className="quick-actions">
         <h2>Accesos Rápidos</h2>

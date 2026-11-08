@@ -45,10 +45,10 @@ function consultarCitaciones(rol) {
 // El administrador ve y gestiona las citaciones de toda la institución.
 function Citaciones() {
   const { usuario, rolActivo } = useAuth();
-  const rol = rolActivo || usuario?.roles?.[0];
-  const esDocente = rol === "Docente";
-  const esApoderado = rol === "Apoderado";
-  const esAdmin = rol === "Administrador" || usuario?.administradorTipo === "Super Admin";
+  const rol = rolActivo || localStorage.getItem("rolActivo") || usuario?.rol || usuario?.roles?.[0];
+  const esDocente = rol === "Docente" || usuario?.roles?.includes("Docente");
+  const esApoderado = rol === "Apoderado" || usuario?.roles?.includes("Apoderado");
+  const esAdmin = rol === "Administrador" || usuario?.administradorTipo === "Super Admin" || usuario?.roles?.includes("Administrador");
   const rolAgenda = esDocente || esApoderado ? rol : "Administrador";
 
   const [citaciones, setCitaciones] = useState([]);

@@ -4,6 +4,7 @@ import ExportMenu from "../../components/ExportMenu";
 import { COLORES_ASIGNATURA, COLOR_PENDIENTE, DIAS_SEMANA, aMinutos, hhmm } from "../../utils/horarios";
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
+const COLOR_DEFAULT = { bg: "#f1f5f9", border: "#cbd5e1", text: "#334155" };
 
 // Día de la semana actual (o lunes si es fin de semana) para abrir la vista por día
 function diaInicial() {
@@ -234,7 +235,7 @@ function HorarioMaestro() {
           {asignaturas.length > 0 && (
             <div style={s.leyenda}>
               {asignaturas.map((a) => {
-                const c = colorAsig[a.id];
+                const c = colorAsig[a.id] || COLOR_DEFAULT;
                 return (
                   <span key={a.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.75rem", color: "#475569" }}>
                     <span style={{ width: 12, height: 12, borderRadius: 3, background: c.bg, border: `1px solid ${c.border}` }} />
@@ -251,20 +252,21 @@ function HorarioMaestro() {
 }
 
 function TarjetaClase({ clase, color }) {
+  const c = color || COLOR_DEFAULT;
   return (
     <div
       title={`${clase.curso} · ${clase.asignatura} · ${clase.docente || "Sin docente"} (${clase.dia} ${hhmm(clase.hora_inicio)}–${hhmm(clase.hora_fin)})`}
       style={{
-        background: color.bg,
-        border: `1px solid ${color.border}`,
-        borderLeft: `3px solid ${color.text}`,
+        background: c.bg,
+        border: `1px solid ${c.border}`,
+        borderLeft: `3px solid ${c.text}`,
         borderRadius: 6,
         padding: "5px 7px",
         minHeight: 40,
         boxSizing: "border-box",
       }}
     >
-      <div style={{ fontSize: "0.74rem", fontWeight: 700, color: color.text, lineHeight: 1.25 }}>{clase.asignatura}</div>
+      <div style={{ fontSize: "0.74rem", fontWeight: 700, color: c.text, lineHeight: 1.25 }}>{clase.asignatura}</div>
       <div style={{ fontSize: "0.66rem", color: clase.docente ? "#475569" : "#b91c1c", marginTop: 2, lineHeight: 1.2 }}>
         {clase.docente || "Sin docente"}
       </div>
@@ -273,17 +275,18 @@ function TarjetaClase({ clase, color }) {
 }
 
 function ChipClase({ clase, color }) {
+  const c = color || COLOR_DEFAULT;
   return (
     <div
       title={`${clase.curso} · ${clase.asignatura} · ${clase.docente || "Sin docente"}`}
       style={{
-        background: color.bg,
-        borderLeft: `3px solid ${color.text}`,
+        background: c.bg,
+        borderLeft: `3px solid ${c.text}`,
         borderRadius: 4,
         padding: "2px 6px",
         fontSize: "0.68rem",
         lineHeight: 1.3,
-        color: color.text,
+        color: c.text,
         overflowWrap: "anywhere",
       }}
     >

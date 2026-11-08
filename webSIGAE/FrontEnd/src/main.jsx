@@ -690,13 +690,13 @@ function getMockResponseForUrl(urlStr, method = "GET") {
     ];
   }
 
-  // Eventos Institucionales: pestaña de BloquesHorarios
+  // Eventos Institucionales: pestaña de BloquesHorarios (5 eventos: 3 futuros y 2 pasados)
   if (p.includes("/eventos")) {
     return [
       {
         Evento_Institucional_Id: 1,
         Evento_Institucional_Nombre: "Jornada Pedagógica Institucional",
-        Evento_Institucional_Fecha: "2026-11-20T08:00:00",
+        Evento_Institucional_Fecha: "2026-11-20",
         Evento_Institucional_Impacto_Clases: "Suspensión de jornada",
         Evento_Institucional_Descripcion: "Jornada de evaluación docente y planificación curricular segundo semestre.",
         bloques_afectados_count: 5,
@@ -704,7 +704,7 @@ function getMockResponseForUrl(urlStr, method = "GET") {
       {
         Evento_Institucional_Id: 2,
         Evento_Institucional_Nombre: "Aniversario del Colegio Jacques Cousteau",
-        Evento_Institucional_Fecha: "2026-12-04T08:00:00",
+        Evento_Institucional_Fecha: "2026-12-04",
         Evento_Institucional_Impacto_Clases: "Retiro temprano",
         Evento_Institucional_Descripcion: "Acto cívico conmemorativo y premiación de estudiantes destacados.",
         bloques_afectados_count: 3,
@@ -712,10 +712,26 @@ function getMockResponseForUrl(urlStr, method = "GET") {
       {
         Evento_Institucional_Id: 3,
         Evento_Institucional_Nombre: "Día de la Ciencia y la Tecnología",
-        Evento_Institucional_Fecha: "2026-10-15T08:00:00",
+        Evento_Institucional_Fecha: "2026-10-15",
         Evento_Institucional_Impacto_Clases: "Sin impacto",
         Evento_Institucional_Descripcion: "Feria científica escolar realizada en el patio central.",
         bloques_afectados_count: 0,
+      },
+      {
+        Evento_Institucional_Id: 4,
+        Evento_Institucional_Nombre: "Feria del Libro y Literatura",
+        Evento_Institucional_Fecha: "2026-11-28",
+        Evento_Institucional_Impacto_Clases: "Retiro temprano",
+        Evento_Institucional_Descripcion: "Muestra literaria, cuenta cuentos y presentaciones de editoriales.",
+        bloques_afectados_count: 2,
+      },
+      {
+        Evento_Institucional_Id: 5,
+        Evento_Institucional_Nombre: "Día del Profesor y Asistentes",
+        Evento_Institucional_Fecha: "2026-10-16",
+        Evento_Institucional_Impacto_Clases: "Suspensión de jornada",
+        Evento_Institucional_Descripcion: "Celebración y reconocimiento institucional a los educadores.",
+        bloques_afectados_count: 6,
       },
     ];
   }

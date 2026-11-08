@@ -48,11 +48,17 @@ function MainLayout() {
           ☰
         </button>
 
-        <img
-          src={`${import.meta.env.BASE_URL}logo-colegio.png`}
-          alt="Logo Colegio Jacques Cousteau"
-          className="mobile-topbar-logo"
-        />
+        <div className="mobile-topbar-brand">
+          <img
+            src={`${import.meta.env.BASE_URL}logo-colegio.png`}
+            alt="Logo Colegio Jacques Cousteau"
+            className="mobile-topbar-logo"
+          />
+          <div className="mobile-topbar-titles">
+            <span className="mobile-topbar-name">Colegio Jacques Cousteau</span>
+            <span className="mobile-topbar-sub">SIGAE</span>
+          </div>
+        </div>
       </header>
 
       {/* Fondo oscuro al abrir la sidebar en móvil */}
