@@ -72,6 +72,8 @@ CREATE TABLE `apoderado_suplente` (
 
 --
 -- Table structure for table `asignatura`
+-- Asignatura_Color: color (#RRGGBB) que la identifica en los horarios; al crearla se asigna
+-- al azar de la paleta básica de 12 colores (BackEnd/utils/colores.js) y se cambia en Asignaturas
 -- Incremento 4, CU47 (RF28): Asignatura_Es_Electiva marca las asignaturas electivas de 3° y 4°
 -- medio: solo van en el plan de electivos, no en planes regulares ni en cursos (RF27, RF33).
 --
@@ -83,6 +85,7 @@ CREATE TABLE `asignatura` (
   `Asignatura_Nombre` varchar(100) NOT NULL,
   `Asignatura_Prioridad_Academica` varchar(50) NOT NULL,
   `Asignatura_Es_Electiva` tinyint(1) NOT NULL DEFAULT 0,
+  `Asignatura_Color` char(7) NOT NULL DEFAULT '#2563EB',
   PRIMARY KEY (`Asignatura_Id`),
   UNIQUE KEY `Asignatura_Nombre_UNIQUE` (`Asignatura_Nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -846,6 +849,7 @@ CREATE TABLE `tieneasig` (
 -- sin estudiantes (inactivo); se elimina en el siguiente cambio de período si sigue así
 -- Usuario_Correo_Verificado: 0 hasta confirmar el correo principal con un código (primer ingreso);
 -- vuelve a 0 si la administración cambia un correo de la cuenta
+-- Docente_Color: color (#RRGGBB) que identifica al docente; se asigna al azar de la paleta básica
 --
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -874,6 +878,7 @@ CREATE TABLE `usuario` (
   `Docente_Recepcion_Mensajes` tinyint(1) NOT NULL DEFAULT 1,
   `Apoderado_Sin_Asociaciones_Desde` varchar(10) DEFAULT NULL,
   `Usuario_Correo_Verificado` tinyint(1) NOT NULL DEFAULT 0,
+  `Docente_Color` char(7) DEFAULT NULL,
   PRIMARY KEY (`Usuario_Id`),
   UNIQUE KEY `Usuario_RUT_UNIQUE` (`Usuario_RUT`),
   UNIQUE KEY `Apoderado_Correo_Natural_UNIQUE` (`Apoderado_Correo_Natural`),

@@ -18,6 +18,7 @@ const {
   CAMPOS_DIRECCION,
 } = require('../middleware/validation');
 const { PERIODO_VIGENTE_SQL } = require('../utils/periodos');
+const { colorAleatorioDocente } = require('../utils/colores');
 const {
   PROPOSITOS,
   MINUTOS_VALIDEZ: MINUTOS_VALIDEZ_CODIGO,
@@ -469,6 +470,8 @@ const createUsuario = async (req, res) => {
     const hash = await bcrypt.hash(Usuario_Contraseña, 10);
 
     let guardadoDisponibilidad = null;
+    // El docente nuevo recibe un color aleatorio que lo identifica (se cambia en Docentes)
+    const colorDocente = Es_Docente ? await colorAleatorioDocente(db) : null;
     const nuevoId = await enTransaccion(async (conn) => {
       const [resultado] = await conn.query(
         `INSERT INTO usuario (
@@ -477,8 +480,8 @@ const createUsuario = async (req, res) => {
           Es_Docente, Docente_Carga_Horaria_Semanal, Docente_Especialidad, Docente_Correo_Institucional,
           Es_Administrador, Administrador_Tipo, Administrador_Correo_Institucional,
           Es_Apoderado, Usuario_Direccion_Calle, Usuario_Direccion_Numero,
-          Usuario_Direccion_Depto, Usuario_Direccion_Comuna, Apoderado_Correo_Natural
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          Usuario_Direccion_Depto, Usuario_Direccion_Comuna, Apoderado_Correo_Natural, Docente_Color
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           Usuario_RUT,
           normalizarTelefono(Usuario_Telefono),
@@ -496,6 +499,7 @@ const createUsuario = async (req, res) => {
           Es_Apoderado    ? 1 : 0,
           ...columnasDireccion(direccionDesdeColumnas(req.body)).map(([, valor]) => valor),
           Apoderado_Correo_Natural        || null,
+          colorDocente,
         ]
       );
       if (especialidades) await guardarEspecialidadesDocente(conn, resultado.insertId, especialidades);
@@ -725,19 +729,23 @@ const updateRoles = async (req, res) => {
 
         }
 
+        // Un docente sin color recibe uno aleatorio
+        const colorDocente = Es_Docente ? await colorAleatorioDocente(db) : null;
         await db.query(
             `UPDATE usuario
              SET
              Es_Administrador = ?,
              Es_Docente = ?,
              Es_Apoderado = ?,
-             Administrador_Tipo = ?
+             Administrador_Tipo = ?,
+             Docente_Color = COALESCE(Docente_Color, ?)
              WHERE Usuario_Id = ?`,
             [
                 Es_Administrador,
                 Es_Docente,
                 Es_Apoderado,
                 Administrador_Tipo || null,
+                colorDocente,
                 id
             ]
         );
@@ -919,9 +927,11 @@ const asignarRol = async (req, res) => {
     if (rol === 'Docente') {
       setCampos.push('Es_Docente = 1',
         'Docente_Correo_Institucional = ?',
-        'Docente_Carga_Horaria_Semanal = ?'
+        'Docente_Carga_Horaria_Semanal = ?',
+        // Si nunca tuvo color (o lo tuvo como docente antes), se conserva; si no, uno aleatorio
+        'Docente_Color = COALESCE(Docente_Color, ?)'
       );
-      setValores.push(correoDocente, carga);
+      setValores.push(correoDocente, carga, await colorAleatorioDocente(db));
     }
 
     if (rol === 'Administrador') {
@@ -1053,6 +1063,7 @@ const getDocentes = async (req, res) => {
         Docente_Correo_Institucional,
         Docente_Especialidad,
         Docente_Carga_Horaria_Semanal,
+        Docente_Color,
         -- CU107: horas disponibles a la semana en el período vigente (NULL = sin restricción)
         (SELECT SUM(TIME_TO_SEC(TIMEDIFF(dd.Disponibilidad_Docente_Hora_Fin, dd.Disponibilidad_Docente_Hora_Inicio))) / 3600
            FROM disponibilidad_docente dd

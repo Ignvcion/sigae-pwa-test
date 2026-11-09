@@ -1,3 +1,4 @@
+import useColores from "../../hooks/useColores";
 import { useEffect, useState } from "react";
 import {
   DIAS_SEMANA, COLORES_ASIGNATURA, COLOR_PENDIENTE, aMinutos, hhmm, minutosAHHMM, detectarTopes,
@@ -93,6 +94,7 @@ function distribuirEnCarriles(clases) {
  * administración aún debe reubicarla; se muestra en amarillo tenue con ⚠.
  */
 export default function HorarioSemanal({ clases }) {
+  const { tonosAsignatura } = useColores();
   const [hover, setHover] = useState(null);
   const [jornada, setJornada] = useState(null);
 
@@ -121,9 +123,11 @@ export default function HorarioSemanal({ clases }) {
     .filter((m, i, arr) => i === 0 || m === rangoMax || m - arr[i - 1] >= 20);
   const recreos = (jornada?.recreos || []).filter((r) => r.inicio >= rangoMin && r.fin <= rangoMax);
 
-  // Color estable por asignatura dentro de esta vista
+  // Color de la asignatura (el guardado en Asignaturas); si no se conoce (p. ej. la
+  // atención de apoderados), uno de la paleta estable dentro de esta vista
   const claves = [...new Set(clases.map((c) => String(c.colorKey ?? c.titulo)))].sort();
-  const colorDe = (c) => COLORES[claves.indexOf(String(c.colorKey ?? c.titulo)) % COLORES.length];
+  const colorDe = (c) => tonosAsignatura(c.colorKey)
+    || COLORES[claves.indexOf(String(c.colorKey ?? c.titulo)) % COLORES.length];
 
   const idsEnTope = new Set(detectarTopes(clases).flatMap((t) => t.clases.map((c) => c.id)));
 

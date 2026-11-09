@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import SelectorColor, { PuntoColor } from "../../components/SelectorColor";
+import { colorAleatorio, nombreColor } from "../../utils/colores";
+import { fijarColor } from "../../hooks/useColores";
 
 const PRIORIDADES = ["Alta", "Media", "Baja"];
 
@@ -24,14 +27,16 @@ function BadgePrioridad({ valor }) {
   );
 }
 
-function FormAsignatura({ inicial, onGuardar, onCancelar, guardando, error }) {
+function FormAsignatura({ inicial, onGuardar, onCancelar, guardando, error, usados }) {
   const [nombre, setNombre]       = useState(inicial?.nombre    || "");
   const [prioridad, setPrioridad] = useState(inicial?.prioridad || "");
   const [electiva, setElectiva]   = useState(Boolean(inicial?.electiva));
+  // Una asignatura nueva parte con un color aleatorio de la paleta (entre los menos usados)
+  const [color, setColor]         = useState(() => inicial?.color || colorAleatorio(usados));
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onGuardar({ nombre, prioridad, electiva });
+    onGuardar({ nombre, prioridad, electiva, color });
   };
 
   return (
@@ -59,6 +64,14 @@ function FormAsignatura({ inicial, onGuardar, onCancelar, guardando, error }) {
           <option key={p} value={p}>{p}</option>
         ))}
       </select>
+
+      <label style={{ marginTop: "0.9rem" }}>Color en los horarios</label>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+        <SelectorColor value={color} onChange={setColor} usados={usados} etiqueta="Color de la asignatura" mostrarHex />
+        <span style={{ fontSize: "0.8rem", color: "#64748b" }}>
+          {nombreColor(color)}{inicial ? "" : " · asignado al azar, puedes cambiarlo"}
+        </span>
+      </div>
 
       {/* CU47 / RF28: las electivas solo van en el plan de electivos de 3° y 4° medio */}
       <label style={{ marginTop: "0.9rem", display: "flex", alignItems: "flex-start", gap: "0.5rem", fontWeight: 400 }}>
@@ -127,7 +140,7 @@ function Asignaturas() {
     setTimeout(() => setExito(""), 4000);
   };
 
-  const handleCrear = async ({ nombre, prioridad, electiva }) => {
+  const handleCrear = async ({ nombre, prioridad, electiva, color }) => {
     setGuardando(true);
     setError("");
     try {
@@ -137,10 +150,11 @@ function Asignaturas() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ nombre, prioridad, electiva }),
+        body: JSON.stringify({ nombre, prioridad, electiva, color }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
+      fijarColor("asignaturas", data.asignatura_id, data.color);
       mostrarExito(data.mensaje);
       setMostrarForm(false);
       cargar();
@@ -151,7 +165,7 @@ function Asignaturas() {
     }
   };
 
-  const handleEditar = async ({ nombre, prioridad, electiva }) => {
+  const handleEditar = async ({ nombre, prioridad, electiva, color }) => {
     setGuardando(true);
     setError("");
     try {
@@ -161,10 +175,11 @@ function Asignaturas() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ nombre, prioridad, electiva }),
+        body: JSON.stringify({ nombre, prioridad, electiva, color }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
+      fijarColor("asignaturas", editando.id, color);
       mostrarExito(data.mensaje);
       setEditando(null);
       cargar();
@@ -175,12 +190,36 @@ function Asignaturas() {
     }
   };
 
+  // Cambio rápido del color desde la tabla (se guarda al cerrar el selector)
+  const cambiarColor = async (a, color) => {
+    const anterior = a.Asignatura_Color;
+    setAsignaturas((lista) => lista.map((x) => (x.Asignatura_Id === a.Asignatura_Id ? { ...x, Asignatura_Color: color } : x)));
+    setError("");
+    try {
+      const res = await fetch(`/api/colores/asignaturas/${a.Asignatura_Id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ color }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "No fue posible guardar el color");
+      fijarColor("asignaturas", a.Asignatura_Id, data.color);
+      mostrarExito(`Color de "${a.Asignatura_Nombre}" actualizado`);
+    } catch (err) {
+      setAsignaturas((lista) => lista.map((x) => (x.Asignatura_Id === a.Asignatura_Id ? { ...x, Asignatura_Color: anterior } : x)));
+      setError(err.message || "No fue posible guardar el color");
+    }
+  };
+
+  const coloresDeOtras = (id) => asignaturas.filter((a) => a.Asignatura_Id !== id).map((a) => a.Asignatura_Color);
+
   const abrirEdicion = (a) => {
     setEditando({
       id: a.Asignatura_Id,
       nombre: a.Asignatura_Nombre,
       prioridad: a.Asignatura_Prioridad_Academica,
       electiva: Number(a.Asignatura_Es_Electiva) === 1,
+      color: a.Asignatura_Color,
     });
     setMostrarForm(false);
     setError("");
@@ -218,12 +257,14 @@ function Asignaturas() {
       </div>
 
       {exito && <p className="msg-exito">{exito}</p>}
+      {error && !mostrarForm && !editando && <p className="msg-error">{error}</p>}
 
       {/* Formulario de creación */}
       {mostrarForm && (
         <div className="form-card">
           <h2>Nueva Asignatura</h2>
           <FormAsignatura
+            usados={coloresDeOtras(null)}
             onGuardar={handleCrear}
             onCancelar={cancelarCrear}
             guardando={guardando}
@@ -237,6 +278,8 @@ function Asignaturas() {
         <div className="form-card" style={{ borderLeft: "3px solid #2563eb" }}>
           <h2>Editar Asignatura</h2>
           <FormAsignatura
+            key={editando.id}
+            usados={coloresDeOtras(editando.id)}
             inicial={editando}
             onGuardar={handleEditar}
             onCancelar={cancelarEdicion}
@@ -269,6 +312,7 @@ function Asignaturas() {
           <thead>
             <tr>
               <th>#</th>
+              <th>Color</th>
               <th>Nombre</th>
               <th>Prioridad</th>
               {esAdmin && <th>Acciones</th>}
@@ -278,6 +322,19 @@ function Asignaturas() {
             {filtradas.map((a, i) => (
               <tr key={a.Asignatura_Id} style={editando?.id === a.Asignatura_Id ? { background: "#eff6ff" } : {}}>
                 <td style={{ color: "#94a3b8", fontSize: "0.85rem" }}>{i + 1}</td>
+                <td>
+                  {esAdmin ? (
+                    <SelectorColor
+                      value={a.Asignatura_Color}
+                      usados={coloresDeOtras(a.Asignatura_Id)}
+                      onChange={(color) => cambiarColor(a, color)}
+                      etiqueta={`Color de ${a.Asignatura_Nombre}`}
+                      diferido
+                    />
+                  ) : (
+                    <PuntoColor color={a.Asignatura_Color} titulo={nombreColor(a.Asignatura_Color)} />
+                  )}
+                </td>
                 <td style={{ fontWeight: 500 }}>
                   {a.Asignatura_Nombre}
                   {Number(a.Asignatura_Es_Electiva) === 1 && (

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
+import useColores from "../../hooks/useColores";
+import { PuntoColor } from "../../components/SelectorColor";
 import { useAuth } from "../context/AuthContext";
 import ExportMenu from "../../components/ExportMenu";
 import DetalleBloqueModal from "../../components/horarios/DetalleBloqueModal";
@@ -11,6 +13,7 @@ const API = "/api";
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
 const DIAS_ABR = ["Lun", "Mar", "Mié", "Jue", "Vie"];
 
+// Respaldo mientras cargan los colores guardados de cada asignatura (Asignaturas)
 const ASIG_COLORS = [
   { bg: "#dbeafe", border: "#93c5fd", text: "#1e40af" },
   { bg: "#fce7f3", border: "#f9a8d4", text: "#9d174d" },
@@ -113,6 +116,7 @@ function ClasesEliminadasMini({ clases }) {
 /*  ListadoCursosSidebar — panel that overlays the nav sidebar   */
 /* ═══════════════════════════════════════════════════════════════ */
 function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
+  const { tonosAsignatura } = useColores();
   const [vistas, setVistas] = useState({});
 
   useEffect(() => {
@@ -132,7 +136,9 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
         fetch(`/api/horarios/asignaturas-curso?curso_id=${cursoId}`, { headers: h }).then(r => r.json()),
       ]);
       const colorMap = {};
-      (Array.isArray(rA) ? rA : []).forEach((a, i) => { colorMap[a.Asignatura_Id] = ASIG_COLORS[i % ASIG_COLORS.length]; });
+      (Array.isArray(rA) ? rA : []).forEach((a, i) => {
+        colorMap[a.Asignatura_Id] = tonosAsignatura(a.Asignatura_Id) || ASIG_COLORS[i % ASIG_COLORS.length];
+      });
       setVistas(p => ({ ...p, [cursoId]: { horarios: Array.isArray(rH) ? rH : [], colorMap } }));
     } catch {
       setVistas(p => ({ ...p, [cursoId]: null }));
@@ -206,6 +212,7 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
 /* ═══════════════════════════════════════════════════════════════ */
 export default function Horarios() {
   const { rolActivo, usuario } = useAuth();
+  const { tonosAsignatura } = useColores();
   const rolEfectivo = rolActivo || usuario?.roles?.[0];
   const esSuperAdmin = usuario?.administradorTipo === "Super Admin";
   const esAdmin =
@@ -362,10 +369,11 @@ export default function Horarios() {
     }
   };
 
-  // color index map for asignaturas
+  // Color de cada asignatura: el guardado en Asignaturas (respaldo: orden del plan)
+  const colorDeAsignatura = (id, i) => tonosAsignatura(id) || ASIG_COLORS[i % ASIG_COLORS.length];
   const colorMap = {};
   asignaturasCurso.forEach((a, i) => {
-    colorMap[a.Asignatura_Id] = ASIG_COLORS[i % ASIG_COLORS.length];
+    colorMap[a.Asignatura_Id] = colorDeAsignatura(a.Asignatura_Id, i);
   });
 
   // ── Panel handlers ──
@@ -686,7 +694,7 @@ export default function Horarios() {
               ) : (
                 <div style={s.asigList}>
                   {asignaturasCurso.map((a, i) => {
-                    const color = ASIG_COLORS[i % ASIG_COLORS.length];
+                    const color = colorDeAsignatura(a.Asignatura_Id, i);
                     const pct =
                       a.Horas_Semanales_Requeridas > 0
                         ? Math.min(
@@ -962,6 +970,7 @@ function VistaBloqueGrid({
   onToggleSeleccion,
   onVerDetalle,
 }) {
+  const { colorDocente } = useColores();
   const [hoveredCell, setHoveredCell] = useState(null); // { bloqueId, dia }
 
   if (bloques.length === 0) {
@@ -1274,7 +1283,7 @@ function VistaBloqueGrid({
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {h.docente}
+                          <PuntoColor color={colorDocente(h.Usuario_Id)} /> {h.docente}
                         </div>
                       )}
                       {h.estado === "Suspendido" && (

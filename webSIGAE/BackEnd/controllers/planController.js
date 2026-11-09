@@ -3,6 +3,7 @@ const pool = require('../config/db');
 const MSG_ELECTIVA_EN_PLAN = (nombre) =>
   `${nombre} es una asignatura electiva: solo puede incluirse en el plan de electivos de 3° y 4° medio`;
 const { claseVigente } = require('../utils/clasesEliminadas');
+const { normalizarColor, colorAleatorioAsignatura, MENSAJE_COLOR_INVALIDO } = require('../utils/colores');
 
 // ── GET /api/planes  ─────────────────────────────────────────────
 const getPlanes = async (req, res) => {
@@ -515,7 +516,8 @@ const getNivelesSinPlan = async (req, res) => {
 const getAsignaturas = async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      `SELECT Asignatura_Id, Asignatura_Nombre, Asignatura_Prioridad_Academica, Asignatura_Es_Electiva
+      `SELECT Asignatura_Id, Asignatura_Nombre, Asignatura_Prioridad_Academica, Asignatura_Es_Electiva,
+              Asignatura_Color
        FROM asignatura ORDER BY Asignatura_Nombre`
     );
     res.json(rows);
@@ -538,6 +540,13 @@ const crearAsignatura = async (req, res) => {
     return res.status(400).json({ error: 'La prioridad debe ser Alta, Media o Baja' });
   }
 
+  // Color que la identifica en los horarios: el elegido o uno aleatorio de la paleta
+  const colorElegido = req.body.color === undefined || req.body.color === null || req.body.color === ''
+    ? null : normalizarColor(req.body.color);
+  if (colorElegido === null && req.body.color) {
+    return res.status(400).json({ error: MENSAJE_COLOR_INVALIDO });
+  }
+
   const nombreTrim = nombre.trim();
 
   try {
@@ -549,15 +558,17 @@ const crearAsignatura = async (req, res) => {
       return res.status(409).json({ error: `Ya existe una asignatura con el nombre "${nombreTrim}"` });
     }
 
+    const color = colorElegido || await colorAleatorioAsignatura(pool);
     const [result] = await pool.execute(
-      `INSERT INTO asignatura (Asignatura_Nombre, Asignatura_Prioridad_Academica, Asignatura_Es_Electiva)
-       VALUES (?, ?, ?)`,
-      [nombreTrim, prioridad, electiva ? 1 : 0]
+      `INSERT INTO asignatura (Asignatura_Nombre, Asignatura_Prioridad_Academica, Asignatura_Es_Electiva, Asignatura_Color)
+       VALUES (?, ?, ?, ?)`,
+      [nombreTrim, prioridad, electiva ? 1 : 0, color]
     );
 
     res.status(201).json({
       mensaje: `Asignatura${electiva ? ' electiva' : ''} "${nombreTrim}" registrada correctamente`,
       asignatura_id: result.insertId,
+      color,
     });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
@@ -581,6 +592,13 @@ const editarAsignatura = async (req, res) => {
   }
   if (!['Alta', 'Media', 'Baja'].includes(prioridad)) {
     return res.status(400).json({ error: 'La prioridad debe ser Alta, Media o Baja' });
+  }
+
+  // El color es opcional al editar; si no llega, se mantiene
+  const cambiaColor = req.body.color !== undefined;
+  const color = cambiaColor ? normalizarColor(req.body.color) : null;
+  if (cambiaColor && !color) {
+    return res.status(400).json({ error: MENSAJE_COLOR_INVALIDO });
   }
 
   const nombreTrim = nombre.trim();
@@ -624,9 +642,9 @@ const editarAsignatura = async (req, res) => {
 
     await pool.execute(
       `UPDATE asignatura
-       SET Asignatura_Nombre = ?, Asignatura_Prioridad_Academica = ?, Asignatura_Es_Electiva = ?
+       SET Asignatura_Nombre = ?, Asignatura_Prioridad_Academica = ?, Asignatura_Es_Electiva = ?${cambiaColor ? ', Asignatura_Color = ?' : ''}
        WHERE Asignatura_Id = ?`,
-      [nombreTrim, prioridad, (cambiaElectiva ? electiva : eraElectiva) ? 1 : 0, id]
+      [nombreTrim, prioridad, (cambiaElectiva ? electiva : eraElectiva) ? 1 : 0, ...(cambiaColor ? [color] : []), id]
     );
 
     res.json({ mensaje: `Asignatura "${nombreTrim}" actualizada correctamente` });

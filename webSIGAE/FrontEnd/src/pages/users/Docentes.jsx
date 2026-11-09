@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { getDocentes, getEspecialidades, actualizarEspecialidadesDocente } from "../../services/api";
 import EtiquetasInput, { separarEtiquetas } from "../../components/EtiquetasInput";
+import SelectorColor from "../../components/SelectorColor";
+import { fijarColor } from "../../hooks/useColores";
 import "./Docentes.css";
 
 // CU30 y CU31: listado y filtros de docentes.
@@ -11,6 +13,8 @@ import "./Docentes.css";
 // - RF04: las especialidades de cada docente se editan en la misma fila; escribir una
 //   que no existe la crea en el catálogo.
 // Los filtros se aplican al instante sobre el listado ya cargado.
+// - Cada docente tiene un color que lo identifica en los horarios: se asigna al azar al
+//   crearlo y se cambia aquí (paleta básica, selector libre o hexadecimal).
 
 const normalizar = (t) =>
   String(t ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
@@ -26,6 +30,7 @@ function Docentes() {
   const [orden, setOrden] = useState({ campo: "Usuario_Nombre_Completo", ascendente: true });
   const [edicion, setEdicion] = useState(null); // { id, valores, guardando, error }
   const [aviso, setAviso] = useState("");
+  const [errorColor, setErrorColor] = useState("");
 
   const cargarCatalogo = () =>
     getEspecialidades().then((d) => setCatalogo(d || [])).catch(() => {});
@@ -112,6 +117,30 @@ function Docentes() {
     }
   };
 
+  // Cambio del color del docente (se guarda al cerrar el selector)
+  const cambiarColor = async (d, color) => {
+    const anterior = d.Docente_Color;
+    const fijar = (valor) => setDocentes((lista) => lista.map((x) => (
+      x.Usuario_Id === d.Usuario_Id ? { ...x, Docente_Color: valor } : x
+    )));
+    fijar(color);
+    setAviso("");
+    try {
+      const res = await fetch(`/api/colores/docentes/${d.Usuario_Id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: JSON.stringify({ color }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "No fue posible guardar el color");
+      fijarColor("docentes", d.Usuario_Id, data.color);
+      setAviso(`Color de ${d.Usuario_Nombre_Completo} actualizado`);
+    } catch (error) {
+      fijar(anterior);
+      setErrorColor(error.message || "No fue posible guardar el color");
+    }
+  };
+
   if (loading) {
     return (
       <div className="usuarios-container">
@@ -179,6 +208,7 @@ function Docentes() {
       )}
 
       {aviso && <div className="msg-exito" role="status">{aviso}</div>}
+      {errorColor && <div className="msg-error" role="alert">{errorColor}</div>}
 
       {errorCarga && (
         <div className="usuarios-empty" style={{ color: "#dc2626" }}>
@@ -202,6 +232,7 @@ function Docentes() {
               <thead>
                 <tr>
                   <th>#</th>
+                  <th>Color</th>
                   <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Usuario_Nombre_Completo")}>
                     Nombre{flechaOrden("Usuario_Nombre_Completo")}
                   </th>
@@ -224,6 +255,15 @@ function Docentes() {
                   return (
                     <tr key={d.Usuario_Id}>
                       <td>{idx + 1}</td>
+                      <td>
+                        <SelectorColor
+                          value={d.Docente_Color}
+                          usados={docentes.filter((x) => x.Usuario_Id !== d.Usuario_Id).map((x) => x.Docente_Color)}
+                          onChange={(color) => { setErrorColor(""); cambiarColor(d, color); }}
+                          etiqueta={`Color de ${d.Usuario_Nombre_Completo}`}
+                          diferido
+                        />
+                      </td>
                       <td>{d.Usuario_Nombre_Completo}</td>
                       <td>{d.Usuario_RUT}</td>
                       <td className="docentes-celda-especialidades">

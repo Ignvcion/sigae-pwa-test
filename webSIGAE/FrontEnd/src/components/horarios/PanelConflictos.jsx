@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { COLORES_ASIGNATURA, COLOR_PENDIENTE, hhmm } from "../../utils/horarios";
+import useColores from "../../hooks/useColores";
 
 // Panel desplegable (derecha) con las clases pendientes de reubicar tras
 // redefinir la jornada o los bloques horarios. Por cada clase: migrar a un
@@ -58,6 +59,7 @@ export default function PanelConflictos({
   onCancelarEliminarBloque,
   onCambio,
 }) {
+  const { tonosAsignatura } = useColores();
   const [abierto, setAbierto] = useState(false);
   const [clases, setClases] = useState([]);
   const [destinos, setDestinos] = useState([]);
@@ -236,7 +238,8 @@ export default function PanelConflictos({
   const renderTarjeta = (c) => {
     const id = c.Horario_Asignatura_Id;
     const pospuesta = pospuestas[id];
-    const color = coloresCurso[c.Curso_Id]?.[c.Asignatura_Id] || COLORES_ASIGNATURA[0];
+    // Color guardado de la asignatura; si aún no carga, el del plan del curso
+    const color = tonosAsignatura(c.Asignatura_Id) || coloresCurso[c.Curso_Id]?.[c.Asignatura_Id] || COLORES_ASIGNATURA[0];
     const minutosRestantes = pospuesta ? Math.max(1, Math.ceil((pospuesta - Date.now()) / 60_000)) : 0;
     const opciones = destinos.filter((d) => d.Bloque_Horario_Id !== c.Bloque_Horario_Id);
 

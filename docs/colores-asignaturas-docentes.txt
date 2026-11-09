@@ -1,0 +1,70 @@
+SIGAE - Colores de asignaturas y docentes
+
+======================================================================
+1. QUÉ HACE
+======================================================================
+
+- Cada asignatura y cada docente tiene un color (#RRGGBB) que lo
+  identifica: asignatura.Asignatura_Color y usuario.Docente_Color.
+- Al crearlos, el color es ALEATORIO de la paleta básica de 12 colores,
+  elegido entre los menos usados (no se repite mientras queden libres).
+  Pasa al crear una asignatura, crear un docente, asignar el rol Docente
+  o activarlo en Gestión de roles (si ya tenía color, lo conserva).
+- Se cambia desde:
+    Gestión Académica › Asignaturas  (columna Color y formulario)
+    Gestión Usuarios › Docentes      (columna Color)
+  El selector ofrece la paleta básica, un selector libre (hex color
+  picker del navegador), el campo hexadecimal y "Al azar". En las tablas
+  se guarda al cerrar el selector (Listo o clic fuera); Escape descarta.
+- Dónde se ve: los bloques de cada asignatura en Mi horario, horario del
+  estudiante, creador de horarios, horario maestro y panel de conflictos
+  usan el color guardado (fondo claro, borde y texto derivados del color,
+  con contraste legible). El nombre del docente lleva un punto de su
+  color en el creador de horarios y en el horario maestro.
+  Antes cada vista asignaba colores por posición, así que la misma
+  asignatura podía cambiar de color entre vistas.
+
+Paleta (BackEnd/utils/colores.js y FrontEnd/src/utils/colores.js):
+  Rojo #DC2626, Naranja #EA580C, Amarillo #CA8A04, Lima #65A30D,
+  Verde #16A34A, Turquesa #0D9488, Celeste #0284C7, Azul #2563EB,
+  Índigo #4F46E5, Violeta #7C3AED, Fucsia #C026D3, Rosa #DB2777
+
+API:
+  GET /api/colores                  { asignaturas: {id: hex}, docentes: {id: hex} }
+                                    (cualquier usuario autenticado)
+  PUT /api/colores/asignaturas/:id  { color }  administración
+  PUT /api/colores/docentes/:id     { color }  administración
+  POST/PUT /api/planes/asignaturas  aceptan "color" (opcional)
+
+======================================================================
+2. PRODUCCIÓN (RDS)
+======================================================================
+
+Snapshot de la RDS y luego (MariaDB). Verificado: el esquema de main +
+estos ALTER queda idéntico al schema_base.sql nuevo, y los colores
+iniciales quedan al azar sin repetirse hasta usar los 12.
+
+    SET NAMES utf8mb4;
+
+    ALTER TABLE asignatura
+      ADD COLUMN Asignatura_Color char(7) NOT NULL DEFAULT '#2563EB';
+    ALTER TABLE usuario
+      ADD COLUMN Docente_Color char(7) DEFAULT NULL;
+
+    -- Colores iniciales al azar, repartidos entre los 12 de la paleta
+    UPDATE asignatura a
+      JOIN (SELECT Asignatura_Id, ROW_NUMBER() OVER (ORDER BY RAND()) AS n FROM asignatura) r
+        ON r.Asignatura_Id = a.Asignatura_Id
+      SET a.Asignatura_Color = ELT(1 + MOD(r.n - 1, 12),
+        '#DC2626','#EA580C','#CA8A04','#65A30D','#16A34A','#0D9488',
+        '#0284C7','#2563EB','#4F46E5','#7C3AED','#C026D3','#DB2777');
+
+    UPDATE usuario u
+      JOIN (SELECT Usuario_Id, ROW_NUMBER() OVER (ORDER BY RAND()) AS n FROM usuario WHERE Es_Docente = 1) r
+        ON r.Usuario_Id = u.Usuario_Id
+      SET u.Docente_Color = ELT(1 + MOD(r.n - 1, 12),
+        '#DC2626','#EA580C','#CA8A04','#65A30D','#16A34A','#0D9488',
+        '#0284C7','#2563EB','#4F46E5','#7C3AED','#C026D3','#DB2777');
+
+Si se aplican también los ALTER de docs/correos-institucionales-y-codigos.txt,
+el orden entre ambos da igual. Publicar backend y frontend juntos.

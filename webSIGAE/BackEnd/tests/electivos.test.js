@@ -236,7 +236,8 @@ describe('RF27 y CU47: asignaturas electivas', () => {
     await planController.crearAsignatura({ body: { nombre: 'Química Avanzada', prioridad: 'Media', electiva: true } }, r);
     expect(r.status).toHaveBeenCalledWith(201);
     const insert = pool.execute.mock.calls.find(([sql]) => /INSERT INTO asignatura/.test(sql));
-    expect(insert[1]).toEqual(['Química Avanzada', 'Media', 1]);
+    // El último valor es el color aleatorio de la paleta (utils/colores.js)
+    expect(insert[1]).toEqual(['Química Avanzada', 'Media', 1, expect.stringMatching(/^#[0-9A-F]{6}$/)]);
   });
 
   test('CU47: no se marca como electiva una asignatura usada en planes o cursos', async () => {
