@@ -233,7 +233,7 @@ describe('RF27 y CU47: asignaturas electivas', () => {
   test('CU47: se registra una asignatura marcada como electiva', async () => {
     pool.execute = porPatron([[/INSERT INTO asignatura/, [{ insertId: 3000 }]]]);
     const r = res();
-    await planController.crearAsignatura({ body: { nombre: 'Química Avanzada', prioridad: 'Media', electiva: true } }, r);
+    await planController.crearAsignatura({ body: { nombre: 'Química Avanzada', tramo: 'Media', electiva: true } }, r);
     expect(r.status).toHaveBeenCalledWith(201);
     const insert = pool.execute.mock.calls.find(([sql]) => /INSERT INTO asignatura/.test(sql));
     // El último valor es el color aleatorio de la paleta (utils/colores.js)
@@ -241,10 +241,10 @@ describe('RF27 y CU47: asignaturas electivas', () => {
   });
 
   test('CU47: no se marca como electiva una asignatura usada en planes o cursos', async () => {
-    pool.execute = porPatron([[/SELECT Asignatura_Id, Asignatura_Es_Electiva FROM asignatura/, [[{ Asignatura_Id: 2222, Asignatura_Es_Electiva: 0 }]]]]);
+    pool.execute = porPatron([[/SELECT Asignatura_Id, Asignatura_Es_Electiva, Asignatura_Tramo FROM asignatura/, [[{ Asignatura_Id: 2231, Asignatura_Es_Electiva: 0, Asignatura_Tramo: 'Media' }]]]]);
     pool.query = porPatron([[/FROM incluyeasig/, [[{ n: 2 }]]]]);
     const r = res();
-    await planController.editarAsignatura({ params: { id: '2222' }, body: { nombre: 'Matemática', prioridad: 'Alta', electiva: true } }, r);
+    await planController.editarAsignatura({ params: { id: '2231' }, body: { nombre: 'Matemática', tramo: 'Media', electiva: true } }, r);
     expect(r.status).toHaveBeenCalledWith(409);
     expect(pool.execute.mock.calls.some(([sql]) => /UPDATE asignatura/.test(sql))).toBe(false);
   });

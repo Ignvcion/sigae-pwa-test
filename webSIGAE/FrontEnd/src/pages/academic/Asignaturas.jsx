@@ -4,23 +4,30 @@ import SelectorColor, { PuntoColor } from "../../components/SelectorColor";
 import { colorAleatorio, nombreColor } from "../../utils/colores";
 import { fijarColor } from "../../hooks/useColores";
 
-const PRIORIDADES = ["Alta", "Media", "Baja"];
+// Tramo de la asignatura: solo se usa en planes (cursos, horarios) de niveles de ese tramo
+const TRAMOS = [
+  { valor: "Kinder", detalle: "Pre-Kinder y Kinder" },
+  { valor: "Básica", detalle: "1ero a 6to Básico" },
+  { valor: "Media",  detalle: "7mo Básico a 4to Medio" },
+];
 
-const BADGE_PRIORIDAD = {
-  Alta:  { background: "#fee2e2", color: "#b91c1c" },
-  Media: { background: "#fef3c7", color: "#92400e" },
-  Baja:  { background: "#dcfce7", color: "#15803d" },
+const BADGE_TRAMO = {
+  Kinder: { background: "#fce7f3", color: "#9d174d" },
+  Básica: { background: "#dbeafe", color: "#1e40af" },
+  Media:  { background: "#ede9fe", color: "#5b21b6" },
 };
 
-function BadgePrioridad({ valor }) {
-  const estilo = BADGE_PRIORIDAD[valor] || { background: "#f1f5f9", color: "#475569" };
+function BadgeTramo({ valor }) {
+  const estilo = BADGE_TRAMO[valor] || { background: "#f1f5f9", color: "#475569" };
+  const detalle = TRAMOS.find((t) => t.valor === valor)?.detalle;
   return (
-    <span style={{
+    <span title={detalle} style={{
       ...estilo,
       padding: "2px 10px",
       borderRadius: "999px",
       fontSize: "0.8rem",
       fontWeight: 600,
+      whiteSpace: "nowrap",
     }}>
       {valor}
     </span>
@@ -29,14 +36,14 @@ function BadgePrioridad({ valor }) {
 
 function FormAsignatura({ inicial, onGuardar, onCancelar, guardando, error, usados }) {
   const [nombre, setNombre]       = useState(inicial?.nombre    || "");
-  const [prioridad, setPrioridad] = useState(inicial?.prioridad || "");
+  const [tramo, setTramo]         = useState(inicial?.tramo || "");
   const [electiva, setElectiva]   = useState(Boolean(inicial?.electiva));
   // Una asignatura nueva parte con un color aleatorio de la paleta (entre los menos usados)
   const [color, setColor]         = useState(() => inicial?.color || colorAleatorio(usados));
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onGuardar({ nombre, prioridad, electiva, color });
+    onGuardar({ nombre, tramo, electiva, color });
   };
 
   return (
@@ -53,17 +60,22 @@ function FormAsignatura({ inicial, onGuardar, onCancelar, guardando, error, usad
         required
       />
 
-      <label style={{ marginTop: "0.9rem" }}>Prioridad académica *</label>
+      <label style={{ marginTop: "0.9rem" }}>Tramo *</label>
       <select
-        value={prioridad}
-        onChange={(e) => setPrioridad(e.target.value)}
+        value={tramo}
+        onChange={(e) => setTramo(e.target.value)}
+        disabled={electiva}
         required
       >
-        <option value="">Seleccionar prioridad...</option>
-        {PRIORIDADES.map((p) => (
-          <option key={p} value={p}>{p}</option>
+        <option value="">Seleccionar tramo...</option>
+        {TRAMOS.map((t) => (
+          <option key={t.valor} value={t.valor}>{t.valor} ({t.detalle})</option>
         ))}
       </select>
+      <span style={{ display: "block", fontSize: "0.8rem", color: "#64748b", marginTop: 4 }}>
+        La asignatura solo podrá incluirse en planes de niveles de este tramo.
+        {inicial && " Si ya se usa en planes, cursos u horarios, su tramo no se puede cambiar."}
+      </span>
 
       <label style={{ marginTop: "0.9rem" }}>Color en los horarios</label>
       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
@@ -78,13 +90,17 @@ function FormAsignatura({ inicial, onGuardar, onCancelar, guardando, error, usad
         <input
           type="checkbox"
           checked={electiva}
-          onChange={(e) => setElectiva(e.target.checked)}
+          onChange={(e) => {
+            setElectiva(e.target.checked);
+            // Los electivos son de 3° y 4° medio: tramo Media
+            if (e.target.checked) setTramo("Media");
+          }}
           style={{ width: "auto", marginTop: 3 }}
         />
         <span>
           <strong>Asignatura electiva de 3° y 4° medio</strong>
           <span style={{ display: "block", fontSize: "0.8rem", color: "#64748b" }}>
-            Solo se incluye en el plan de electivos; no entra en planes educativos ni se asocia a cursos.
+            Solo se incluye en el plan de electivos; no entra en planes educativos ni se asocia a cursos. Siempre del tramo Media.
           </span>
         </span>
       </label>
@@ -108,7 +124,8 @@ function Asignaturas() {
   const [asignaturas, setAsignaturas] = useState([]);
   const [cargando, setCargando]       = useState(true);
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [editando, setEditando]       = useState(null); // { id, nombre, prioridad }
+  const [editando, setEditando]       = useState(null); // { id, nombre, tramo, electiva, color }
+  const [filtroTramo, setFiltroTramo] = useState("");
   const [guardando, setGuardando]     = useState(false);
   const [error, setError]             = useState("");
   const [exito, setExito]             = useState("");
@@ -140,7 +157,7 @@ function Asignaturas() {
     setTimeout(() => setExito(""), 4000);
   };
 
-  const handleCrear = async ({ nombre, prioridad, electiva, color }) => {
+  const handleCrear = async ({ nombre, tramo, electiva, color }) => {
     setGuardando(true);
     setError("");
     try {
@@ -150,7 +167,7 @@ function Asignaturas() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ nombre, prioridad, electiva, color }),
+        body: JSON.stringify({ nombre, tramo, electiva, color }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
@@ -165,7 +182,7 @@ function Asignaturas() {
     }
   };
 
-  const handleEditar = async ({ nombre, prioridad, electiva, color }) => {
+  const handleEditar = async ({ nombre, tramo, electiva, color }) => {
     setGuardando(true);
     setError("");
     try {
@@ -175,7 +192,7 @@ function Asignaturas() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ nombre, prioridad, electiva, color }),
+        body: JSON.stringify({ nombre, tramo, electiva, color }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
@@ -217,7 +234,7 @@ function Asignaturas() {
     setEditando({
       id: a.Asignatura_Id,
       nombre: a.Asignatura_Nombre,
-      prioridad: a.Asignatura_Prioridad_Academica,
+      tramo: a.Asignatura_Tramo,
       electiva: Number(a.Asignatura_Es_Electiva) === 1,
       color: a.Asignatura_Color,
     });
@@ -236,8 +253,8 @@ function Asignaturas() {
   const cancelarCrear = () => { setMostrarForm(false); setError(""); };
 
   const filtradas = asignaturas.filter((a) =>
-    busqueda.trim() === "" ||
-    a.Asignatura_Nombre.toLowerCase().includes(busqueda.toLowerCase())
+    (filtroTramo === "" || a.Asignatura_Tramo === filtroTramo) &&
+    (busqueda.trim() === "" || a.Asignatura_Nombre.toLowerCase().includes(busqueda.toLowerCase()))
   );
 
   if (cargando) return <div className="page-container"><p>Cargando asignaturas...</p></div>;
@@ -292,20 +309,31 @@ function Asignaturas() {
       {/* Buscador */}
       {asignaturas.length > 0 && (
         <div style={{ marginBottom: "1rem" }}>
-          <input
-            type="text"
-            placeholder="Buscar por nombre..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            style={{ maxWidth: "360px" }}
-          />
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <input
+              type="text"
+              placeholder="Buscar por nombre..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              style={{ maxWidth: "360px" }}
+            />
+            <select
+              value={filtroTramo}
+              onChange={(e) => setFiltroTramo(e.target.value)}
+              aria-label="Filtrar por tramo"
+              style={{ maxWidth: "220px" }}
+            >
+              <option value="">Todos los tramos</option>
+              {TRAMOS.map((t) => <option key={t.valor} value={t.valor}>{t.valor}</option>)}
+            </select>
+          </div>
         </div>
       )}
 
       {/* Tabla */}
       {filtradas.length === 0 ? (
         <div className="empty-state">
-          <p>{asignaturas.length === 0 ? "No hay asignaturas registradas aún." : "Sin resultados para la búsqueda."}</p>
+          <p>{asignaturas.length === 0 ? "No hay asignaturas registradas aún." : "Sin resultados para la búsqueda o el tramo elegido."}</p>
         </div>
       ) : (
         <table className="tabla-asignaturas">
@@ -314,7 +342,7 @@ function Asignaturas() {
               <th>#</th>
               <th>Color</th>
               <th>Nombre</th>
-              <th>Prioridad</th>
+              <th>Tramo</th>
               {esAdmin && <th>Acciones</th>}
             </tr>
           </thead>
@@ -341,7 +369,7 @@ function Asignaturas() {
                     <span className="badge-electiva" title="Electiva de 3° y 4° medio: va en el plan de electivos">Electiva</span>
                   )}
                 </td>
-                <td><BadgePrioridad valor={a.Asignatura_Prioridad_Academica} /></td>
+                <td><BadgeTramo valor={a.Asignatura_Tramo} /></td>
                 {esAdmin && (
                   <td>
                     <button
@@ -360,7 +388,7 @@ function Asignaturas() {
       )}
 
       <p style={{ marginTop: "1rem", fontSize: "0.85rem", color: "#94a3b8" }}>
-        {filtradas.length} asignatura{filtradas.length !== 1 ? "s" : ""}{busqueda ? " encontradas" : " registradas"}
+        {filtradas.length} asignatura{filtradas.length !== 1 ? "s" : ""}{busqueda || filtroTramo ? " encontradas" : " registradas"}
       </p>
     </div>
   );

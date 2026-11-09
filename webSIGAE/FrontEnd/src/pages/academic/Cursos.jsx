@@ -209,7 +209,7 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
           <thead>
             <tr>
               <th>Asignatura</th>
-              <th>Prioridad</th>
+              <th>Tramo</th>
               <th>Estado</th>
             </tr>
           </thead>
@@ -217,7 +217,7 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
             {asignadas.map((a) => (
               <tr key={a.tieneasig_Id}>
                 <td>{a.Asignatura_Nombre}</td>
-                <td>{a.Asignatura_Prioridad_Academica}</td>
+                <td>{a.Asignatura_Tramo}</td>
                 <td>
                   <span className={`badge-estado ${a.Estado_Asignacion === "Activa" ? "badge-vigente" : "badge-inactiva"}`}>
                     {a.Estado_Asignacion}

@@ -109,7 +109,7 @@ const getAsignaturasDeCurso = async (req, res) => {
   try {
     const [rows] = await pool.execute(`
       SELECT ta.tieneasig_Id, ta.Estado_Asignacion,
-             a.Asignatura_Id, a.Asignatura_Nombre, a.Asignatura_Prioridad_Academica
+             a.Asignatura_Id, a.Asignatura_Nombre, a.Asignatura_Tramo
       FROM tieneasig ta
       JOIN asignatura a ON ta.Asignatura_Id = a.Asignatura_Id
       WHERE ta.Curso_Id = ?
@@ -143,7 +143,7 @@ const getAsignaturasDisponibles = async (req, res) => {
     const planId = planes[0].Plan_Educativo_Id;
 
     const [rows] = await pool.execute(`
-      SELECT a.Asignatura_Id, a.Asignatura_Nombre, a.Asignatura_Prioridad_Academica,
+      SELECT a.Asignatura_Id, a.Asignatura_Nombre, a.Asignatura_Tramo,
              ia.Horas_Semanales_Requeridas, ia.Tipo
       FROM incluyeasig ia
       JOIN asignatura a ON ia.Asignatura_Id = a.Asignatura_Id

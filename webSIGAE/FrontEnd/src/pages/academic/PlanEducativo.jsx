@@ -5,6 +5,34 @@ const TOKEN = () => localStorage.getItem("token");
 const authH = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${TOKEN()}` });
 // RF27: las asignaturas electivas solo van en el plan de electivos de 3° y 4° medio
 const sinElectivas = (lista) => (Array.isArray(lista) ? lista.filter((a) => Number(a.Asignatura_Es_Electiva) !== 1) : []);
+// Cada asignatura pertenece a un tramo (Kinder, Básica o Media) y solo se incluye
+// en planes de niveles de ese tramo (el backend también lo valida)
+const tramoDeNivel = (niveles, nivelId) =>
+  niveles.find((n) => String(n.Nivel_Educativo_Id) === String(nivelId))?.Nivel_Educativo_Tramo || null;
+const fueraDeTramo = (lista, tramo) => (tramo ? lista.filter((a) => a.Asignatura_Tramo && a.Asignatura_Tramo !== tramo) : []);
+const mensajeFueraDeTramo = (lista, tramo) =>
+  `${lista.map((a) => `"${a.Asignatura_Nombre}" (${a.Asignatura_Tramo})`).join(", ")} `
+  + `${lista.length === 1 ? "no es" : "no son"} del tramo ${tramo}: quítala${lista.length === 1 ? "" : "s"} del plan`;
+
+/** Tramo del nivel elegido, junto al selector de nivel */
+function TramoNivel({ tramo }) {
+  if (!tramo) return null;
+  return <small className="tramo-nivel">Tramo {tramo}: solo asignaturas de este tramo</small>;
+}
+
+/** Aviso con las asignaturas del plan que no son del tramo del nivel elegido */
+function AvisoFueraDeTramo({ lista, tramo, onQuitar }) {
+  if (lista.length === 0) return null;
+  return (
+    <div className="msg-error" role="alert" style={{ marginTop: "0.75rem" }}>
+      {mensajeFueraDeTramo(lista, tramo)}.{" "}
+      <button type="button" className="btn-secundario" style={{ fontSize: "0.8rem", padding: "2px 10px" }}
+        onClick={() => lista.forEach((a) => onQuitar(a.Asignatura_Id))}>
+        Quitar {lista.length === 1 ? "la asignatura" : `las ${lista.length}`}
+      </button>
+    </div>
+  );
+}
 
 function TablaAsignaturas({ asignaturas }) {
   if (!asignaturas || asignaturas.length === 0) {
@@ -15,7 +43,7 @@ function TablaAsignaturas({ asignaturas }) {
       <thead>
         <tr>
           <th>Asignatura</th>
-          <th>Prioridad</th>
+          <th>Tramo</th>
           <th>Tipo</th>
           <th>Horas / sem</th>
         </tr>
@@ -24,7 +52,7 @@ function TablaAsignaturas({ asignaturas }) {
         {asignaturas.map((a) => (
           <tr key={a.IncluyeAsig_Id}>
             <td>{a.Asignatura_Nombre}</td>
-            <td>{a.Asignatura_Prioridad_Academica}</td>
+            <td>{a.Asignatura_Tramo}</td>
             <td>
               <span className={`badge-estado ${a.Tipo === "Obligatorio" ? "badge-vigente" : "badge-inactiva"}`}>
                 {a.Tipo}
@@ -39,7 +67,14 @@ function TablaAsignaturas({ asignaturas }) {
 }
 
 /* Catálogo de asignaturas disponibles: siempre visible; el buscador solo filtra */
-function SelectorAsignaturas({ disponibles, busqueda, onBuscar, onAgregar, maxHeight }) {
+function SelectorAsignaturas({ disponibles, busqueda, onBuscar, onAgregar, maxHeight, tramo }) {
+  if (!tramo) {
+    return (
+      <p className="empty-state-text" style={{ marginTop: "0.25rem" }}>
+        Selecciona el nivel educativo para ver las asignaturas de su tramo.
+      </p>
+    );
+  }
   return (
     <>
       <input
@@ -53,7 +88,7 @@ function SelectorAsignaturas({ disponibles, busqueda, onBuscar, onAgregar, maxHe
         <p className="empty-state-text" style={{ marginTop: "0.25rem" }}>
           {busqueda
             ? `No hay asignaturas que coincidan con "${busqueda}".`
-            : "Todas las asignaturas ya fueron agregadas al plan."}
+            : `Todas las asignaturas del tramo ${tramo} ya fueron agregadas al plan.`}
         </p>
       ) : (
         <div className="asignaturas-lista" style={{ maxHeight, overflowY: "auto", marginTop: "0.25rem" }}>
@@ -66,7 +101,7 @@ function SelectorAsignaturas({ disponibles, busqueda, onBuscar, onAgregar, maxHe
               title="Agregar al plan"
             >
               <span className="asig-nombre">{a.Asignatura_Nombre}</span>
-              <span className="asig-tipo">{a.Asignatura_Prioridad_Academica}</span>
+              <span className="asig-tipo">{a.Asignatura_Tramo}</span>
               <span style={{ color: "#6366f1", fontWeight: 600 }}>＋</span>
             </div>
           ))}
@@ -76,12 +111,14 @@ function SelectorAsignaturas({ disponibles, busqueda, onBuscar, onAgregar, maxHe
   );
 }
 
-function FilaAsignatura({ asig, onChange, onRemove }) {
+function FilaAsignatura({ asig, onChange, onRemove, tramo }) {
+  const fuera = tramo && asig.Asignatura_Tramo && asig.Asignatura_Tramo !== tramo;
   return (
-    <div className="asignatura-item" style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+    <div className="asignatura-item" style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap", ...(fuera && { borderColor: "#fca5a5", background: "#fef2f2" }) }}>
       <span className="asig-nombre" style={{ flex: "1 1 180px" }}>{asig.Asignatura_Nombre}</span>
-      <span className="asig-tipo" style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
-        {asig.Asignatura_Prioridad_Academica}
+      <span className="asig-tipo" style={{ fontSize: "0.75rem", color: fuera ? "#b91c1c" : "var(--text-secondary)", fontWeight: fuera ? 700 : undefined }}
+        title={fuera ? `Es del tramo ${asig.Asignatura_Tramo}, no del tramo ${tramo}` : undefined}>
+        {fuera ? `⚠ ${asig.Asignatura_Tramo}` : asig.Asignatura_Tramo}
       </span>
       <select
         value={asig.tipo}
@@ -131,7 +168,7 @@ function ModalDetallePlan({ planId, onClose, onEditar }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "640px" }}>
         <div className="modal-header">
-          <h2>{plan ? `${plan.Nivel_Educativo_Nombre} – ${plan.Plan_Educativo_Periodo_Lectivo}` : "Detalle del plan"}</h2>
+          <h2>{plan ? `${plan.Nivel_Educativo_Nombre} – ${plan.Plan_Educativo_Periodo_Lectivo}${plan.Nivel_Educativo_Tramo ? ` · Tramo ${plan.Nivel_Educativo_Tramo}` : ""}` : "Detalle del plan"}</h2>
           <button className="btn-cerrar" onClick={onClose}>✕</button>
         </div>
         {cargando ? (
@@ -200,6 +237,10 @@ function FormCrearPlan({ onExito, onCancelar, periodoPropuesto }) {
     setError("");
     if (!nivelId) return setError("Debe seleccionar un nivel educativo");
     if (seleccionadas.length === 0) return setError("Debe incluir al menos una asignatura");
+    {
+      const fuera = fueraDeTramo(seleccionadas, tramoDeNivel(niveles, nivelId));
+      if (fuera.length > 0) return setError(mensajeFueraDeTramo(fuera, tramoDeNivel(niveles, nivelId)));
+    }
 
     const payload = {
       nivel_educativo_id: Number(nivelId),
@@ -224,8 +265,11 @@ function FormCrearPlan({ onExito, onCancelar, periodoPropuesto }) {
     }
   };
 
+  const tramo = tramoDeNivel(niveles, nivelId);
+  const asigFueraDeTramo = fueraDeTramo(seleccionadas, tramo);
   const asigNoSeleccionadas = todasAsig.filter(
     (a) =>
+      a.Asignatura_Tramo === tramo &&
       !seleccionadas.find((s) => s.Asignatura_Id === a.Asignatura_Id) &&
       (asigBuscada === "" || a.Asignatura_Nombre.toLowerCase().includes(asigBuscada.toLowerCase()))
   );
@@ -255,6 +299,7 @@ function FormCrearPlan({ onExito, onCancelar, periodoPropuesto }) {
               </option>
             ))}
           </select>
+          <TramoNivel tramo={tramo} />
           {niveles.length === 0 && periodo && (
             <small style={{ color: "var(--text-secondary)" }}>
               Todos los niveles ya tienen plan para {periodo}.
@@ -269,6 +314,7 @@ function FormCrearPlan({ onExito, onCancelar, periodoPropuesto }) {
         busqueda={asigBuscada}
         onBuscar={setAsigBuscada}
         onAgregar={agregarAsig}
+        tramo={tramo}
         maxHeight="220px"
       />
 
@@ -278,10 +324,12 @@ function FormCrearPlan({ onExito, onCancelar, periodoPropuesto }) {
       ) : (
         <div className="asignaturas-lista">
           {seleccionadas.map((a) => (
-            <FilaAsignatura key={a.Asignatura_Id} asig={a} onChange={actualizarAsig} onRemove={quitarAsig} />
+            <FilaAsignatura key={a.Asignatura_Id} asig={a} onChange={actualizarAsig} onRemove={quitarAsig} tramo={tramo} />
           ))}
         </div>
       )}
+
+      <AvisoFueraDeTramo lista={asigFueraDeTramo} tramo={tramo} onQuitar={quitarAsig} />
 
       <div className="modal-actions" style={{ marginTop: "1.5rem" }}>
         <button type="button" className="btn-secundario" onClick={onCancelar}>Cancelar</button>
@@ -325,7 +373,7 @@ function FormEditarPlan({ planId, onExito, onCancelar }) {
           plan.asignaturas.map((a) => ({
             Asignatura_Id                 : a.Asignatura_Id,
             Asignatura_Nombre             : a.Asignatura_Nombre,
-            Asignatura_Prioridad_Academica: a.Asignatura_Prioridad_Academica,
+            Asignatura_Tramo              : a.Asignatura_Tramo,
             tipo                          : a.Tipo,
             horas_semanales               : a.Horas_Semanales_Requeridas,
           }))
@@ -361,6 +409,10 @@ function FormEditarPlan({ planId, onExito, onCancelar }) {
     if (!nivelId) return setError("Debe seleccionar un nivel educativo");
     if (!periodo.trim()) return setError("Debe indicar el periodo lectivo");
     if (asignaturas.length === 0) return setError("El plan debe contener al menos una asignatura");
+    {
+      const fuera = fueraDeTramo(asignaturas, tramoDeNivel(niveles, nivelId));
+      if (fuera.length > 0) return setError(mensajeFueraDeTramo(fuera, tramoDeNivel(niveles, nivelId)));
+    }
 
     const payload = {
       nivel_educativo_id: Number(nivelId),
@@ -385,8 +437,11 @@ function FormEditarPlan({ planId, onExito, onCancelar }) {
     }
   };
 
+  const tramo = tramoDeNivel(niveles, nivelId);
+  const asigFueraDeTramo = fueraDeTramo(asignaturas, tramo);
   const asigNoSeleccionadas = todasAsig.filter(
     (a) =>
+      a.Asignatura_Tramo === tramo &&
       !asignaturas.find((s) => s.Asignatura_Id === a.Asignatura_Id) &&
       (asigBuscada === "" || a.Asignatura_Nombre.toLowerCase().includes(asigBuscada.toLowerCase()))
   );
@@ -418,6 +473,7 @@ function FormEditarPlan({ planId, onExito, onCancelar }) {
               </option>
             ))}
           </select>
+          <TramoNivel tramo={tramo} />
         </div>
       </div>
 
@@ -427,6 +483,7 @@ function FormEditarPlan({ planId, onExito, onCancelar }) {
         busqueda={asigBuscada}
         onBuscar={setAsigBuscada}
         onAgregar={agregarAsig}
+        tramo={tramo}
         maxHeight="200px"
       />
 
@@ -436,10 +493,12 @@ function FormEditarPlan({ planId, onExito, onCancelar }) {
       ) : (
         <div className="asignaturas-lista">
           {asignaturas.map((a) => (
-            <FilaAsignatura key={a.Asignatura_Id} asig={a} onChange={actualizarAsig} onRemove={quitarAsig} />
+            <FilaAsignatura key={a.Asignatura_Id} asig={a} onChange={actualizarAsig} onRemove={quitarAsig} tramo={tramo} />
           ))}
         </div>
       )}
+
+      <AvisoFueraDeTramo lista={asigFueraDeTramo} tramo={tramo} onQuitar={quitarAsig} />
 
       <div className="modal-actions" style={{ marginTop: "1.5rem" }}>
         <button type="button" className="btn-secundario" onClick={onCancelar}>Cancelar</button>
@@ -492,7 +551,7 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
           data.asignaturas.map((a) => ({
             Asignatura_Id                 : a.Asignatura_Id,
             Asignatura_Nombre             : a.Asignatura_Nombre,
-            Asignatura_Prioridad_Academica: a.Asignatura_Prioridad_Academica,
+            Asignatura_Tramo              : a.Asignatura_Tramo,
             tipo                          : a.Tipo,
             horas_semanales               : a.Horas_Semanales_Requeridas,
           }))
@@ -528,6 +587,10 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
     if (!planOrigenId) return setError("Debe seleccionar un plan origen");
     if (!nivelDestId)  return setError("Debe seleccionar el nivel educativo destino");
     if (asignaturas.length === 0) return setError("El plan debe contener al menos una asignatura");
+    {
+      const fuera = fueraDeTramo(asignaturas, tramoDeNivel(niveles, nivelDestId));
+      if (fuera.length > 0) return setError(mensajeFueraDeTramo(fuera, tramoDeNivel(niveles, nivelDestId)));
+    }
 
     const payload = {
       plan_origen_id       : Number(planOrigenId),
@@ -553,8 +616,11 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
     }
   };
 
+  const tramo = tramoDeNivel(niveles, nivelDestId);
+  const asigFueraDeTramo = fueraDeTramo(asignaturas, tramo);
   const asigNoSeleccionadas = todasAsig.filter(
     (a) =>
+      a.Asignatura_Tramo === tramo &&
       !asignaturas.find((s) => s.Asignatura_Id === a.Asignatura_Id) &&
       (asigBuscada === "" || a.Asignatura_Nombre.toLowerCase().includes(asigBuscada.toLowerCase()))
   );
@@ -598,6 +664,7 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
               </option>
             ))}
           </select>
+          <TramoNivel tramo={tramo} />
         </div>
       </div>
 
@@ -611,6 +678,7 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
             busqueda={asigBuscada}
             onBuscar={setAsigBuscada}
             onAgregar={agregarAsig}
+        tramo={tramo}
             maxHeight="200px"
           />
 
@@ -620,12 +688,14 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
           ) : (
             <div className="asignaturas-lista">
               {asignaturas.map((a) => (
-                <FilaAsignatura key={a.Asignatura_Id} asig={a} onChange={actualizarAsig} onRemove={quitarAsig} />
+                <FilaAsignatura key={a.Asignatura_Id} asig={a} onChange={actualizarAsig} onRemove={quitarAsig} tramo={tramo} />
               ))}
             </div>
           )}
         </>
       )}
+
+      <AvisoFueraDeTramo lista={asigFueraDeTramo} tramo={tramo} onQuitar={quitarAsig} />
 
       <div className="modal-actions" style={{ marginTop: "1.5rem" }}>
         <button type="button" className="btn-secundario" onClick={onCancelar}>Cancelar</button>

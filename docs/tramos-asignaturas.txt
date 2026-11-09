@@ -1,0 +1,190 @@
+SIGAE - Tramos de las asignaturas (reemplazan a la prioridad académica)
+
+======================================================================
+1. QUÉ CAMBIA
+======================================================================
+
+- La prioridad académica (Alta/Media/Baja) se ELIMINÓ. En su lugar cada
+  asignatura tiene un TRAMO: Kinder, Básica o Media.
+- El tramo de cada nivel se calcula desde su orden
+  (nivel_educativo.Nivel_Educativo_Tramo, columna generada):
+    Kinder: Pre-Kinder y Kinder
+    Básica: 1ero a 6to Básico
+    Media:  7mo Básico a 4to Medio
+- Bloqueo: una asignatura solo se incluye en planes educativos de niveles
+  de su tramo (crear, editar y clonar plan; el servidor responde 422).
+  Como los cursos, horarios y evaluaciones solo usan asignaturas del plan
+  de su nivel, todo queda bloqueado al tramo.
+- El nombre es único DENTRO del tramo: "Matemática" de Básica y
+  "Matemática" de Media son asignaturas distintas (cada una con su plan,
+  color y horas).
+- Las electivas (3° y 4° medio) son siempre del tramo Media.
+- El tramo de una asignatura no se puede cambiar mientras se use en
+  planes, cursos, horarios, evaluaciones o el plan de electivos; para otro
+  tramo se registra una asignatura nueva con el mismo nombre.
+- Pantallas: Asignaturas (tramo obligatorio, columna y filtro por tramo),
+  Plan educativo (el selector muestra solo las asignaturas del tramo del
+  nivel elegido y avisa si queda alguna de otro tramo), Cursos y detalle
+  de bloque muestran el tramo.
+
+======================================================================
+2. PRODUCCIÓN (RDS): MIGRACIÓN
+======================================================================
+
+Hoy una misma asignatura puede estar en niveles de distintos tramos (p. ej.
+Matemática en 1ero Básico y en 1ero Medio). La migración:
+  1. calcula en qué tramos se usa cada asignatura (planes, cursos,
+     horarios, evaluaciones y electivos);
+  2. deja la asignatura en su tramo más usado;
+  3. crea una copia (mismo nombre y color) por cada otro tramo;
+  4. mueve cada plan, curso, horario y evaluación a la asignatura del
+     tramo de su nivel;
+  5. elimina la prioridad académica.
+Muestra un resumen de las asignaturas separadas y de las que no tenían uso
+(quedan en Básica, o en Media si son electivas: revisarlas en Asignaturas,
+donde su tramo sí se puede cambiar). Al final comprueba que ninguna
+asignatura quede usada fuera de su tramo (debe dar 0).
+
+Verificado en MariaDB: el esquema de main + esta migración queda idéntico
+al schema_base.sql nuevo, y SIGAE.sql nuevo es igual al anterior migrado.
+
+Antes: snapshot de la RDS. Conectarse con --default-character-set=utf8mb4
+(los tramos llevan tilde: 'Básica'). Publicar backend y frontend juntos.
+
+    SET NAMES utf8mb4;
+    
+    -- 1. Tramo de cada nivel, según su orden: Pre-Kinder y Kinder → Kinder;
+    --    1ero a 6to Básico → Básica; 7mo Básico a 4to Medio → Media
+    ALTER TABLE nivel_educativo
+      ADD COLUMN Nivel_Educativo_Tramo varchar(10)
+        AS (CASE WHEN Nivel_Educativo_Orden <= 2 THEN 'Kinder'
+                 WHEN Nivel_Educativo_Orden <= 8 THEN 'Básica'
+                 ELSE 'Media' END) VIRTUAL;
+    
+    -- 2. Tramo de la asignatura (se completa abajo) y nombre único por tramo
+    ALTER TABLE asignatura
+      ADD COLUMN Asignatura_Tramo varchar(10) DEFAULT NULL AFTER Asignatura_Nombre,
+      DROP INDEX Asignatura_Nombre_UNIQUE,
+      ADD UNIQUE KEY Asignatura_Nombre_Tramo_UNIQUE (Asignatura_Nombre, Asignatura_Tramo);
+    
+    -- 3. En qué tramos se usa hoy cada asignatura (planes, cursos, horarios,
+    --    evaluaciones; los electivos son de 3° y 4° medio)
+    CREATE TABLE mig_tramo_uso (
+      Asignatura_Id int unsigned NOT NULL, Tramo varchar(10) NOT NULL, Usos int NOT NULL,
+      PRIMARY KEY (Asignatura_Id, Tramo)
+    );
+    INSERT INTO mig_tramo_uso
+    SELECT x.Asignatura_Id, x.Tramo, COUNT(*) FROM (
+      SELECT ia.Asignatura_Id, n.Nivel_Educativo_Tramo AS Tramo
+        FROM incluyeasig ia
+        JOIN plan_educativo p ON p.Plan_Educativo_Id = ia.Plan_Educativo_Id
+        JOIN nivel_educativo n ON n.Nivel_Educativo_Id = p.Nivel_Educativo_Id
+      UNION ALL
+      SELECT ta.Asignatura_Id, n.Nivel_Educativo_Tramo
+        FROM tieneasig ta JOIN curso c ON c.Curso_Id = ta.Curso_Id
+        JOIN nivel_educativo n ON n.Nivel_Educativo_Id = c.Nivel_Educativo_Id
+      UNION ALL
+      SELECT ha.Asignatura_Id, n.Nivel_Educativo_Tramo
+        FROM horario_asignatura ha JOIN curso c ON c.Curso_Id = ha.Curso_Id
+        JOIN nivel_educativo n ON n.Nivel_Educativo_Id = c.Nivel_Educativo_Id
+      UNION ALL
+      SELECT e.Asignatura_Id, n.Nivel_Educativo_Tramo
+        FROM evaluacion e JOIN curso c ON c.Curso_Id = e.Curso_Id
+        JOIN nivel_educativo n ON n.Nivel_Educativo_Id = c.Nivel_Educativo_Id
+      UNION ALL SELECT Asignatura_Id, 'Media' FROM plan_electivos_asignatura
+      UNION ALL SELECT Asignatura_Id, 'Media' FROM clase_electivo
+    ) x GROUP BY x.Asignatura_Id, x.Tramo;
+    
+    -- 4. Cada asignatura queda en su tramo más usado (empate: el menor).
+    --    Electivas: Media. Sin uso: Básica (revisarlas en Asignaturas).
+    UPDATE asignatura a
+      JOIN (SELECT Asignatura_Id, Tramo,
+                   ROW_NUMBER() OVER (PARTITION BY Asignatura_Id
+                                      ORDER BY Usos DESC, FIELD(Tramo, 'Kinder', 'Básica', 'Media')) AS r
+              FROM mig_tramo_uso) u ON u.Asignatura_Id = a.Asignatura_Id AND u.r = 1
+      SET a.Asignatura_Tramo = u.Tramo;
+    UPDATE asignatura SET Asignatura_Tramo = 'Media' WHERE Asignatura_Es_Electiva = 1;
+    UPDATE asignatura SET Asignatura_Tramo = 'Básica' WHERE Asignatura_Tramo IS NULL;
+    
+    -- 5. Una copia (mismo nombre y color) por cada otro tramo en que se usa
+    CREATE TABLE mig_tramo_copia (
+      Asignatura_Id int unsigned NOT NULL, Tramo varchar(10) NOT NULL, Nuevo_Id int unsigned DEFAULT NULL,
+      PRIMARY KEY (Asignatura_Id, Tramo)
+    );
+    INSERT INTO mig_tramo_copia (Asignatura_Id, Tramo)
+    SELECT u.Asignatura_Id, u.Tramo FROM mig_tramo_uso u
+      JOIN asignatura a ON a.Asignatura_Id = u.Asignatura_Id
+     WHERE u.Tramo <> a.Asignatura_Tramo;
+    
+    INSERT INTO asignatura (Asignatura_Nombre, Asignatura_Tramo, Asignatura_Prioridad_Academica, Asignatura_Es_Electiva, Asignatura_Color)
+    SELECT a.Asignatura_Nombre, c.Tramo, a.Asignatura_Prioridad_Academica, 0, a.Asignatura_Color
+      FROM mig_tramo_copia c JOIN asignatura a ON a.Asignatura_Id = c.Asignatura_Id;
+    
+    UPDATE mig_tramo_copia c
+      JOIN asignatura o ON o.Asignatura_Id = c.Asignatura_Id
+      JOIN asignatura n ON n.Asignatura_Nombre = o.Asignatura_Nombre AND n.Asignatura_Tramo = c.Tramo
+       SET c.Nuevo_Id = n.Asignatura_Id;
+    
+    -- 6. Cada plan, curso, horario y evaluación pasa a la asignatura del tramo de su nivel
+    UPDATE incluyeasig ia
+      JOIN plan_educativo p ON p.Plan_Educativo_Id = ia.Plan_Educativo_Id
+      JOIN nivel_educativo n ON n.Nivel_Educativo_Id = p.Nivel_Educativo_Id
+      JOIN mig_tramo_copia c ON c.Asignatura_Id = ia.Asignatura_Id AND c.Tramo = n.Nivel_Educativo_Tramo
+       SET ia.Asignatura_Id = c.Nuevo_Id;
+    UPDATE tieneasig t
+      JOIN curso cu ON cu.Curso_Id = t.Curso_Id
+      JOIN nivel_educativo n ON n.Nivel_Educativo_Id = cu.Nivel_Educativo_Id
+      JOIN mig_tramo_copia c ON c.Asignatura_Id = t.Asignatura_Id AND c.Tramo = n.Nivel_Educativo_Tramo
+       SET t.Asignatura_Id = c.Nuevo_Id;
+    UPDATE horario_asignatura h
+      JOIN curso cu ON cu.Curso_Id = h.Curso_Id
+      JOIN nivel_educativo n ON n.Nivel_Educativo_Id = cu.Nivel_Educativo_Id
+      JOIN mig_tramo_copia c ON c.Asignatura_Id = h.Asignatura_Id AND c.Tramo = n.Nivel_Educativo_Tramo
+       SET h.Asignatura_Id = c.Nuevo_Id;
+    UPDATE evaluacion e
+      JOIN curso cu ON cu.Curso_Id = e.Curso_Id
+      JOIN nivel_educativo n ON n.Nivel_Educativo_Id = cu.Nivel_Educativo_Id
+      JOIN mig_tramo_copia c ON c.Asignatura_Id = e.Asignatura_Id AND c.Tramo = n.Nivel_Educativo_Tramo
+       SET e.Asignatura_Id = c.Nuevo_Id;
+    UPDATE plan_electivos_asignatura pa
+      JOIN mig_tramo_copia c ON c.Asignatura_Id = pa.Asignatura_Id AND c.Tramo = 'Media'
+       SET pa.Asignatura_Id = c.Nuevo_Id;
+    UPDATE clase_electivo ce
+      JOIN mig_tramo_copia c ON c.Asignatura_Id = ce.Asignatura_Id AND c.Tramo = 'Media'
+       SET ce.Asignatura_Id = c.Nuevo_Id;
+    
+    -- Resumen para revisar: asignaturas separadas y las que quedaron sin uso
+    SELECT o.Asignatura_Nombre AS asignatura, o.Asignatura_Tramo AS tramo_original,
+           c.Tramo AS tramo_copia, c.Nuevo_Id AS id_copia
+      FROM mig_tramo_copia c JOIN asignatura o ON o.Asignatura_Id = c.Asignatura_Id
+     ORDER BY 1, 3;
+    SELECT Asignatura_Id, Asignatura_Nombre, Asignatura_Tramo AS tramo_asignado_sin_uso
+      FROM asignatura a
+     WHERE NOT EXISTS (SELECT 1 FROM mig_tramo_uso u WHERE u.Asignatura_Id = a.Asignatura_Id)
+       AND NOT EXISTS (SELECT 1 FROM mig_tramo_copia c WHERE c.Nuevo_Id = a.Asignatura_Id);
+    
+    -- 7. Restricciones finales; la prioridad académica se elimina
+    ALTER TABLE asignatura
+      MODIFY Asignatura_Tramo varchar(10) NOT NULL,
+      DROP COLUMN Asignatura_Prioridad_Academica,
+      ADD CONSTRAINT chk_Asignatura_Tramo CHECK (Asignatura_Tramo IN ('Kinder','Básica','Media')),
+      ADD CONSTRAINT chk_Asignatura_Electiva_Media CHECK (Asignatura_Es_Electiva = 0 OR Asignatura_Tramo = 'Media');
+    
+    DROP TABLE mig_tramo_uso, mig_tramo_copia;
+    
+    -- Comprobación: debe dar 0 (ninguna asignatura usada fuera de su tramo)
+    SELECT COUNT(*) AS fuera_de_tramo FROM (
+      SELECT a.Asignatura_Tramo t, n.Nivel_Educativo_Tramo tn FROM incluyeasig ia
+        JOIN plan_educativo p ON p.Plan_Educativo_Id = ia.Plan_Educativo_Id
+        JOIN nivel_educativo n ON n.Nivel_Educativo_Id = p.Nivel_Educativo_Id
+        JOIN asignatura a ON a.Asignatura_Id = ia.Asignatura_Id
+      UNION ALL SELECT a.Asignatura_Tramo, n.Nivel_Educativo_Tramo FROM tieneasig x
+        JOIN curso c ON c.Curso_Id = x.Curso_Id JOIN nivel_educativo n ON n.Nivel_Educativo_Id = c.Nivel_Educativo_Id
+        JOIN asignatura a ON a.Asignatura_Id = x.Asignatura_Id
+      UNION ALL SELECT a.Asignatura_Tramo, n.Nivel_Educativo_Tramo FROM horario_asignatura x
+        JOIN curso c ON c.Curso_Id = x.Curso_Id JOIN nivel_educativo n ON n.Nivel_Educativo_Id = c.Nivel_Educativo_Id
+        JOIN asignatura a ON a.Asignatura_Id = x.Asignatura_Id
+      UNION ALL SELECT a.Asignatura_Tramo, n.Nivel_Educativo_Tramo FROM evaluacion x
+        JOIN curso c ON c.Curso_Id = x.Curso_Id JOIN nivel_educativo n ON n.Nivel_Educativo_Id = c.Nivel_Educativo_Id
+        JOIN asignatura a ON a.Asignatura_Id = x.Asignatura_Id
+    ) r WHERE r.t <> r.tn;

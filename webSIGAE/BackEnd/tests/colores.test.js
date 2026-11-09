@@ -107,7 +107,7 @@ describe('Asignaturas (CU47): color al crear y editar', () => {
     pool.query.mockResolvedValueOnce([usados.map((color) => ({ color }))]);
     const res = nuevoRes();
 
-    await planController.crearAsignatura({ body: { nombre: 'Química', prioridad: 'Media' } }, res);
+    await planController.crearAsignatura({ body: { nombre: 'Química', tramo: 'Básica' } }, res);
 
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json.mock.calls[0][0].color).toBe('#16A34A');
@@ -118,7 +118,7 @@ describe('Asignaturas (CU47): color al crear y editar', () => {
   test('Con un color elegido (cualquier hexadecimal) se usa ese', async () => {
     sinDuplicados();
     const res = nuevoRes();
-    await planController.crearAsignatura({ body: { nombre: 'Química', prioridad: 'Media', color: '#123abc' } }, res);
+    await planController.crearAsignatura({ body: { nombre: 'Química', tramo: 'Básica', color: '#123abc' } }, res);
 
     expect(res.json.mock.calls[0][0].color).toBe('#123ABC');
     expect(pool.query).not.toHaveBeenCalled(); // no hace falta sortear
@@ -126,23 +126,23 @@ describe('Asignaturas (CU47): color al crear y editar', () => {
 
   test('Un color inválido se rechaza antes de tocar la base', async () => {
     const res = nuevoRes();
-    await planController.crearAsignatura({ body: { nombre: 'Química', prioridad: 'Media', color: '#12' } }, res);
+    await planController.crearAsignatura({ body: { nombre: 'Química', tramo: 'Básica', color: '#12' } }, res);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(pool.execute).not.toHaveBeenCalled();
   });
 
   test('Al editar, el color es opcional: si llega se guarda, si no se mantiene', async () => {
     pool.execute.mockImplementation(async (sql) => (
-      /SELECT Asignatura_Id, Asignatura_Es_Electiva/.test(sql) ? [[{ Asignatura_Id: 2222, Asignatura_Es_Electiva: 0 }]] : [[]]
+      /SELECT Asignatura_Id, Asignatura_Es_Electiva/.test(sql) ? [[{ Asignatura_Id: 2222, Asignatura_Es_Electiva: 0, Asignatura_Tramo: 'Básica' }]] : [[]]
     ));
     const conColor = nuevoRes();
-    await planController.editarAsignatura({ params: { id: '2222' }, body: { nombre: 'Matemática', prioridad: 'Alta', color: '#7c3aed' } }, conColor);
+    await planController.editarAsignatura({ params: { id: '2222' }, body: { nombre: 'Matemática', tramo: 'Básica', color: '#7c3aed' } }, conColor);
     let update = pool.execute.mock.calls.find(([sql]) => /UPDATE asignatura/.test(sql));
     expect(update[0]).toContain('Asignatura_Color = ?');
-    expect(update[1]).toEqual(['Matemática', 'Alta', 0, '#7C3AED', '2222']);
+    expect(update[1]).toEqual(['Matemática', 'Básica', 0, '#7C3AED', '2222']);
 
     pool.execute.mockClear();
-    await planController.editarAsignatura({ params: { id: '2222' }, body: { nombre: 'Matemática', prioridad: 'Alta' } }, nuevoRes());
+    await planController.editarAsignatura({ params: { id: '2222' }, body: { nombre: 'Matemática', tramo: 'Básica' } }, nuevoRes());
     update = pool.execute.mock.calls.find(([sql]) => /UPDATE asignatura/.test(sql));
     expect(update[0]).not.toContain('Asignatura_Color');
   });

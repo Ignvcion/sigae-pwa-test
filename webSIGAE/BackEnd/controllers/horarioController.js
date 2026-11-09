@@ -129,7 +129,7 @@ const getBloques = async (req, res) => {
 const getAsignaturas = async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      `SELECT Asignatura_Id, Asignatura_Nombre, Asignatura_Prioridad_Academica
+      `SELECT Asignatura_Id, Asignatura_Nombre, Asignatura_Tramo
        FROM asignatura ORDER BY Asignatura_Nombre`
     );
     res.json(rows);
@@ -1776,7 +1776,7 @@ const getDetalleBloqueHorario = async (req, res) => {
         bh.Bloque_Horario_Tipo            AS tipoBloque,
         a.Asignatura_Id                   AS asignaturaId,
         a.Asignatura_Nombre               AS asignatura,
-        a.Asignatura_Prioridad_Academica  AS prioridadAcademica,
+        a.Asignatura_Tramo                AS tramo,
         u.Usuario_Id                      AS docenteId,
         COALESCE(u.Usuario_Nombre_Completo, 'Sin docente asignado') AS docente,
         u.Docente_Especialidad            AS especialidadDocente

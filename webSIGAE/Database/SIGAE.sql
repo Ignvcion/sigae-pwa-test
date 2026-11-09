@@ -79,6 +79,10 @@ UNLOCK TABLES;
 
 --
 -- Table structure for table `asignatura`
+-- Asignatura_Tramo: Kinder, Básica o Media. La asignatura solo se usa en planes (y por ende en cursos,
+-- horarios y evaluaciones) de niveles de su tramo (nivel_educativo.Nivel_Educativo_Tramo). El nombre
+-- es único dentro del tramo: "Matemática" de Básica y de Media son asignaturas distintas.
+-- Reemplaza a la prioridad académica (Alta/Media/Baja), que se eliminó.
 -- Asignatura_Color: color (#RRGGBB) que la identifica en los horarios; al crearla se asigna
 -- al azar de la paleta básica de 12 colores (BackEnd/utils/colores.js) y se cambia en Asignaturas
 -- Incremento 4, CU47 (RF28): Asignatura_Es_Electiva marca las asignaturas electivas de 3° y 4°
@@ -91,12 +95,14 @@ DROP TABLE IF EXISTS `asignatura`;
 CREATE TABLE `asignatura` (
   `Asignatura_Id` int unsigned NOT NULL AUTO_INCREMENT,
   `Asignatura_Nombre` varchar(100) NOT NULL,
-  `Asignatura_Prioridad_Academica` varchar(50) NOT NULL,
+  `Asignatura_Tramo` varchar(10) NOT NULL,
   `Asignatura_Es_Electiva` tinyint(1) NOT NULL DEFAULT 0,
   `Asignatura_Color` char(7) NOT NULL DEFAULT '#2563EB',
   PRIMARY KEY (`Asignatura_Id`),
-  UNIQUE KEY `Asignatura_Nombre_UNIQUE` (`Asignatura_Nombre`)
-) ENGINE=InnoDB AUTO_INCREMENT=2231 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  UNIQUE KEY `Asignatura_Nombre_Tramo_UNIQUE` (`Asignatura_Nombre`,`Asignatura_Tramo`),
+  CONSTRAINT `chk_Asignatura_Tramo` CHECK (`Asignatura_Tramo` IN ('Kinder','Básica','Media')),
+  CONSTRAINT `chk_Asignatura_Electiva_Media` CHECK (`Asignatura_Es_Electiva` = 0 OR `Asignatura_Tramo` = 'Media')
+) ENGINE=InnoDB AUTO_INCREMENT=2233 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -105,7 +111,7 @@ CREATE TABLE `asignatura` (
 
 LOCK TABLES `asignatura` WRITE;
 /*!40000 ALTER TABLE `asignatura` DISABLE KEYS */;
-INSERT INTO `asignatura` VALUES (2222,'Matemática','Alta',0,'#DC2626'),(2223,'Lenguaje y Comunicación','Alta',0,'#EA580C'),(2224,'Historia, Geografía y Ciencias Sociales','Media',0,'#CA8A04'),(2225,'Ciencias Naturales','Media',0,'#65A30D'),(2226,'Inglés','Media',0,'#16A34A'),(2227,'Biología de los Ecosistemas','Media',1,'#0D9488'),(2228,'Física','Media',1,'#0284C7'),(2229,'Comprensión Histórica del Presente','Media',1,'#2563EB'),(2230,'Filosofía Política','Media',1,'#4F46E5');
+INSERT INTO `asignatura` VALUES (2222,'Matemática','Básica',0,'#DC2626'),(2223,'Lenguaje y Comunicación','Básica',0,'#EA580C'),(2224,'Historia, Geografía y Ciencias Sociales','Media',0,'#CA8A04'),(2225,'Ciencias Naturales','Media',0,'#65A30D'),(2226,'Inglés','Básica',0,'#16A34A'),(2227,'Biología de los Ecosistemas','Media',1,'#0D9488'),(2228,'Física','Media',1,'#0284C7'),(2229,'Comprensión Histórica del Presente','Media',1,'#2563EB'),(2230,'Filosofía Política','Media',1,'#4F46E5'),(2231,'Matemática','Media',0,'#DC2626'),(2232,'Historia, Geografía y Ciencias Sociales','Básica',0,'#CA8A04');
 /*!40000 ALTER TABLE `asignatura` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -662,7 +668,7 @@ CREATE TABLE `incluyeasig` (
 
 LOCK TABLES `incluyeasig` WRITE;
 /*!40000 ALTER TABLE `incluyeasig` DISABLE KEYS */;
-INSERT INTO `incluyeasig` VALUES (22222222,6,'Obligatorio',2222,2222222),(22222223,6,'Obligatorio',2223,2222222),(22222224,4,'Obligatorio',2224,2222222),(22222225,6,'Obligatorio',2222,2222223),(22222226,4,'Obligatorio',2223,2222223),(22222227,6,'Obligatorio',2222,2222224),(22222228,4,'Obligatorio',2225,2222224);
+INSERT INTO `incluyeasig` VALUES (22222222,6,'Obligatorio',2222,2222222),(22222223,6,'Obligatorio',2223,2222222),(22222224,4,'Obligatorio',2232,2222222),(22222225,6,'Obligatorio',2222,2222223),(22222226,4,'Obligatorio',2223,2222223),(22222227,6,'Obligatorio',2231,2222224),(22222228,4,'Obligatorio',2225,2222224);
 /*!40000 ALTER TABLE `incluyeasig` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -700,6 +706,8 @@ UNLOCK TABLES;
 --
 -- Table structure for table `nivel_educativo`
 -- Incremento 4, RF61: Nivel_Educativo_Orden define el nivel siguiente (Pre-Kinder = 1 ... 4to Medio = 14)
+-- Nivel_Educativo_Tramo (calculada desde el orden): Pre-Kinder y Kinder → Kinder; 1ero a 6to Básico
+-- → Básica; 7mo Básico a 4to Medio → Media. Las asignaturas quedan bloqueadas a su tramo.
 --
 
 DROP TABLE IF EXISTS `nivel_educativo`;
@@ -709,6 +717,7 @@ CREATE TABLE `nivel_educativo` (
   `Nivel_Educativo_Id` int unsigned NOT NULL AUTO_INCREMENT,
   `Nivel_Educativo_Nombre` varchar(100) NOT NULL,
   `Nivel_Educativo_Orden` int unsigned NOT NULL,
+  `Nivel_Educativo_Tramo` varchar(10) GENERATED ALWAYS AS (case when `Nivel_Educativo_Orden` <= 2 then 'Kinder' when `Nivel_Educativo_Orden` <= 8 then 'Básica' else 'Media' end) VIRTUAL,
   PRIMARY KEY (`Nivel_Educativo_Id`),
   UNIQUE KEY `Nivel_Educativo_Nombre_UNIQUE` (`Nivel_Educativo_Nombre`),
   UNIQUE KEY `Nivel_Educativo_Orden_UNIQUE` (`Nivel_Educativo_Orden`)
@@ -721,7 +730,7 @@ CREATE TABLE `nivel_educativo` (
 
 LOCK TABLES `nivel_educativo` WRITE;
 /*!40000 ALTER TABLE `nivel_educativo` DISABLE KEYS */;
-INSERT INTO `nivel_educativo` VALUES (24,'1ero Básico',3),(32,'1ero Medio',11),(25,'2do Básico',4),(33,'2do Medio',12),(26,'3ero Básico',5),(34,'3ero Medio',13),(27,'4to Básico',6),(35,'4to Medio',14),(28,'5to Básico',7),(29,'6to Básico',8),(30,'7mo Básico',9),(31,'8vo Básico',10),(23,'Kinder',2),(22,'Pre-Kinder',1);
+INSERT INTO `nivel_educativo` (`Nivel_Educativo_Id`, `Nivel_Educativo_Nombre`, `Nivel_Educativo_Orden`) VALUES (24,'1ero Básico',3),(32,'1ero Medio',11),(25,'2do Básico',4),(33,'2do Medio',12),(26,'3ero Básico',5),(34,'3ero Medio',13),(27,'4to Básico',6),(35,'4to Medio',14),(28,'5to Básico',7),(29,'6to Básico',8),(30,'7mo Básico',9),(31,'8vo Básico',10),(23,'Kinder',2),(22,'Pre-Kinder',1);
 /*!40000 ALTER TABLE `nivel_educativo` ENABLE KEYS */;
 UNLOCK TABLES;
 
