@@ -67,7 +67,8 @@ describe('Pruebas Unitarias - CU89: Solicitud de citación por el apoderado (RF5
 
     await controller.getDocentesSolicitud(req, res);
 
-    expect(pool.query.mock.calls[1][1]).toEqual([222]);
+    // El propio apoderado (si también es docente del curso) no aparece: [curso, apoderado]
+    expect(pool.query.mock.calls[1][1]).toEqual([222, 8]);
     expect(res.json).toHaveBeenCalledWith([expect.objectContaining({ Usuario_Id: 3, Tiene_Horario_Atencion: true })]);
   });
 
@@ -194,6 +195,17 @@ describe('Pruebas Unitarias - CU89: Solicitud de citación por el apoderado (RF5
 
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith({ mensaje: 'El tramo seleccionado ya no está disponible. Elige otro.' });
+  });
+
+  test('Un apoderado que también es docente del estudiante no puede citarse a sí mismo', async () => {
+    req.user = { id: 3, roles: ['Docente', 'Apoderado'] };
+    req.body = bodyValido({ Docente_Usuario_Id: 3 });
+
+    await controller.solicitarCitacion(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ mensaje: 'No puedes solicitarte una citación a ti mismo' });
+    expect(pool.query).not.toHaveBeenCalled();
   });
 
   test('CU89 Flujo correcto: registra la solicitud pendiente a nombre del apoderado (también suplente)', async () => {

@@ -92,6 +92,11 @@ async function docenteImparteEnCurso(conn, docenteId, cursoId) {
  * Valida estudiante y docente de una solicitud. Devuelve { estudiante } o { error: {status, body} }.
  */
 async function validarEstudianteYDocente(conn, apoderadoId, estudianteId, docenteId) {
+  // La solicitud siempre la acepta otro: un apoderado que además es docente del
+  // estudiante no puede citarse a sí mismo (sería él quien la confirmara)
+  if (Number(docenteId) === Number(apoderadoId)) {
+    return { error: { status: 400, body: { mensaje: 'No puedes solicitarte una citación a ti mismo' } } };
+  }
   const estudiante = await buscarEstudianteAsociado(conn, apoderadoId, estudianteId);
   if (!estudiante) {
     return { error: { status: 404, body: { mensaje: 'El estudiante no existe o no está asociado a tu cuenta' } } };
@@ -147,9 +152,10 @@ const getDocentesSolicitud = async (req, res) => {
          JOIN asignatura a ON a.Asignatura_Id = ha.Asignatura_Id
         WHERE ha.Curso_Id = ? AND ${claseVigente('ha')}
           AND u.Es_Docente = 1 AND u.Usuario_Estado_Cuenta = 1
+          AND u.Usuario_Id <> ?  -- no se ofrece a sí mismo (apoderado que también es docente)
         GROUP BY u.Usuario_Id, u.Usuario_Nombre_Completo
         ORDER BY u.Usuario_Nombre_Completo`,
-      [estudiante.Curso_Id]
+      [estudiante.Curso_Id, req.user.id]
     );
     const lista = docentes.map((d) => ({ ...d, Tiene_Horario_Atencion: Boolean(Number(d.Tiene_Horario_Atencion)) }));
     if (lista.length === 0) {
