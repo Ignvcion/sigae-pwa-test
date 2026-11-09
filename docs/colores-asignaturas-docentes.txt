@@ -23,6 +23,14 @@ SIGAE - Colores de asignaturas y docentes
   color en el creador de horarios y en el horario maestro.
   Antes cada vista asignaba colores por posición, así que la misma
   asignatura podía cambiar de color entre vistas.
+- Gestor de horarios: junto a "Selección múltiple", el botón
+  "🎨 Colores: Asignatura | Docente" cambia los colores de los bloques.
+  Por docente, cada bloque toma el color de su docente (gris si no tiene)
+  y el listado de la izquierda pasa a ser la lista de docentes del curso
+  con su color y número de bloques; el punto junto al docente muestra
+  entonces el color de la asignatura. La elección se recuerda en el
+  navegador de cada usuario. Por asignatura, cada tarjeta del listado
+  lleva un borde de su color, como leyenda.
 
 Paleta (BackEnd/utils/colores.js y FrontEnd/src/utils/colores.js):
   Rojo #DC2626, Naranja #EA580C, Amarillo #CA8A04, Lima #65A30D,

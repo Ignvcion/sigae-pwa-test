@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import useColores from "../../hooks/useColores";
 import { PuntoColor } from "../../components/SelectorColor";
+import { tonosDesdeHex } from "../../utils/colores";
 import { useAuth } from "../context/AuthContext";
 import ExportMenu from "../../components/ExportMenu";
 import DetalleBloqueModal from "../../components/horarios/DetalleBloqueModal";
@@ -12,6 +13,19 @@ import { getElectivosDeCurso } from "../../services/api";
 const API = "/api";
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
 const DIAS_ABR = ["Lun", "Mar", "Mié", "Jue", "Vie"];
+
+// Clases sin docente cuando los bloques se colorean por docente
+const COLOR_SIN_DOCENTE = { bg: "#f3f4f6", border: "#d1d5db", text: "#4b5563" };
+
+// "Colorear por" del gestor de horarios: preferencia de cada usuario en este navegador
+const CLAVE_COLOREAR_POR = "horarios.colorearPor";
+function leerColorearPor() {
+  try {
+    return localStorage.getItem(CLAVE_COLOREAR_POR) === "docente" ? "docente" : "asignatura";
+  } catch {
+    return "asignatura";
+  }
+}
 
 // Respaldo mientras cargan los colores guardados de cada asignatura (Asignaturas)
 const ASIG_COLORS = [
@@ -212,7 +226,13 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
 /* ═══════════════════════════════════════════════════════════════ */
 export default function Horarios() {
   const { rolActivo, usuario } = useAuth();
-  const { tonosAsignatura } = useColores();
+  const { tonosAsignatura, colorDocente } = useColores();
+  // Los bloques y el listado de la izquierda se colorean por asignatura o por docente
+  const [colorearPor, setColorearPor] = useState(leerColorearPor);
+  const cambiarColorearPor = (modo) => {
+    setColorearPor(modo);
+    try { localStorage.setItem(CLAVE_COLOREAR_POR, modo); } catch { /* sin almacenamiento: solo esta visita */ }
+  };
   const rolEfectivo = rolActivo || usuario?.roles?.[0];
   const esSuperAdmin = usuario?.administradorTipo === "Super Admin";
   const esAdmin =
@@ -375,6 +395,13 @@ export default function Horarios() {
   asignaturasCurso.forEach((a, i) => {
     colorMap[a.Asignatura_Id] = colorDeAsignatura(a.Asignatura_Id, i);
   });
+  // Color del docente (Gestión Usuarios › Docentes); gris si la clase no tiene docente
+  const tonosDocente = (id) => {
+    if (!id) return COLOR_SIN_DOCENTE;
+    const hex = colorDocente(id);
+    return hex ? tonosDesdeHex(hex) : ASIG_COLORS[Number(id) % ASIG_COLORS.length];
+  };
+  const colorDeClase = (h) => (colorearPor === "docente" ? tonosDocente(h.Usuario_Id) : colorMap[h.Asignatura_Id]);
 
   // ── Panel handlers ──
   const abrirDesdeGrid = (bloqueId, dia) => {
@@ -557,6 +584,13 @@ export default function Horarios() {
 
   const cursoObj = cursos.find((c) => String(c.Curso_Id) === String(cursoSeleccionado));
   const horariosVigentes = horarios.filter((h) => !esEliminada(h));
+  // Docentes con clases en el curso (listado de colores al colorear por docente)
+  const docentesCurso = Object.values(horariosVigentes.reduce((acc, h) => {
+    const clave = h.Usuario_Id || "sin";
+    acc[clave] = acc[clave] || { id: h.Usuario_Id || null, nombre: h.docente || "Sin docente", bloques: 0 };
+    acc[clave].bloques += 1;
+    return acc;
+  }, {})).sort((a, b) => (!a.id) - (!b.id) || a.nombre.localeCompare(b.nombre, "es"));
   const bloquesActivos = horarios.filter((h) => h.estado === "Activo").length;
 
   const preview =
@@ -641,21 +675,40 @@ export default function Horarios() {
               ⚠ Este curso no tiene asignaturas en el plan educativo.
             </span>
           )}
-          {/* CU63 / CU64 — activar casillas de selección en la grilla */}
-          {cursoSeleccionado && horariosVigentes.length > 0 && (
+          <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+            {/* CU63 / CU64 — activar casillas de selección en la grilla */}
+            {cursoSeleccionado && horariosVigentes.length > 0 && (
+              <button
+                style={{ padding: "0.35rem 0.85rem", borderRadius: "6px", border: "1px solid #c4b5fd", background: modoSeleccion ? "#5b21b6" : "#fff", color: modoSeleccion ? "#fff" : "#5b21b6", cursor: "pointer", fontWeight: 600, fontSize: "0.82rem", whiteSpace: "nowrap", transition: "all 0.15s" }}
+                onClick={toggleModoSeleccion}
+              >
+                ☑ Selección múltiple
+              </button>
+            )}
+            {/* Colores de los bloques y del listado: por asignatura o por docente */}
+            {cursoSeleccionado && (
+              <div role="group" aria-label="Colorear bloques por" style={s.colorearGrupo}>
+                <span style={s.colorearEtiqueta}>🎨 Colores:</span>
+                {[["asignatura", "Asignatura"], ["docente", "Docente"]].map(([modo, texto]) => (
+                  <button
+                    key={modo}
+                    type="button"
+                    aria-pressed={colorearPor === modo}
+                    onClick={() => cambiarColorearPor(modo)}
+                    style={colorearPor === modo ? s.colorearBotonActivo : s.colorearBoton}
+                  >
+                    {texto}
+                  </button>
+                ))}
+              </div>
+            )}
             <button
-              style={{ marginLeft: "auto", padding: "0.35rem 0.85rem", borderRadius: "6px", border: "1px solid #c4b5fd", background: modoSeleccion ? "#5b21b6" : "#fff", color: modoSeleccion ? "#fff" : "#5b21b6", cursor: "pointer", fontWeight: 600, fontSize: "0.82rem", whiteSpace: "nowrap", transition: "all 0.15s" }}
-              onClick={toggleModoSeleccion}
+              style={{ padding: "0.35rem 0.85rem", borderRadius: "6px", border: "1px solid #93c5fd", background: listadoAbierto ? "#4f46e5" : "#fff", color: listadoAbierto ? "#fff" : "#4f46e5", cursor: "pointer", fontWeight: 600, fontSize: "0.82rem", whiteSpace: "nowrap", transition: "all 0.15s" }}
+              onClick={() => setListadoAbierto(v => !v)}
             >
-              ☑ Selección múltiple
+              📋 Desplegar listado
             </button>
-          )}
-          <button
-            style={{ marginLeft: cursoSeleccionado && horariosVigentes.length > 0 ? 0 : "auto", padding: "0.35rem 0.85rem", borderRadius: "6px", border: "1px solid #93c5fd", background: listadoAbierto ? "#4f46e5" : "#fff", color: listadoAbierto ? "#fff" : "#4f46e5", cursor: "pointer", fontWeight: 600, fontSize: "0.82rem", whiteSpace: "nowrap", transition: "all 0.15s" }}
-            onClick={() => setListadoAbierto(v => !v)}
-          >
-            📋 Desplegar listado
-          </button>
+          </div>
         </div>
       )}
 
@@ -677,7 +730,7 @@ export default function Horarios() {
             <div style={s.asigPanel}>
               <div style={s.asigPanelHead}>
                 <span style={{ fontWeight: 700, color: "#1e3a5f", fontSize: "0.9rem" }}>
-                  Asignaturas
+                  {colorearPor === "docente" ? "Docentes" : "Asignaturas"}
                 </span>
                 {cursoObj && (
                   <span style={{ fontSize: "0.72rem", color: "#6b7280", display: "inline-flex", gap: 6, alignItems: "center" }}>
@@ -687,7 +740,9 @@ export default function Horarios() {
                 )}
               </div>
 
-              {asignaturasCurso.length === 0 ? (
+              {colorearPor === "docente" ? (
+                <ListaColoresDocentes docentes={docentesCurso} tonosDocente={tonosDocente} />
+              ) : asignaturasCurso.length === 0 ? (
                 <p style={{ color: "#6b7280", fontSize: "0.85rem", padding: "0.75rem 0.5rem", fontStyle: "italic" }}>
                   Sin asignaturas en el plan educativo.
                 </p>
@@ -715,6 +770,8 @@ export default function Horarios() {
                         style={{
                           ...s.asigCard,
                           borderColor: activa ? color.border : "#e5e7eb",
+                          // Borde izquierdo del color de la asignatura: el listado sirve de leyenda
+                          borderLeft: `4px solid ${color.solido || color.border}`,
                           background: activa ? color.bg : "#fff",
                           boxShadow: activa ? `0 0 0 2px ${color.border}` : "none",
                         }}
@@ -858,6 +915,8 @@ export default function Horarios() {
               esAdmin={esAdmin}
               asignaturaActiva={asignaturaActiva}
               colorMap={colorMap}
+              colorDeClase={colorDeClase}
+              colorearPor={colorearPor}
               preview={preview}
               onCelda={esAdmin ? abrirDesdeGrid : null}
               onEditar={esAdmin ? abrirEditar : null}
@@ -960,6 +1019,8 @@ function VistaBloqueGrid({
   esAdmin,
   asignaturaActiva,
   colorMap,
+  colorDeClase,
+  colorearPor = "asignatura",
   preview,
   onCelda,
   onEditar,
@@ -1131,7 +1192,7 @@ function VistaBloqueGrid({
               const enElectivo = electivosMap[key] || [];
               const canClick = esAdmin && !esRecreo && !desajustado && !h && enElectivo.length === 0 && !!onCelda && !modoSeleccion;
               const seleccionado = !!h && seleccionados.includes(h.Horario_Asignatura_Id);
-              const asigColor = h ? colorMap[h.Asignatura_Id] || ASIG_COLORS[0] : null;
+              const asigColor = h ? (colorDeClase?.(h) || colorMap[h.Asignatura_Id] || ASIG_COLORS[0]) : null;
 
               return (
                 <div
@@ -1283,7 +1344,10 @@ function VistaBloqueGrid({
                             whiteSpace: "nowrap",
                           }}
                         >
-                          <PuntoColor color={colorDocente(h.Usuario_Id)} /> {h.docente}
+                          {/* Por docente el bloque ya es de su color: el punto muestra la asignatura */}
+                          <PuntoColor
+                            color={colorearPor === "docente" ? colorMap[h.Asignatura_Id]?.solido : colorDocente(h.Usuario_Id)}
+                          /> {h.docente}
                         </div>
                       )}
                       {h.estado === "Suspendido" && (
@@ -1442,6 +1506,42 @@ function VistaBloqueGrid({
 /*  (estas ya no aparecen en la grilla de bloques horarios)          */
 /* ═══════════════════════════════════════════════════════════════ */
 const ORDEN_DIA = Object.fromEntries(DIAS.map((d, i) => [d, i]));
+
+/* Listado simple de colores por docente (gestor de horarios, "Colores: Docente") */
+function ListaColoresDocentes({ docentes, tonosDocente }) {
+  if (docentes.length === 0) {
+    return (
+      <p style={{ color: "#6b7280", fontSize: "0.85rem", padding: "0.75rem 0.5rem", fontStyle: "italic" }}>
+        Este curso aún no tiene clases programadas.
+      </p>
+    );
+  }
+  return (
+    <div style={s.asigList}>
+      {docentes.map((d) => {
+        const color = tonosDocente(d.id);
+        return (
+          <div
+            key={d.id || "sin-docente"}
+            style={{ ...s.asigCard, cursor: "default", background: color.bg, borderColor: color.border, borderLeft: `4px solid ${color.solido || color.border}` }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+              <span style={{ fontWeight: 600, fontSize: "0.83rem", color: color.text, flex: 1, lineHeight: 1.3 }}>
+                {d.nombre}
+              </span>
+              <span style={{ fontSize: "0.7rem", color: "#475569", flexShrink: 0 }}>
+                {d.bloques} bloque{d.bloques === 1 ? "" : "s"}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+      <p style={{ fontSize: "0.7rem", color: "#6b7280", margin: "0.5rem 0.25rem 0", lineHeight: 1.4 }}>
+        El color de cada docente se cambia en Gestión Usuarios › Docentes.
+      </p>
+    </div>
+  );
+}
 
 function ListadoClases({ clases, onEliminar, onRestaurar, onVerDetalle }) {
   const [filtro, setFiltro] = useState("todas");
@@ -2525,6 +2625,42 @@ const s = {
     display: "flex",
     flexDirection: "column",
     minHeight: 300,
+  },
+  colorearGrupo: {
+    display: "inline-flex",
+    alignItems: "center",
+    border: "1px solid #cbd5e1",
+    borderRadius: "6px",
+    overflow: "hidden",
+    background: "#fff",
+  },
+  colorearEtiqueta: {
+    padding: "0.35rem 0.55rem",
+    fontSize: "0.78rem",
+    color: "#475569",
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    borderRight: "1px solid #e2e8f0",
+  },
+  colorearBoton: {
+    padding: "0.35rem 0.7rem",
+    border: "none",
+    background: "#fff",
+    color: "#334155",
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: "0.8rem",
+    whiteSpace: "nowrap",
+  },
+  colorearBotonActivo: {
+    padding: "0.35rem 0.7rem",
+    border: "none",
+    background: "#0f172a",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: "0.8rem",
+    whiteSpace: "nowrap",
   },
   asigPanelHead: {
     display: "flex",
