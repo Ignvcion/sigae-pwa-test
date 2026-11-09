@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import PanelJefaturaCurso from "../../components/cursos/PanelJefaturaCurso";
 import { getEstadoPeriodo } from "../../services/promocion";
+import BarraFiltrosCursos, { tramoDelCurso, TRAMOS_CURSO } from "../../components/cursos/BarraFiltrosCursos";
 
 function ModalAsignarAsignaturas({ curso, token, onClose, onExito }) {
   const [disponibles, setDisponibles] = useState([]);
@@ -257,6 +258,11 @@ function Cursos() {
   const [vistaLista, setVistaLista] = useState(false);
   const [periodos, setPeriodos] = useState(null); // { vigente, siguiente }
   const [periodo, setPeriodo] = useState("");
+  // Listado: filtro por tramo y período que se ve (vigente / siguiente durante el cierre)
+  const [tramoFiltro, setTramoFiltro] = useState("");
+  const [periodoVista, setPeriodoVista] = useState("");
+  const [giro, setGiro] = useState(0);
+  const [desdeIzquierda, setDesdeIzquierda] = useState(false);
 
   const token = localStorage.getItem("token");
 
@@ -333,9 +339,33 @@ function Cursos() {
     cargarDatos();
   };
 
-  // Agrupados por período y nivel (durante el cierre conviven dos períodos)
-  const cursosAgrupados = cursos.reduce((acc, curso) => {
-    const nivel = `${curso.Nivel_Educativo_Nombre} · ${curso.Curso_Periodo_Lectivo}`;
+  // Períodos del listado (durante el cierre conviven el vigente y el siguiente)
+  const ETIQUETA_PERIODO = { Vigente: "Vigente", Futuro: "Siguiente", Anterior: "Anterior" };
+  const periodosLista = [...new Map(cursos.map((c) => [String(c.Curso_Periodo_Lectivo), {
+    valor: String(c.Curso_Periodo_Lectivo),
+    etiqueta: ETIQUETA_PERIODO[c.Curso_Periodo_Estado] || "Período",
+  }])).values()].sort((a, b) => a.valor.localeCompare(b.valor));
+  const periodoPorDefecto = (periodosLista.find((p) => p.etiqueta === "Vigente") || periodosLista[0])?.valor || "";
+  const periodoActivo = periodosLista.some((p) => p.valor === periodoVista) ? periodoVista : periodoPorDefecto;
+
+  const cambiarPeriodo = () => {
+    const otro = periodosLista.find((p) => p.valor !== periodoActivo);
+    if (!otro) return;
+    setDesdeIzquierda(otro.valor < periodoActivo);
+    setPeriodoVista(otro.valor);
+    setGiro((g) => g + 1);
+  };
+
+  const cursosDelPeriodo = cursos.filter((c) => String(c.Curso_Periodo_Lectivo) === periodoActivo);
+  const conteosTramo = Object.fromEntries([
+    ["", cursosDelPeriodo.length],
+    ...TRAMOS_CURSO.map((t) => [t, cursosDelPeriodo.filter((c) => tramoDelCurso(c) === t).length]),
+  ]);
+  const cursosVisibles = cursosDelPeriodo.filter((c) => tramoFiltro === "" || tramoDelCurso(c) === tramoFiltro);
+
+  // Tarjetas agrupadas por nivel (el período ya está elegido)
+  const cursosAgrupados = cursosVisibles.reduce((acc, curso) => {
+    const nivel = curso.Nivel_Educativo_Nombre;
     if (!acc[nivel]) acc[nivel] = [];
     acc[nivel].push(curso);
     return acc;
@@ -357,7 +387,7 @@ function Cursos() {
     );
   }
 
-  const hayCursos = Object.keys(cursosAgrupados).length > 0;
+  const hayCursos = cursos.length > 0;
 
   return (
     <div className="page-container">
@@ -437,9 +467,30 @@ function Cursos() {
         </div>
       )}
 
+      {hayCursos && (
+        <BarraFiltrosCursos
+          tramo={tramoFiltro}
+          onTramo={setTramoFiltro}
+          conteos={conteosTramo}
+          periodos={periodosLista}
+          periodo={periodoActivo}
+          onCambiarPeriodo={cambiarPeriodo}
+          giro={giro}
+        />
+      )}
+
       {!hayCursos ? (
         <div className="empty-state">
           <p>No hay cursos registrados aún.</p>
+        </div>
+      ) : (
+        <div
+          key={periodoActivo}
+          className={`cursos-vista-periodo${giro > 0 ? " entrando" : ""}${desdeIzquierda ? " desde-izquierda" : ""}`}
+        >
+      {cursosVisibles.length === 0 ? (
+        <div className="empty-state">
+          <p>No hay cursos {tramoFiltro ? `del tramo ${tramoFiltro} ` : ""}en el período {periodoActivo}.</p>
         </div>
       ) : vistaLista ? (
         /* ── Vista Lista ── */
@@ -449,6 +500,7 @@ function Cursos() {
               <tr>
                 <th>Curso</th>
                 <th>Nivel Educativo</th>
+                <th>Tramo</th>
                 <th>Sección</th>
                 <th>Período</th>
                 <th>Profesor jefe</th>
@@ -457,7 +509,7 @@ function Cursos() {
               </tr>
             </thead>
             <tbody>
-              {cursos.map((c) => (
+              {cursosVisibles.map((c) => (
                 <tr
                   key={c.Curso_Id}
                   className="tabla-curso-fila"
@@ -465,6 +517,7 @@ function Cursos() {
                 >
                   <td className="tabla-curso-nombre">{c.Curso_Nombre}</td>
                   <td>{c.Nivel_Educativo_Nombre}</td>
+                  <td>{tramoDelCurso(c) || "—"}</td>
                   <td>{c.Curso_Seccion}</td>
                   <td>{c.Curso_Periodo_Lectivo}</td>
                   <td>{c.Profesor_Jefe_Nombre || "—"}</td>
@@ -516,6 +569,8 @@ function Cursos() {
             </div>
           </div>
         ))
+      )}
+        </div>
       )}
     </div>
   );

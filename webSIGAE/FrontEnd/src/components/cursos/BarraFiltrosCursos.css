@@ -1,0 +1,260 @@
+/* components/cursos/BarraFiltrosCursos.jsx */
+.cursos-barra {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+/* Cuatro botones de tramo, uno al lado del otro */
+.cursos-tramos {
+  display: inline-flex;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 3px;
+  max-width: 100%;
+}
+
+.cursos-tramo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.cursos-tramo-btn:hover:not(.activo) {
+  background: #f1f5f9;
+}
+
+.cursos-tramo-btn.activo {
+  background: #4f46e5;
+  color: #fff;
+}
+
+.cursos-tramo-btn:focus-visible,
+.cursos-cambiar-periodo:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
+}
+
+.cursos-tramo-cuenta {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 0.72rem;
+  line-height: 18px;
+  text-align: center;
+}
+
+.cursos-tramo-btn.activo .cursos-tramo-cuenta {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+/* Separador flexible: empuja "Cambiar período" al final */
+.cursos-barra-espacio {
+  flex: 1 1 24px;
+  min-width: 24px;
+  border-top: 2px dashed #cbd5e1;
+  align-self: center;
+}
+
+/* Botón con dos tarjetas que intercambian lugar */
+.cursos-cambiar-periodo {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px 6px 8px;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  background: #fff;
+  color: #3730a3;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.cursos-cambiar-periodo:hover:not(:disabled) {
+  background: #eef2ff;
+  border-color: #818cf8;
+}
+
+.cursos-cambiar-periodo:disabled {
+  cursor: not-allowed;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+}
+
+.cursos-cambiar-texto {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  font-weight: 700;
+  font-size: 0.88rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.cursos-cambiar-texto small {
+  font-weight: 500;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.tarjetas-periodo {
+  position: relative;
+  width: 102px;  /* dos tarjetas de 50px casi sin superponerse: se leen ambos períodos */
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.tarjeta-periodo {
+  position: absolute;
+  width: 50px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.05;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+}
+
+.tarjeta-periodo strong {
+  font-size: 0.74rem;
+}
+
+.tarjeta-periodo small {
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.85;
+}
+
+/* Adelante (abajo a la izquierda): el período que se ve */
+.tarjeta-periodo.frente {
+  left: 0;
+  bottom: 0;
+  z-index: 2;
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: #fff;
+}
+
+/* Atrás (arriba a la derecha): el otro período */
+.tarjeta-periodo.atras {
+  right: 0;
+  top: 0;
+  z-index: 1;
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.cursos-cambiar-periodo:disabled .tarjeta-periodo.frente {
+  background: #cbd5e1;
+}
+
+/* Intercambio: la tarjeta que estaba adelante sale hacia la derecha y queda atrás;
+   la de atrás sale hacia la izquierda y queda adelante */
+.tarjeta-periodo.va-atras {
+  animation: tarjeta-va-atras 0.5s ease both;
+}
+
+.tarjeta-periodo.viene-al-frente {
+  animation: tarjeta-viene-al-frente 0.5s ease both;
+}
+
+@keyframes tarjeta-va-atras {
+  0%   { transform: translate(-52px, 8px); z-index: 2; }
+  45%  { transform: translate(-24px, 16px) rotate(6deg) scale(0.92); z-index: 2; }
+  55%  { z-index: 1; }
+  100% { transform: translate(0, 0); z-index: 1; }
+}
+
+@keyframes tarjeta-viene-al-frente {
+  0%   { transform: translate(52px, -8px); z-index: 1; }
+  45%  { transform: translate(24px, -14px) rotate(-6deg) scale(1.06); z-index: 1; }
+  55%  { z-index: 2; }
+  100% { transform: translate(0, 0); z-index: 2; }
+}
+
+/* El listado entra desde el lado hacia el que se cambió */
+.cursos-vista-periodo.entrando {
+  animation: cursos-entra 0.35s ease both;
+}
+
+.cursos-vista-periodo.entrando.desde-izquierda {
+  animation-name: cursos-entra-izquierda;
+}
+
+@keyframes cursos-entra {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes cursos-entra-izquierda {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta-periodo.va-atras,
+  .tarjeta-periodo.viene-al-frente,
+  .cursos-vista-periodo.entrando {
+    animation: none;
+  }
+}
+
+/* Pantallas angostas: los tramos ocupan todo el ancho en partes iguales y
+   "Cambiar período" pasa abajo, al final */
+@media (max-width: 640px) {
+  .cursos-tramos {
+    display: flex;
+    width: 100%;
+  }
+
+  .cursos-tramo-btn {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 7px 6px;
+    font-size: 0.8rem;
+    min-width: 0;
+  }
+
+  .cursos-barra-espacio {
+    display: none;
+  }
+
+  .cursos-cambiar-periodo {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Celulares angostos: el número va bajo el nombre para que los cuatro quepan lado a lado */
+@media (max-width: 420px) {
+  .cursos-tramo-btn {
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 2px;
+    font-size: 0.78rem;
+  }
+
+  .cursos-tramo-cuenta {
+    font-size: 0.66rem;
+    line-height: 15px;
+  }
+}

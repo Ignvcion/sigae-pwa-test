@@ -736,6 +736,8 @@ select {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 30px;
 }
 
@@ -785,6 +787,7 @@ select {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .vista-toggle {
@@ -835,8 +838,9 @@ select {
 /* === Vista Tarjetas === */
 .cursos-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 16px;
+  /* Fluido: tantas columnas como quepan; en un celular, una de ancho completo */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: clamp(10px, 2vw, 16px);
 }
 
 .curso-card {
@@ -911,6 +915,7 @@ select {
   font-size: 0.85rem;
   color: #334155;
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .curso-asig-count {
@@ -972,7 +977,8 @@ select {
 /* === Vista Lista === */
 .cursos-lista-container {
   border-radius: 12px;
-  overflow: hidden;
+  /* La tabla se desplaza dentro de su contenedor en pantallas angostas */
+  overflow-x: auto;
   box-shadow: 0 2px 8px rgba(0,0,0,0.07);
 }
 
