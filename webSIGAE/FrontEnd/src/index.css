@@ -2826,3 +2826,22 @@ td.col-correo-td {
     font-size: 0.80rem !important;
   }
 }
+
+
+/* ── PREVENIR DESBORDES Y ZOOM NO DESEADO EN MÓVIL ────────────────────────── */
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+.usuarios-container {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .usuarios-container {
+    padding: 14px 10px !important;
+  }
+}

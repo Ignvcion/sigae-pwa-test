@@ -287,6 +287,7 @@ function Estudiantes() {
           {estudiantesFiltrados.length === 0 ? (
             <div className="usuarios-empty">No se encontraron estudiantes</div>
           ) : (
+            <div className="tabla-responsive-container">
             <table className="tabla-usuarios">
               <thead>
                 <tr>
@@ -338,6 +339,7 @@ function Estudiantes() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </>
       )}

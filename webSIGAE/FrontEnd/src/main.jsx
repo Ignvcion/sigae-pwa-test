@@ -117,9 +117,41 @@ const SEED_USUARIOS = [
     Usuario_Telefono: "+56 9 7788 9900",
     Usuario_Estado_Cuenta: 0, // Inactivo para pruebas
   },
+  {
+    Usuario_Id: 8,
+    Usuario_Nombre_Completo: "Gonzalo Andres Ramos Herrera",
+    Usuario_RUT: "15888999-2",
+    Es_Administrador: 0,
+    Es_Docente: 1,
+    Es_Apoderado: 0,
+    Docente_Correo_Institucional: "g.ramos@jacquescousteau.edu",
+    Usuario_Correo: "g.ramos@jacquescousteau.edu",
+    Docente_Especialidad: "Historia y Geografía",
+    Usuario_Telefono: "+56 9 7788 9900",
+    Usuario_Estado_Cuenta: 0, // Inactivo para pruebas
+  },
 ];
 
 let STORE_USUARIOS = loadStore("SIGAE_USUARIOS", SEED_USUARIOS);
+
+
+// Asegurar que el docente inactivo esté presente en STORE_USUARIOS
+if (!STORE_USUARIOS.some(u => u.Usuario_Id === 8)) {
+  STORE_USUARIOS.push({
+    Usuario_Id: 8,
+    Usuario_Nombre_Completo: "Gonzalo Andres Ramos Herrera",
+    Usuario_RUT: "15888999-2",
+    Es_Administrador: 0,
+    Es_Docente: 1,
+    Es_Apoderado: 0,
+    Docente_Correo_Institucional: "g.ramos@jacquescousteau.edu",
+    Usuario_Correo: "g.ramos@jacquescousteau.edu",
+    Docente_Especialidad: "Historia y Geografía",
+    Usuario_Telefono: "+56 9 7788 9900",
+    Usuario_Estado_Cuenta: 0,
+  });
+  saveStore("SIGAE_USUARIOS", STORE_USUARIOS);
+}
 
 // 2. Eventos Institucionales
 const SEED_EVENTOS = [
@@ -1188,6 +1220,26 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   }
 
   if (m === "PUT" || m === "PATCH") {
+    // Editar usuario o administrador
+    if (p.includes("/usuarios") && reqId) {
+      STORE_USUARIOS = STORE_USUARIOS.map(u => {
+        if (u.Usuario_Id === reqId) {
+          return {
+            ...u,
+            ...b,
+            Usuario_Telefono: b?.Usuario_Telefono ?? b?.telefono ?? u.Usuario_Telefono,
+            Usuario_Correo: b?.Administrador_Correo_Institucional ?? b?.correo ?? u.Usuario_Correo,
+            Administrador_Correo_Institucional: b?.Administrador_Correo_Institucional ?? b?.correo ?? u.Administrador_Correo_Institucional,
+            Docente_Correo_Institucional: b?.Docente_Correo_Institucional ?? b?.correo ?? u.Docente_Correo_Institucional,
+            Usuario_Estado_Cuenta: b?.Usuario_Estado_Cuenta !== undefined ? Number(b.Usuario_Estado_Cuenta) : (b?.estado !== undefined ? (b.estado ? 1 : 0) : u.Usuario_Estado_Cuenta),
+          };
+        }
+        return u;
+      });
+      saveStore("SIGAE_USUARIOS", STORE_USUARIOS);
+      return { ok: true, status: 200, mensaje: "Administrador actualizado correctamente" };
+    }
+
     // Reasignar apoderado de estudiante (/api/estudiantes/:id/apoderado)
     if (p.includes("/estudiantes") && p.includes("/apoderado") && reqId) {
       const apoId = Number(b?.apoderadoId);
@@ -1433,9 +1485,21 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     return STORE_USUARIOS.filter(u => u.Es_Administrador);
   }
 
-  // Docentes
+  // Docentes (soporta filtros por especialidad y estado activo/inactivo)
   if (p.includes("/docentes")) {
-    return STORE_USUARIOS.filter(u => u.Es_Docente).map(d => ({
+    let list = STORE_USUARIOS.filter(u => u.Es_Docente);
+    try {
+      const urlObj = new URL(urlStr, "http://localhost");
+      const esp = (urlObj.searchParams.get("especialidad") || "").trim().toLowerCase();
+      const est = urlObj.searchParams.get("estado");
+      if (esp) {
+        list = list.filter(d => (d.Docente_Especialidad || "").toLowerCase().includes(esp));
+      }
+      if (est !== null && est !== "" && est !== undefined) {
+        list = list.filter(d => String(d.Usuario_Estado_Cuenta) === String(est));
+      }
+    } catch {}
+    return list.map(d => ({
       ...d,
       Docente_Correo_Institucional: d.Docente_Correo_Institucional || d.Usuario_Correo,
       Usuario_Telefono: d.Usuario_Telefono,

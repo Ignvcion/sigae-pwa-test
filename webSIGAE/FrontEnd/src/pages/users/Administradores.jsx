@@ -168,11 +168,9 @@ function Administradores() {
                   )}
                 </td>
                 <td>
-                  {a.Administrador_Tipo !== "Super Admin" && (
-                    <button className="btn-roles" onClick={() => abrirEdicion(a)}>
-                      Editar
-                    </button>
-                  )}
+                  <button className="btn-roles" onClick={() => abrirEdicion(a)}>
+                    Editar
+                  </button>
                 </td>
               </tr>
             ))}
