@@ -1,6 +1,6 @@
 const { body, validationResult } = require('express-validator');
 
-const DOMINIO_INSTITUCIONAL = '@jacquescousteau.edu';
+const { DOMINIOS_INSTITUCIONALES, TEXTO_DOMINIOS_INSTITUCIONALES } = require('../config/institucion');
 
 function validarRut(rutCompleto) {
   if (!/^\d{7,8}-[\dkK]$/.test(rutCompleto)) return false;
@@ -16,8 +16,12 @@ function validarRut(rutCompleto) {
   return dv === dvIngresado.toLowerCase();
 }
 
+// Correo con formato usuario@dominio y de alguno de los dominios del colegio
+// (config/institucion.js). La comparación incluye la @: "x@otro.colegiojc.cl" no pasa.
 function validarCorreoInstitucional(correo) {
-  return correo.toLowerCase().endsWith(DOMINIO_INSTITUCIONAL);
+  const normalizado = String(correo ?? '').trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizado)
+    && DOMINIOS_INSTITUCIONALES.some((dominio) => normalizado.endsWith(dominio));
 }
 
 // Formato chileno: 9 dígitos, opcionalmente con prefijo internacional +56 (o 56).
@@ -183,7 +187,7 @@ const validateCrearUsuario = [
     .optional({ nullable: true, checkFalsy: true })
     .custom((value, { req }) => {
       if (req.body.Es_Docente && value && !validarCorreoInstitucional(value)) {
-        throw new Error(`El correo institucional del docente debe pertenecer al dominio ${DOMINIO_INSTITUCIONAL}`);
+        throw new Error(`El correo institucional del docente debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}`);
       }
       return true;
     }),
@@ -191,7 +195,7 @@ const validateCrearUsuario = [
     .optional({ nullable: true, checkFalsy: true })
     .custom((value, { req }) => {
       if (req.body.Es_Administrador && value && !validarCorreoInstitucional(value)) {
-        throw new Error(`El correo institucional del administrador debe pertenecer al dominio ${DOMINIO_INSTITUCIONAL}`);
+        throw new Error(`El correo institucional del administrador debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}`);
       }
       return true;
     }),
@@ -210,6 +214,7 @@ module.exports = {
   validateCrearUsuario,
   validarRut,
   validarCorreoInstitucional,
+  TEXTO_DOMINIOS_INSTITUCIONALES,
   validarTelefonoChileno,
   normalizarTelefono,
   validarNombreCompleto,

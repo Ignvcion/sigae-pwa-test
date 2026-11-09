@@ -2,13 +2,13 @@ import {
   BrowserRouter,
   Routes,
   Route,
+  Navigate,
 } from "react-router-dom";
 
 /* AUTH */
 
 import Login from "../pages/auth/Login";
 import ForgotPassword from "../pages/auth/ForgotPassword";
-import ResetPassword from "../pages/auth/ResetPassword";
 import SessionExpired from "../pages/auth/SessionExpired";
 import SelectRole from "../pages/auth/SelectRole";
 import GestionRoles from "../pages/users/GestionRoles";
@@ -82,7 +82,8 @@ function AppRouter() {
         <Route path="/"                 element={<Login />} />
         <Route path="/seleccionar-rol" element={<SelectRole />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password"  element={<ResetPassword />} />
+        {/* CU14 ya no usa enlaces: los enlaces antiguos llevan al flujo con código */}
+        <Route path="/reset-password"  element={<Navigate to="/forgot-password" replace />} />
         <Route path="/session-expired" element={<SessionExpired />} />
 
         {/* RUTAS PRIVADAS — requieren sesion */}

@@ -4,7 +4,7 @@ import EtiquetasInput, { separarEtiquetas } from "../../components/EtiquetasInpu
 import DisponibilidadSemanal, { errorTramos } from "../../components/DisponibilidadSemanal";
 import "./FormEditarUsuario.css";
 import {
-  validarNombreCompleto, validarCorreoInstitucional, validarCorreo, DOMINIO_INSTITUCIONAL,
+  validarNombreCompleto, validarCorreoInstitucional, validarCorreo, DOMINIO_INSTITUCIONAL, TEXTO_DOMINIOS_INSTITUCIONALES,
   validarTelefonoChileno, validarDireccion, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
 } from "../../utils/validaciones";
 
@@ -52,7 +52,7 @@ function validarCampo(name, value, form) {
   switch (name) {
     case "Administrador_Correo_Institucional":
     case "Docente_Correo_Institucional":
-      return !validarCorreoInstitucional(value) ? `El correo debe pertenecer al dominio ${DOMINIO_INSTITUCIONAL}` : "";
+      return !validarCorreoInstitucional(value) ? `El correo debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}` : "";
     case "Apoderado_Correo_Natural":
       return !validarCorreo(value) ? "Ingrese un correo electrónico válido" : "";
     default:

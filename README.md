@@ -257,7 +257,7 @@ cd webSIGAE/BackEnd && PUPPETEER_SKIP_DOWNLOAD=true npm ci --omit=dev
   `GRANT SELECT, INSERT, UPDATE, DELETE ON sigae.* TO 'sigae_app'@'%';` (restringe el host a la subred de la EC2 si puedes).
 - Después del esquema, carga **una vez** los niveles educativos con su orden (sin ellos no funciona la promoción): `mariadb -h <endpoint> -u <admin> -p < webSIGAE/Database/catalogos_base.sql`. Es idempotente (`INSERT IGNORE`).
 - El resto parte vacío: parámetros institucionales y bloques, asignaturas, planes, cursos y horarios se cargan desde la aplicación. Al guardar los parámetros institucionales queda fijado el período vigente (el año actual).
-- El primer administrador real (y los super administradores adicionales) se crean con `node scripts/crearSuperAdmin.js --rut 12345678-9 --nombre "Ana Pérez" --telefono 912345678 --correo an.perez@jacquescousteau.edu`, desde `webSIGAE/BackEnd` y con el `.env` de producción. La contraseña se pide por consola (o se toma de `SUPERADMIN_PASSWORD`) y se guarda con bcrypt. **No** se usa `hashPasswords.js`.
+- El primer administrador real (y los super administradores adicionales) se crean con `node scripts/crearSuperAdmin.js --rut 12345678-9 --nombre "Ana Pérez" --telefono 912345678 --correo an.perez@colegiojc.cl` (dominio `@colegiojc.cl` o `@colegiojacquescousteau.cl`), desde `webSIGAE/BackEnd` y con el `.env` de producción. La contraseña se pide por consola (o se toma de `SUPERADMIN_PASSWORD`) y se guarda con bcrypt. **No** se usa `hashPasswords.js`. En su primer ingreso confirma el correo con un código.
 
 ### 3. `.env` de producción
 
@@ -268,10 +268,10 @@ En `webSIGAE/BackEnd/.env`, con `chmod 600` y como dueño el usuario que corre p
 | `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Endpoint de la RDS, `sigae_app` y su contraseña, `sigae` |
 | `DB_SSL` | `true` (TLS verificado con la CA de Amazon RDS) |
 | `JWT_SECRET` | 32+ caracteres aleatorios: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
-| `FRONTEND_URL` | `https://tu-dominio` (enlaces de recuperación y CORS) |
+| `FRONTEND_URL` | `https://tu-dominio` (CORS) |
 | `CORS_ORIGINS` | Opcional; por defecto, `FRONTEND_URL` |
 | `UPLOADS_DIR` | `/var/sigae/uploads` (créala con permisos para el usuario de pm2) |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | Correo para recuperar contraseñas. AWS bloquea el puerto 25 en EC2: usa 587 o 465 |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | Bot de códigos de verificación: la cuenta `noreply@colegiojc.cl` (`EMAIL_FROM="SIGAE <noreply@colegiojc.cl>"`). Con Google Workspace: `smtp.gmail.com`, puerto 465, `SMTP_SECURE=true` y una **contraseña de aplicación** de esa cuenta. AWS bloquea el puerto 25 en EC2. Ver `docs/correos-institucionales-y-codigos.txt` |
 
 `NODE_ENV=production` y `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` los fija `ecosystem.config.js`. Si falta algo, el backend no arranca y `pm2 logs sigae-api` dice qué variable falta (nunca muestra valores). En producción los logs tapan RUT, correos y tokens.
 
@@ -298,7 +298,7 @@ El backend escucha solo en `127.0.0.1:3000`; únicamente Nginx llega a él.
 
 - La RDS: snapshots automáticos (y uno manual antes de cualquier cambio de esquema).
 - **`/var/sigae/uploads` no la cubren los snapshots de la RDS**: respáldala aparte.
-- Al cambiar de período (Gestión Académica › Cierre de Período), el super administrador descarga un Excel con todo lo que se va a eliminar (cursos de dos períodos atrás, sus egresados y retirados con su historial, y apoderados sin estudiantes) y lo sube a la cuenta de Google Drive de respaldos. Tiene datos personales de menores: no se guarda en equipos personales.
+- Al cambiar de período (Gestión Académica › Cierre de Período), el super administrador descarga un Excel con todo lo que se va a eliminar (cursos de dos períodos atrás, sus egresados y retirados con su historial, y apoderados sin estudiantes) y lo sube al Google Drive de la cuenta de respaldos **`respaldosigae@colegiojc.cl`**. Tiene datos personales de menores: no se guarda en equipos personales.
 
 ### Actualizar el backend
 

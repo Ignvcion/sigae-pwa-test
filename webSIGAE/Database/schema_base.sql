@@ -183,6 +183,39 @@ CREATE TABLE `clase_electivo` (
 
 
 --
+-- Table structure for table `codigo_verificacion`
+-- Códigos de verificación de 6 dígitos que envía noreply@colegiojc.cl (utils/codigosVerificacion.js):
+-- Recuperacion (CU14), Cambio de correo (CU19) y Activacion (primer ingreso). Se guarda el hash del
+-- código con su sal, nunca el código; Codigo_Verificacion_Desafio es el hash del desafío de activación.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `codigo_verificacion` (
+  `Codigo_Verificacion_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Usuario_Id` int unsigned NOT NULL,
+  `Codigo_Verificacion_Proposito` varchar(20) NOT NULL,
+  `Codigo_Verificacion_Correo` varchar(100) NOT NULL,
+  `Codigo_Verificacion_Hash` char(64) NOT NULL,
+  `Codigo_Verificacion_Sal` char(32) NOT NULL,
+  `Codigo_Verificacion_Desafio` char(64) DEFAULT NULL,
+  `Codigo_Verificacion_Intentos` tinyint unsigned NOT NULL DEFAULT 0,
+  `Codigo_Verificacion_Estado` varchar(20) NOT NULL,
+  `Codigo_Verificacion_Fecha_Creacion` datetime NOT NULL,
+  `Codigo_Verificacion_Fecha_Expiracion` datetime NOT NULL,
+  PRIMARY KEY (`Codigo_Verificacion_Id`),
+  UNIQUE KEY `Codigo_Verificacion_Desafio_UNIQUE` (`Codigo_Verificacion_Desafio`),
+  KEY `fk_Codigo_Verificacion_Usuario_idx` (`Usuario_Id`,`Codigo_Verificacion_Proposito`),
+  CONSTRAINT `fk_Codigo_Verificacion_Usuario` FOREIGN KEY (`Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `chk_Codigo_Verificacion_Proposito` CHECK (`Codigo_Verificacion_Proposito` IN ('Recuperacion','Cambio de correo','Activacion')),
+  CONSTRAINT `chk_Codigo_Verificacion_Estado` CHECK (`Codigo_Verificacion_Estado` IN ('Pendiente','Utilizado','Expirado','Bloqueado'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+--
+
+--
 -- Table structure for table `conversacion`
 -- Incremento 4, RF54 (CU85, CU86): usuario.Docente_Recepcion_Mensajes es la recepción general
 -- del docente; Conversacion_Habilitada_Hasta abre las respuestas del apoderado en esta conversación
@@ -811,6 +844,8 @@ CREATE TABLE `tieneasig` (
 -- Table structure for table `usuario`
 -- Incremento 4, RF61: Apoderado_Sin_Asociaciones_Desde marca el período en que un apoderado quedó
 -- sin estudiantes (inactivo); se elimina en el siguiente cambio de período si sigue así
+-- Usuario_Correo_Verificado: 0 hasta confirmar el correo principal con un código (primer ingreso);
+-- vuelve a 0 si la administración cambia un correo de la cuenta
 --
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -838,6 +873,7 @@ CREATE TABLE `usuario` (
   `Apoderado_Correo_Natural` varchar(100) DEFAULT NULL,
   `Docente_Recepcion_Mensajes` tinyint(1) NOT NULL DEFAULT 1,
   `Apoderado_Sin_Asociaciones_Desde` varchar(10) DEFAULT NULL,
+  `Usuario_Correo_Verificado` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`Usuario_Id`),
   UNIQUE KEY `Usuario_RUT_UNIQUE` (`Usuario_RUT`),
   UNIQUE KEY `Apoderado_Correo_Natural_UNIQUE` (`Apoderado_Correo_Natural`),

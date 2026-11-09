@@ -24,7 +24,7 @@ describe('Pruebas Unitarias - CU2 y CU3: Visualización y Edición de Administra
           Usuario_Id: 1,
           Usuario_Nombre_Completo: 'Ana Torres',
           Usuario_Telefono: '912345678',
-          Administrador_Correo_Institucional: 'ana.torres@jacquescousteau.edu',
+          Administrador_Correo_Institucional: 'ana.torres@colegiojc.cl',
           Usuario_Estado_Cuenta: 1,
           Administrador_Tipo: 'Administrador Normal',
         },
@@ -63,7 +63,7 @@ describe('Pruebas Unitarias - CU2 y CU3: Visualización y Edición de Administra
     test('Debe actualizar correo, teléfono y estado exitosamente', async () => {
       req.params.id = 1;
       req.body = {
-        Administrador_Correo_Institucional: 'nuevo.correo@jacquescousteau.edu',
+        Administrador_Correo_Institucional: 'nuevo.correo@colegiojc.cl',
         Usuario_Telefono: '912345678',
         Usuario_Estado_Cuenta: 1,
       };
@@ -74,7 +74,7 @@ describe('Pruebas Unitarias - CU2 y CU3: Visualización y Edición de Administra
         Usuario_Id: 1,
         Usuario_Nombre_Completo: 'Ana Torres',
         Usuario_Telefono: '912345678',
-        Administrador_Correo_Institucional: 'nuevo.correo@jacquescousteau.edu',
+        Administrador_Correo_Institucional: 'nuevo.correo@colegiojc.cl',
         Usuario_Estado_Cuenta: 1,
         Administrador_Tipo: 'Administrador Normal',
       }]]);
@@ -119,7 +119,24 @@ describe('Pruebas Unitarias - CU2 y CU3: Visualización y Edición de Administra
       await usuarioController.editarAdministrador(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ mensaje: 'Ingresa un correo electrónico insitucional @jacquescousteau' });
+      expect(res.json).toHaveBeenCalledWith({ mensaje: 'Ingresa un correo electrónico institucional @colegiojc.cl o @colegiojacquescousteau.cl' });
+    });
+
+    test('Cambiar el correo deja la cuenta sin verificar si el correo es distinto (se compara antes de reemplazarlo)', async () => {
+      req.params.id = 1;
+      req.body = { Administrador_Correo_Institucional: 'nuevo@colegiojacquescousteau.cl' };
+
+      db.query
+        .mockResolvedValueOnce([[{ Es_Administrador: 1, Administrador_Tipo: 'Administrador Normal' }]])
+        .mockResolvedValueOnce([{ affectedRows: 1 }])
+        .mockResolvedValueOnce([[{ Usuario_Id: 1 }]]);
+
+      await usuarioController.editarAdministrador(req, res);
+
+      const [sql, valores] = db.query.mock.calls[1];
+      expect(sql).toBe('UPDATE usuario SET Usuario_Correo_Verificado = IF(Administrador_Correo_Institucional <=> ?, '
+        + 'Usuario_Correo_Verificado, 0), Administrador_Correo_Institucional = ? WHERE Usuario_Id = ?');
+      expect(valores).toEqual(['nuevo@colegiojacquescousteau.cl', 'nuevo@colegiojacquescousteau.cl', 1]);
     });
 
     test('Excepción 1: Retorna 400 si el teléfono no respeta el estándar chileno de 9 dígitos', async () => {

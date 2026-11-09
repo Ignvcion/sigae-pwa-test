@@ -2781,3 +2781,52 @@ body.bloques-panel-open .main-content {
 
 /* Asignaturas: marca de electiva (CU47) */
 .badge-electiva { margin-left: 8px; background: #ede9fe; color: #5b21b6; border-radius: 999px; padding: 1px 8px; font-size: 0.7rem; font-weight: 700; vertical-align: middle; }
+
+/* ── Códigos de verificación (components/CodigoVerificacion.jsx) ── */
+input.campo-codigo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 24px;
+  letter-spacing: 8px;
+  text-align: center;
+}
+
+.aviso-dev-codigo {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #fef3c7;
+  border: 1px solid #d97706;
+  border-radius: 6px;
+  color: #92400e;
+  font-size: 0.85rem;
+}
+
+.texto-codigo {
+  color: #475569;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.login-form button.btn-enlace,
+button.btn-enlace {
+  background: none;
+  border: none;
+  color: #2563eb;
+  padding: 6px;
+  margin-top: 0;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.login-form button.btn-enlace:hover:not(:disabled),
+button.btn-enlace:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+}
+
+.login-form button.btn-enlace:disabled,
+button.btn-enlace:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 1;
+}

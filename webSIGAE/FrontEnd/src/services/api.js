@@ -72,6 +72,16 @@ export async function editarPerfilPropio({ correo, telefono, direccion }) {
   return handleResponse(res);
 }
 
+// CU19: confirmar el correo nuevo con el código enviado a esa dirección
+export async function confirmarCorreoPropio(codigo) {
+  const res = await fetch(`${BASE_URL}/usuarios/perfil/correo`, {
+    method : 'PUT',
+    headers: authHeaders(),
+    body   : JSON.stringify({ codigo }),
+  });
+  return handleResponse(res);
+}
+
 // ── CU20: Editar fotografía de perfil mediante carga de archivo ──
 
 export async function actualizarFotoPerfil(archivo) {

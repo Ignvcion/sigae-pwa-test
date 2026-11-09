@@ -1,0 +1,156 @@
+SIGAE - Correos institucionales y bot de códigos de verificación
+(9 de noviembre: llegaron los dominios y las cuentas del colegio)
+
+======================================================================
+1. DATOS RECIBIDOS
+======================================================================
+
+- Dominios institucionales: @colegiojc.cl y @colegiojacquescousteau.cl.
+  Ambos son válidos para docentes y administradores (reemplazan al
+  provisorio @jacquescousteau.edu, que ya no se acepta).
+- Cuenta no-reply (envía los códigos): noreply@colegiojc.cl
+- Cuenta de respaldos en Google Drive: respaldosigae@colegiojc.cl
+  (llegó escrita "respaldosigae@colegio.jc"; ".jc" no es un dominio:
+  CONFIRMADO que es @colegiojc.cl).
+
+Un solo lugar por capa:
+  BackEnd/config/institucion.js     (validación en el servidor)
+  FrontEnd/src/config/institucion.js (formularios y textos)
+
+======================================================================
+2. BOT DE CÓDIGOS (BackEnd/utils/codigosVerificacion.js)
+======================================================================
+
+Genera un código de 6 dígitos, lo guarda como hash con sal en la tabla
+codigo_verificacion y lo envía desde noreply@colegiojc.cl (utils/mailer.js,
+correo marcado como automático, sin enlaces). Reglas:
+
+  - Vence a los 10 minutos y sirve una sola vez.
+  - 5 códigos incorrectos lo bloquean: hay que pedir otro.
+  - Pedir otro invalida el anterior; entre dos envíos al mismo usuario
+    deben pasar 60 segundos (el botón "Reenviar código" muestra la espera).
+  - Además, por IP: 10 intentos fallidos cada 15 min (codigoLimiter).
+  - Si el correo no se puede enviar, el código se invalida y se responde 503.
+  - Desarrollo sin SMTP: el código aparece en la consola del backend y en
+    pantalla (recuadro amarillo "Modo desarrollo"). En producción el servidor
+    no arranca sin SMTP.
+
+Se usa en tres flujos:
+
+2.1 CU14, recuperar contraseña (REEMPLAZA AL ENLACE)
+    RUT → elegir correo (si tiene varios) → código + nueva contraseña.
+    POST /api/auth/forgot-password { rut, correoEnmascarado? } envía el código.
+    POST /api/auth/reset-password  { rut, codigo, newPassword }.
+    Al recuperar, el correo queda verificado y se cierran las sesiones.
+    El endpoint validate-reset-token y la página /reset-password se
+    eliminaron; un enlace antiguo lleva a /forgot-password.
+    La tabla solicitud_recuperacion queda sin uso (no se borra: tiene datos
+    en la RDS; se puede eliminar más adelante).
+
+2.2 Primer ingreso: activar la cuenta
+    Columna nueva usuario.Usuario_Correo_Verificado (0 por defecto).
+    Si el RUT y la contraseña son correctos pero el correo no está
+    verificado, el login NO entrega la sesión: envía un código al correo
+    principal (administrador > docente > apoderado) y responde
+    { requiereVerificacion, desafio, correoEnmascarado }. Con el código:
+    POST /api/auth/activacion/verificar { desafio, codigo } → sesión.
+    POST /api/auth/activacion/reenviar  { desafio } → otro código.
+    - El desafío solo se obtiene con la contraseña correcta y sirve 30 min.
+    - Volver a iniciar sesión antes de 60 s no envía otro correo.
+    - Una cuenta sin ningún correo entra directo (no hay qué verificar).
+    - Si la administración cambia un correo de la cuenta (editar usuario,
+      editar administrador, asignar rol), vuelve a 0 y se pide el código en
+      el próximo ingreso. Si el correo queda igual, no cambia.
+
+2.3 CU19, cambiar el propio correo
+    Al guardar el perfil con un correo distinto, el teléfono y la dirección
+    se guardan, pero el correo NO: se envía un código al correo nuevo. Se
+    guarda al confirmarlo (PUT /api/usuarios/perfil/correo { codigo }), y
+    queda verificado. Hasta entonces la cuenta sigue con el correo anterior.
+
+======================================================================
+3. PRODUCCIÓN: ORDEN PARA ACTIVARLO
+======================================================================
+
+IMPORTANTE: con el ALTER, todas las cuentas existentes quedan sin verificar
+y deberán ingresar un código en su próximo ingreso. Si su correo no existe
+(p. ej. quedó con el dominio provisorio @jacquescousteau.edu), no podrán
+entrar. Por eso el orden es:
+
+1) Cuenta no-reply en Google Workspace (si el dominio está ahí):
+   - Activar la verificación en 2 pasos de noreply@colegiojc.cl.
+   - Crear una "contraseña de aplicación" (Cuenta de Google › Seguridad).
+     Si la opción no aparece, el administrador de Workspace debe permitirlo.
+   - Opcional: respuesta automática que avise que la casilla no se lee.
+   Si el dominio usa otro proveedor, usar sus datos SMTP (puerto 465 o 587).
+
+2) .env de producción (chmod 600), reiniciar con pm2:
+     SMTP_HOST=smtp.gmail.com
+     SMTP_PORT=465
+     SMTP_SECURE=true
+     SMTP_USER=noreply@colegiojc.cl
+     SMTP_PASS=<contraseña de aplicación, 16 caracteres>
+     EMAIL_FROM="SIGAE <noreply@colegiojc.cl>"
+   Probar con "¿Olvidó su contraseña?" en una cuenta propia.
+
+3) Revisar que no queden correos institucionales con el dominio provisorio:
+     SELECT Usuario_Id, Usuario_Nombre_Completo,
+            Administrador_Correo_Institucional, Docente_Correo_Institucional
+     FROM usuario
+     WHERE Administrador_Correo_Institucional LIKE '%@jacquescousteau.edu'
+        OR Docente_Correo_Institucional       LIKE '%@jacquescousteau.edu';
+   Corregirlos desde la aplicación (Gestión de usuarios) con la dirección
+   real de cada persona. No se hace un reemplazo automático del dominio: la
+   parte antes de la @ puede no coincidir con la cuenta real.
+
+4) Snapshot de la RDS y luego los ALTER (MariaDB). Verificado: el esquema
+   de main + estos ALTER queda idéntico al schema_base.sql nuevo.
+
+    SET NAMES utf8mb4;
+
+    ALTER TABLE usuario
+      ADD COLUMN Usuario_Correo_Verificado tinyint(1) NOT NULL DEFAULT 0;
+
+    CREATE TABLE codigo_verificacion (
+      Codigo_Verificacion_Id int unsigned NOT NULL AUTO_INCREMENT,
+      Usuario_Id int unsigned NOT NULL,
+      Codigo_Verificacion_Proposito varchar(20) NOT NULL,
+      Codigo_Verificacion_Correo varchar(100) NOT NULL,
+      Codigo_Verificacion_Hash char(64) NOT NULL,
+      Codigo_Verificacion_Sal char(32) NOT NULL,
+      Codigo_Verificacion_Desafio char(64) DEFAULT NULL,
+      Codigo_Verificacion_Intentos tinyint unsigned NOT NULL DEFAULT 0,
+      Codigo_Verificacion_Estado varchar(20) NOT NULL,
+      Codigo_Verificacion_Fecha_Creacion datetime NOT NULL,
+      Codigo_Verificacion_Fecha_Expiracion datetime NOT NULL,
+      PRIMARY KEY (Codigo_Verificacion_Id),
+      UNIQUE KEY Codigo_Verificacion_Desafio_UNIQUE (Codigo_Verificacion_Desafio),
+      KEY fk_Codigo_Verificacion_Usuario_idx (Usuario_Id, Codigo_Verificacion_Proposito),
+      CONSTRAINT fk_Codigo_Verificacion_Usuario FOREIGN KEY (Usuario_Id)
+        REFERENCES usuario (Usuario_Id) ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT chk_Codigo_Verificacion_Proposito
+        CHECK (Codigo_Verificacion_Proposito IN ('Recuperacion','Cambio de correo','Activacion')),
+      CONSTRAINT chk_Codigo_Verificacion_Estado
+        CHECK (Codigo_Verificacion_Estado IN ('Pendiente','Utilizado','Expirado','Bloqueado'))
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+   Si se prefiere no pedir el código a quienes ya usan el sistema (solo a
+   las cuentas nuevas), después del ALTER:
+     UPDATE usuario SET Usuario_Correo_Verificado = 1;
+   DECISIÓN PENDIENTE (PO): la recomendación es NO hacerlo, para comprobar
+   que cada correo existe ahora que cambió el dominio.
+
+5) git pull y desplegar backend y frontend como siempre (README › Deploy).
+   Publicar backend y frontend juntos: el frontend anterior no sabe mostrar
+   la pantalla del código (requiereVerificacion) ni el nuevo CU14.
+
+======================================================================
+4. RESPALDOS
+======================================================================
+
+El Excel del cierre de período (Gestión Académica › Cierre de Período) se
+sube al Google Drive de respaldosigae@colegiojc.cl; la pantalla y el propio
+Excel lo indican. Subirlo sigue siendo manual. Automatizar los respaldos de
+la base hacia ese Drive (p. ej. rclone con una cuenta de servicio desde
+scripts/backup.sh) queda como propuesta: requiere credenciales de Google
+en la EC2 y una decisión sobre qué datos personales salen de AWS.

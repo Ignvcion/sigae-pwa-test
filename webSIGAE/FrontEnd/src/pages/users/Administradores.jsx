@@ -4,7 +4,7 @@ import {
   validarCorreoInstitucional,
   validarTelefonoChileno,
   MENSAJE_TELEFONO,
-  DOMINIO_INSTITUCIONAL,
+  DOMINIO_INSTITUCIONAL, TEXTO_DOMINIOS_INSTITUCIONALES,
 } from "../../utils/validaciones";
 
 function Administradores() {
@@ -68,7 +68,7 @@ function Administradores() {
   const validarFormulario = () => {
     const errores = {};
     if (!validarCorreoInstitucional(form.correo)) {
-      errores.correo = `Ingresa un correo electrónico institucional ${DOMINIO_INSTITUCIONAL}`;
+      errores.correo = `Ingresa un correo electrónico institucional ${TEXTO_DOMINIOS_INSTITUCIONALES}`;
     }
     if (!validarTelefonoChileno(form.telefono)) {
       errores.telefono = MENSAJE_TELEFONO;

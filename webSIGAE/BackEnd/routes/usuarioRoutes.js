@@ -4,6 +4,7 @@ const router = express.Router();
 
 const usuarioController = require('../controllers/usuarioController');
 const uploadFotoPerfil = require('../middleware/uploadFotoPerfil');
+const { codigoLimiter } = require('../middleware/rateLimiter');
 
 const {
   verifyToken,
@@ -23,6 +24,8 @@ router.post('/buscar', verifyToken, verifyAdmin, usuarioController.buscarUsuario
 
 // CU19: editar datos personales del propio perfil — cualquier usuario autenticado, debe estar ANTES de /:id
 router.put('/perfil', verifyToken, usuarioController.editarPerfilPropio);
+// CU19: confirmar el correo nuevo con el código enviado a esa dirección
+router.put('/perfil/correo', verifyToken, codigoLimiter, usuarioController.confirmarCorreoPropio);
 
 // CU20: editar fotografía de perfil mediante carga de archivo
 router.put('/perfil/foto', verifyToken, (req, res, next) => {

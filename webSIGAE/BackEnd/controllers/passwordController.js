@@ -1,21 +1,21 @@
+// CU14: recuperación de contraseña con un código de verificación de 6 dígitos
+// enviado desde noreply@colegiojc.cl (antes era un enlace con token).
+// Flujo: check-recovery-emails (RUT → correos enmascarados) → forgot-password
+// (envía el código al correo elegido) → reset-password (RUT + código + nueva
+// contraseña). Reglas del código en utils/codigosVerificacion.js.
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 const pool = require('../config/db');
 const { validarFortalezaContrasena } = require('../middleware/validation');
-const { esProduccion } = require('../config/env');
-const { correoConfigurado, enviarCorreoRecuperacion } = require('../utils/mailer');
+const {
+  PROPOSITOS,
+  MINUTOS_VALIDEZ,
+  enmascararCorreo,
+  emitirCodigo,
+  verificarCodigo,
+  responderErrorCodigo,
+} = require('../utils/codigosVerificacion');
 
-const MINUTOS_VALIDEZ_ENLACE = 30;
-const MSG_GENERICO = 'Si los datos son correctos, recibirás un enlace de recuperación.';
-
-
-function enmascararCorreo(email) {
-  if (!email) return null;
-  const [local, domain] = email.split('@');
-  const visible = local.slice(0, 2);
-  const oculto = '*'.repeat(Math.max(local.length - 2, 3));
-  return `${visible}${oculto}@${domain}`;
-}
+const MSG_GENERICO = 'Si los datos son correctos, recibirás un código de verificación en tu correo.';
 
 // POST /api/auth/check-recovery-emails
 // Body: { rut }
@@ -46,31 +46,17 @@ const checkRecoveryEmails = async (req, res) => {
     const correos = [];
 
     if (u.Administrador_Correo_Institucional) {
-      correos.push({
-        tipo: 'Administrador (institucional)',
-        enmascarado: enmascararCorreo(u.Administrador_Correo_Institucional),
-        valor: u.Administrador_Correo_Institucional,
-      });
+      correos.push({ tipo: 'Administrador (institucional)', enmascarado: enmascararCorreo(u.Administrador_Correo_Institucional) });
     }
     if (u.Docente_Correo_Institucional) {
-      correos.push({
-        tipo: 'Docente (institucional)',
-        enmascarado: enmascararCorreo(u.Docente_Correo_Institucional),
-        valor: u.Docente_Correo_Institucional,
-      });
+      correos.push({ tipo: 'Docente (institucional)', enmascarado: enmascararCorreo(u.Docente_Correo_Institucional) });
     }
     if (u.Apoderado_Correo_Natural) {
-      correos.push({
-        tipo: 'Apoderado (personal)',
-        enmascarado: enmascararCorreo(u.Apoderado_Correo_Natural),
-        valor: u.Apoderado_Correo_Natural,
-      });
+      correos.push({ tipo: 'Apoderado (personal)', enmascarado: enmascararCorreo(u.Apoderado_Correo_Natural) });
     }
 
-    // Solo devolver el correo enmascarado al frontend, nunca el valor real
-    const correosParaCliente = correos.map(({ tipo, enmascarado }) => ({ tipo, enmascarado }));
-
-    res.json({ correos: correosParaCliente });
+    // Solo se devuelve el correo enmascarado, nunca el valor real
+    res.json({ correos });
   } catch (error) {
     console.error('Error en checkRecoveryEmails:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
@@ -79,6 +65,7 @@ const checkRecoveryEmails = async (req, res) => {
 
 // POST /api/auth/forgot-password
 // Body: { rut, correoEnmascarado }
+// Envía el código de recuperación al correo elegido.
 const forgotPassword = async (req, res) => {
   const { rut, correoEnmascarado } = req.body;
 
@@ -98,7 +85,7 @@ const forgotPassword = async (req, res) => {
 
     // Respuesta genérica para no revelar si el RUT existe
     if (rows.length === 0 || !rows[0].Usuario_Estado_Cuenta) {
-      return res.json({ message: MSG_GENERICO });
+      return res.json({ message: MSG_GENERICO, minutos: MINUTOS_VALIDEZ });
     }
 
     const user = rows[0];
@@ -111,7 +98,7 @@ const forgotPassword = async (req, res) => {
     ].filter(Boolean);
 
     if (correosDisponibles.length === 0) {
-      return res.json({ message: MSG_GENERICO });
+      return res.json({ message: MSG_GENERICO, minutos: MINUTOS_VALIDEZ });
     }
 
     // Determinar el correo destino
@@ -121,90 +108,44 @@ const forgotPassword = async (req, res) => {
     } else {
       // Con múltiples correos, el frontend debe enviar el enmascarado elegido
       if (!correoEnmascarado) {
-        return res.status(400).json({ error: 'Debes seleccionar a qué correo enviar el enlace' });
+        return res.status(400).json({ error: 'Debes seleccionar a qué correo enviar el código' });
       }
-      correoDestino = correosDisponibles.find(
-        (c) => enmascararCorreo(c) === correoEnmascarado
-      );
+      correoDestino = correosDisponibles.find((c) => enmascararCorreo(c) === correoEnmascarado);
       if (!correoDestino) {
         return res.status(400).json({ error: 'Correo seleccionado no válido' });
       }
     }
 
-    // Invalidar tokens anteriores pendientes del mismo usuario
-    await pool.execute(
-      `UPDATE solicitud_recuperacion
-       SET Solicitud_Recuperacion_Estado = 'Expirado'
-       WHERE Usuario_Id = ? AND Solicitud_Recuperacion_Estado = 'En Proceso'`,
-      [user.Usuario_Id]
-    );
-
-    // Generar token seguro — 30 minutos (CU 14)
-    const token = crypto.randomBytes(32).toString('hex');
-    const ahora = new Date();
-    const expiracion = new Date(ahora.getTime() + MINUTOS_VALIDEZ_ENLACE * 60 * 1000);
-
-    await pool.execute(
-      `INSERT INTO solicitud_recuperacion
-       (Solicitud_Recuperacion_Fecha_Expiracion, Solicitud_Recuperacion_Token,
-        Solicitud_Recuperacion_Fecha_Creacion, Solicitud_Recuperacion_Estado, Usuario_Id)
-       VALUES (?, ?, ?, 'En Proceso', ?)`,
-      [expiracion, token, ahora, user.Usuario_Id]
-    );
-
-    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
-    const resetLink = `${frontendUrl}/reset-password?token=${token}`;
-
-    // El enlace (que contiene el token) nunca se registra en los logs ni se
-    // devuelve en la respuesta en producción: solo viaja por correo.
-    if (correoConfigurado()) {
-      try {
-        await enviarCorreoRecuperacion({
-          para: correoDestino,
-          nombre: user.Usuario_Nombre_Completo,
-          enlace: resetLink,
-          minutos: MINUTOS_VALIDEZ_ENLACE,
-        });
-      } catch (errorEnvio) {
-        console.error('Error en forgotPassword (envío de correo):', errorEnvio);
-        // El token no llegó a nadie: se invalida para que no quede vigente.
-        await pool.execute(
-          `UPDATE solicitud_recuperacion SET Solicitud_Recuperacion_Estado = 'Expirado'
-           WHERE Solicitud_Recuperacion_Token = ?`,
-          [token]
-        );
-        return res.status(503).json({
-          error: 'No fue posible enviar el correo de recuperación. Intente más tarde o contacte al administrador.',
-        });
-      }
-      return res.json({ message: MSG_GENERICO });
-    }
-
-    if (esProduccion) {
-      // No debería ocurrir: server.js no arranca en producción sin SMTP_*.
-      return res.status(503).json({
-        error: 'La recuperación por correo no está disponible. Contacte al administrador.',
-      });
-    }
-
-    // Solo desarrollo y sin SMTP configurado: el enlace se muestra en la consola
-    // y se devuelve en la respuesta para poder probar el flujo.
-    console.log(`[dev] Enlace de recuperación (SMTP no configurado): ${resetLink}`);
-    return res.json({ message: MSG_GENERICO, devResetLink: resetLink });
+    // El código nunca se registra en los logs ni se devuelve en producción:
+    // solo viaja por correo (en desarrollo sin SMTP se devuelve como devCodigo).
+    const emitido = await emitirCodigo(pool, {
+      usuarioId: user.Usuario_Id,
+      nombre: user.Usuario_Nombre_Completo,
+      correo: correoDestino,
+      proposito: PROPOSITOS.RECUPERACION,
+    });
+    return res.json({
+      message: MSG_GENERICO,
+      minutos: MINUTOS_VALIDEZ,
+      ...(emitido.devCodigo && { devCodigo: emitido.devCodigo }),
+    });
   } catch (error) {
+    if (responderErrorCodigo(res, error)) return;
     console.error('Error en forgotPassword:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
 
 // POST /api/auth/reset-password
+// Body: { rut, codigo, newPassword }
 const resetPassword = async (req, res) => {
-  const { token, newPassword } = req.body;
+  const { rut, codigo, newPassword } = req.body;
 
-  if (!token || !newPassword) {
-    return res.status(400).json({ error: 'Token y nueva contraseña son requeridos' });
+  if (!rut || !codigo || !newPassword) {
+    return res.status(400).json({ error: 'RUT, código y nueva contraseña son requeridos' });
   }
 
+  // La contraseña se valida antes que el código: una contraseña débil no gasta un intento
   const errorFortaleza = validarFortalezaContrasena(newPassword);
   if (errorFortaleza) {
     return res.status(400).json({ error: errorFortaleza });
@@ -212,90 +153,38 @@ const resetPassword = async (req, res) => {
 
   try {
     const [rows] = await pool.execute(
-      `SELECT Solicitud_Recuperacion_Id, Usuario_Id,
-              Solicitud_Recuperacion_Fecha_Expiracion, Solicitud_Recuperacion_Estado
-       FROM solicitud_recuperacion
-       WHERE Solicitud_Recuperacion_Token = ?
-         AND Solicitud_Recuperacion_Estado = 'En Proceso'`,
-      [token]
+      'SELECT Usuario_Id, Usuario_Estado_Cuenta FROM usuario WHERE Usuario_RUT = ?',
+      [rut]
     );
-
-    if (rows.length === 0) {
-      return res.status(400).json({ error: 'El enlace no es válido o ya fue utilizado' });
+    if (rows.length === 0 || !rows[0].Usuario_Estado_Cuenta) {
+      // Mismo mensaje que un código sin emitir: no revela si el RUT existe
+      return res.status(400).json({ error: 'No hay un código vigente. Pide uno nuevo.' });
     }
+    const usuarioId = rows[0].Usuario_Id;
 
-    const solicitud = rows[0];
-
-    if (new Date() > new Date(solicitud.Solicitud_Recuperacion_Fecha_Expiracion)) {
-      await pool.execute(
-        `UPDATE solicitud_recuperacion SET Solicitud_Recuperacion_Estado = 'Expirado'
-         WHERE Solicitud_Recuperacion_Id = ?`,
-        [solicitud.Solicitud_Recuperacion_Id]
-      );
-      return res.status(400).json({ error: 'El enlace ha expirado. Solicita uno nuevo.' });
-    }
+    await verificarCodigo(pool, { usuarioId, proposito: PROPOSITOS.RECUPERACION, codigo });
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
+    // El código llegó a un correo de la cuenta: queda verificado (no se pide
+    // otro código de activación justo después de recuperar la contraseña).
     await pool.execute(
-      `UPDATE usuario SET Usuario_Contraseña = ? WHERE Usuario_Id = ?`,
-      [hashedPassword, solicitud.Usuario_Id]
-    );
-
-    await pool.execute(
-      `UPDATE solicitud_recuperacion SET Solicitud_Recuperacion_Estado = 'Utilizado'
-       WHERE Solicitud_Recuperacion_Id = ?`,
-      [solicitud.Solicitud_Recuperacion_Id]
+      'UPDATE usuario SET `Usuario_Contraseña` = ?, Usuario_Correo_Verificado = 1 WHERE Usuario_Id = ?',
+      [hashedPassword, usuarioId]
     );
 
     // Invalidar todas las sesiones activas del usuario por seguridad
     await pool.execute(
       `UPDATE sesion SET Sesion_Estado = 0, Sesion_Fecha_Expiracion = NOW()
        WHERE Usuario_Id = ? AND Sesion_Estado = 1`,
-      [solicitud.Usuario_Id]
+      [usuarioId]
     );
 
     res.json({ message: 'Contraseña actualizada correctamente. Ya puedes iniciar sesión.' });
   } catch (error) {
+    if (responderErrorCodigo(res, error)) return;
     console.error('Error en resetPassword:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
-  }
-};
-
-// GET /api/auth/validate-reset-token?token=...
-const validateResetToken = async (req, res) => {
-  const { token } = req.query;
-
-  if (!token) {
-    return res.status(400).json({ valid: false, error: 'Token requerido' });
-  }
-
-  try {
-    const [todas] = await pool.execute(
-      `SELECT Solicitud_Recuperacion_Estado, Solicitud_Recuperacion_Fecha_Expiracion
-       FROM solicitud_recuperacion
-       WHERE Solicitud_Recuperacion_Token = ?`,
-      [token]
-    );
-
-    if (todas.length === 0) {
-      return res.json({ valid: false, error: 'El enlace no es válido o ya fue utilizado' });
-    }
-
-    const solicitud = todas[0];
-
-    if (solicitud.Solicitud_Recuperacion_Estado !== 'En Proceso') {
-      return res.json({ valid: false, error: `El enlace ya fue ${solicitud.Solicitud_Recuperacion_Estado === 'Utilizado' ? 'utilizado' : 'expirado'}. Solicita uno nuevo.` });
-    }
-
-    if (new Date() > new Date(solicitud.Solicitud_Recuperacion_Fecha_Expiracion)) {
-      return res.json({ valid: false, error: 'El enlace ha expirado (30 min). Solicita uno nuevo.' });
-    }
-
-    res.json({ valid: true });
-  } catch (error) {
-    console.error('Error en validateResetToken:', error);
-    res.status(500).json({ valid: false, error: 'Error interno del servidor' });
   }
 };
 
@@ -344,4 +233,4 @@ const cambiarContrasena = async (req, res) => {
   }
 };
 
-module.exports = { checkRecoveryEmails, forgotPassword, resetPassword, validateResetToken, cambiarContrasena };
+module.exports = { checkRecoveryEmails, forgotPassword, resetPassword, cambiarContrasena };

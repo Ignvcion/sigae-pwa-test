@@ -1,7 +1,13 @@
 const usuarioController = require('../controllers/usuarioController');
 const db = require('../config/db');
+const codigos = require('../utils/codigosVerificacion');
 
 jest.mock('../config/db');
+// El envío del código de confirmación del correo nuevo se prueba en codigosVerificacion.test.js
+jest.mock('../utils/codigosVerificacion', () => ({
+  ...jest.requireActual('../utils/codigosVerificacion'),
+  emitirCodigo: jest.fn(),
+}));
 
 describe('Pruebas Unitarias - CU19: Editando Datos Personales del Propio Perfil', () => {
   let req;
@@ -10,11 +16,11 @@ describe('Pruebas Unitarias - CU19: Editando Datos Personales del Propio Perfil'
   const docenteActual = {
     Usuario_Id: 5, Usuario_Nombre_Completo: 'Carlos Docente', Usuario_RUT: '55555555-5',
     Usuario_Telefono: '911111111', Es_Administrador: 0, Es_Docente: 1, Es_Apoderado: 0,
-    Docente_Correo_Institucional: 'carlos@jacquescousteau.edu',
+    Docente_Correo_Institucional: 'carlos@colegiojc.cl',
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     req = { user: { id: 5 }, body: {} };
     res = {
       status: jest.fn().mockReturnThis(),
@@ -22,23 +28,74 @@ describe('Pruebas Unitarias - CU19: Editando Datos Personales del Propio Perfil'
     };
   });
 
-  test('Flujo correcto: actualiza correo institucional y teléfono', async () => {
-    req.body = { correo: 'carlos.nuevo@jacquescousteau.edu', telefono: '922222222' };
+  test('Flujo correcto: guarda el teléfono y envía un código al correo nuevo, sin guardarlo aún', async () => {
+    req.body = { correo: 'carlos.nuevo@colegiojc.cl', telefono: '922222222' };
+    codigos.emitirCodigo.mockResolvedValueOnce({ correoEnmascarado: 'ca**********@colegiojc.cl' });
 
     db.query
       .mockResolvedValueOnce([[docenteActual]]) // SELECT actual
       .mockResolvedValueOnce([[]]) // SELECT duplicado -> ninguno
-      .mockResolvedValueOnce([{ affectedRows: 1 }]) // UPDATE
-      .mockResolvedValueOnce([[{ ...docenteActual, Docente_Correo_Institucional: 'carlos.nuevo@jacquescousteau.edu', Usuario_Telefono: '922222222' }]]); // SELECT actualizado
+      .mockResolvedValueOnce([{ affectedRows: 1 }]) // UPDATE teléfono
+      .mockResolvedValueOnce([[{ ...docenteActual, Usuario_Telefono: '922222222' }]]); // SELECT actualizado
 
     await usuarioController.editarPerfilPropio(req, res);
 
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        mensaje: 'Cambios guardados correctamente',
-        usuario: expect.objectContaining({ Docente_Correo_Institucional: 'carlos.nuevo@jacquescousteau.edu' }),
-      })
+    // El UPDATE no toca el correo: se guarda al confirmar el código (confirmarCorreoPropio)
+    const [sqlUpdate, valores] = db.query.mock.calls[2];
+    expect(sqlUpdate).not.toContain('Docente_Correo_Institucional');
+    expect(valores).toEqual(['922222222', 5]);
+    expect(codigos.emitirCodigo).toHaveBeenCalledWith(db, expect.objectContaining({
+      usuarioId: 5, correo: 'carlos.nuevo@colegiojc.cl', proposito: 'Cambio de correo',
+    }));
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      mensaje: 'Cambios guardados. Para cambiar tu correo, ingresa el código que enviamos a ca**********@colegiojc.cl.',
+      verificacionCorreo: expect.objectContaining({ pendiente: true }),
+      usuario: expect.objectContaining({ Docente_Correo_Institucional: 'carlos@colegiojc.cl' }),
+    }));
+  });
+
+  test('El mismo correo (con otras mayúsculas) no pide código', async () => {
+    req.body = { correo: 'Carlos@ColegioJC.cl', telefono: '922222222' };
+    db.query
+      .mockResolvedValueOnce([[docenteActual]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce([[docenteActual]]);
+
+    await usuarioController.editarPerfilPropio(req, res);
+
+    expect(codigos.emitirCodigo).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ mensaje: 'Cambios guardados correctamente' }));
+  });
+
+  test('Acepta el segundo dominio institucional (@colegiojacquescousteau.cl)', async () => {
+    req.body = { correo: 'carlos@colegiojacquescousteau.cl' };
+    codigos.emitirCodigo.mockResolvedValueOnce({ correoEnmascarado: 'ca***@colegiojacquescousteau.cl' });
+    db.query
+      .mockResolvedValueOnce([[docenteActual]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[docenteActual]]);
+
+    await usuarioController.editarPerfilPropio(req, res);
+
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      mensaje: 'Para cambiar tu correo, ingresa el código que enviamos a ca***@colegiojacquescousteau.cl.',
+    }));
+  });
+
+  test('Solo correo nuevo y espera entre envíos: responde 429 con el mensaje del código', async () => {
+    req.body = { correo: 'carlos.nuevo@colegiojc.cl' };
+    codigos.emitirCodigo.mockRejectedValueOnce(
+      new codigos.ErrorCodigo(429, 'Espera 40 segundos antes de pedir otro código.', { segundos: 40 })
     );
+    db.query
+      .mockResolvedValueOnce([[docenteActual]])
+      .mockResolvedValueOnce([[]]);
+
+    await usuarioController.editarPerfilPropio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(429);
+    expect(res.json).toHaveBeenCalledWith({ mensaje: 'Espera 40 segundos antes de pedir otro código.', segundos: 40 });
   });
 
   test('Un Apoderado puede actualizar su dirección estructurada', async () => {
@@ -165,7 +222,7 @@ describe('Pruebas Unitarias - CU19: Editando Datos Personales del Propio Perfil'
   });
 
   test('Excepción "Correo ya registrado": otro usuario ya usa ese correo', async () => {
-    req.body = { correo: 'ocupado@jacquescousteau.edu' };
+    req.body = { correo: 'ocupado@colegiojc.cl' };
 
     db.query
       .mockResolvedValueOnce([[docenteActual]])

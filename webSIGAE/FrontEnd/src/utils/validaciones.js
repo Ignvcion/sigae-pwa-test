@@ -1,4 +1,8 @@
-const DOMINIO_INSTITUCIONAL = "@jacquescousteau.edu";
+import {
+  DOMINIOS_INSTITUCIONALES,
+  DOMINIO_INSTITUCIONAL,
+  TEXTO_DOMINIOS_INSTITUCIONALES,
+} from "../config/institucion";
 
 // Elimina espacios y puntos del RUT (acepta "12.345.678-9 " → "12345678-9")
 export function normalizarRut(rut) {
@@ -39,7 +43,8 @@ export function validarNombreCompleto(nombre) {
 
 export function validarCorreoInstitucional(correo) {
   const normalizado = correo.trim().toLowerCase();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizado) && normalizado.endsWith(DOMINIO_INSTITUCIONAL);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizado)
+    && DOMINIOS_INSTITUCIONALES.some((dominio) => normalizado.endsWith(dominio));
 }
 
 export function validarCorreo(correo) {
@@ -99,4 +104,4 @@ export function formatearDireccion(registro, columnas = COLUMNAS_DIRECCION_USUAR
   return [calleNumero, registro[columnas.depto], registro[columnas.comuna]].filter(Boolean).join(", ");
 }
 
-export { DOMINIO_INSTITUCIONAL };
+export { DOMINIO_INSTITUCIONAL, TEXTO_DOMINIOS_INSTITUCIONALES };

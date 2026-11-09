@@ -6,6 +6,7 @@ const fs = require('fs');
 const { UPLOAD_DIR } = require('../middleware/uploadFotoPerfil');
 const {
   validarCorreoInstitucional,
+  TEXTO_DOMINIOS_INSTITUCIONALES,
   validarTelefonoChileno,
   normalizarTelefono,
   validarNombreCompleto,
@@ -16,6 +17,14 @@ const {
   CAMPOS_DIRECCION,
 } = require('../middleware/validation');
 const { PERIODO_VIGENTE_SQL } = require('../utils/periodos');
+const {
+  PROPOSITOS,
+  MINUTOS_VALIDEZ: MINUTOS_VALIDEZ_CODIGO,
+  ErrorCodigo,
+  emitirCodigo,
+  verificarCodigo,
+  responderErrorCodigo,
+} = require('../utils/codigosVerificacion');
 const {
   normalizarEspecialidades,
   especialidadesDelCuerpo,
@@ -91,6 +100,30 @@ const getUsuarioById = async (req, res) => {
   }
 };
 
+// El correo vive en una columna distinta según el rol principal de la cuenta
+// (el mismo orden que usa el login para elegir el correo principal).
+function columnaCorreoPrincipal(usuario) {
+  if (usuario.Es_Administrador) return 'Administrador_Correo_Institucional';
+  if (usuario.Es_Docente) return 'Docente_Correo_Institucional';
+  if (usuario.Es_Apoderado) return 'Apoderado_Correo_Natural';
+  return null;
+}
+
+const COLUMNAS_CORREO = ['Administrador_Correo_Institucional', 'Docente_Correo_Institucional', 'Apoderado_Correo_Natural'];
+
+// Si la administración cambia un correo de la cuenta, el usuario lo confirma con
+// un código en su próximo ingreso (Usuario_Correo_Verificado = 0). Devuelve el
+// fragmento de SET que compara con el valor anterior; debe ir PRIMERO en el SET
+// para leer el correo antes de que se reemplace. `cambios`: { columna: valorNuevo }.
+function setReinicioVerificacion(cambios) {
+  const columnas = Object.keys(cambios).filter((c) => COLUMNAS_CORREO.includes(c));
+  if (columnas.length === 0) return null;
+  return {
+    campo: `Usuario_Correo_Verificado = IF(${columnas.map((c) => `${c} <=> ?`).join(' AND ')}, Usuario_Correo_Verificado, 0)`,
+    valores: columnas.map((c) => cambios[c]),
+  };
+}
+
 const CAMPOS_PROTEGIDOS_PERFIL = ['Usuario_Nombre_Completo', 'Usuario_RUT', 'Usuario_Id'];
 const REGEX_CORREO_GENERICO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -130,37 +163,36 @@ const editarPerfilPropio = async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
     const actual = rows[0];
 
-    // El correo vive en una columna distinta según el rol principal de la cuenta
-    let columnaCorreo = null;
-    if (actual.Es_Administrador) columnaCorreo = 'Administrador_Correo_Institucional';
-    else if (actual.Es_Docente) columnaCorreo = 'Docente_Correo_Institucional';
-    else if (actual.Es_Apoderado) columnaCorreo = 'Apoderado_Correo_Natural';
+    const columnaCorreo = columnaCorreoPrincipal(actual);
 
+    // CU19: el correo nuevo no se guarda todavía: se le envía un código desde
+    // noreply@colegiojc.cl y se guarda al confirmarlo (confirmarCorreoPropio).
+    let correoPendiente = null;
     if (correo !== undefined && columnaCorreo) {
+      const correoNuevo = String(correo ?? '').trim();
       // Administrador/Docente usan correo institucional; Apoderado, uno propio
       const correoValido = (actual.Es_Administrador || actual.Es_Docente)
-        ? validarCorreoInstitucional(correo)
-        : REGEX_CORREO_GENERICO.test(correo);
+        ? validarCorreoInstitucional(correoNuevo)
+        : REGEX_CORREO_GENERICO.test(correoNuevo);
       if (!correoValido) {
         return res.status(400).json({ mensaje: 'Datos no cumplen con el formato' });
       }
 
-      // CU19 - Excepción "Correo ya registrado"
-      const [duplicado] = await db.query(
-        `SELECT Usuario_Id FROM usuario WHERE ${columnaCorreo} = ? AND Usuario_Id != ?`,
-        [correo, userId]
-      );
-      if (duplicado.length > 0) {
-        return res.status(400).json({ mensaje: 'El correo ingresado ya se encuentra registrado' });
+      if (correoNuevo.toLowerCase() !== String(actual[columnaCorreo] || '').toLowerCase()) {
+        // CU19 - Excepción "Correo ya registrado"
+        const [duplicado] = await db.query(
+          `SELECT Usuario_Id FROM usuario WHERE ${columnaCorreo} = ? AND Usuario_Id != ?`,
+          [correoNuevo, userId]
+        );
+        if (duplicado.length > 0) {
+          return res.status(400).json({ mensaje: 'El correo ingresado ya se encuentra registrado' });
+        }
+        correoPendiente = correoNuevo;
       }
     }
 
     const campos = [];
     const valores = [];
-    if (correo !== undefined && columnaCorreo) {
-      campos.push(`${columnaCorreo} = ?`);
-      valores.push(correo);
-    }
     if (telefono !== undefined) {
       campos.push('Usuario_Telefono = ?');
       valores.push(normalizarTelefono(telefono));
@@ -173,19 +205,95 @@ const editarPerfilPropio = async (req, res) => {
       }
     }
 
-    if (campos.length === 0) {
+    if (campos.length === 0 && !correoPendiente) {
       return res.status(400).json({ mensaje: 'No hay campos válidos para actualizar' });
     }
 
-    valores.push(userId);
-    await db.query(`UPDATE usuario SET ${campos.join(', ')} WHERE Usuario_Id = ?`, valores);
+    if (campos.length > 0) {
+      valores.push(userId);
+      await db.query(`UPDATE usuario SET ${campos.join(', ')} WHERE Usuario_Id = ?`, valores);
+    }
+
+    let verificacionCorreo = null;
+    if (correoPendiente) {
+      try {
+        const emitido = await emitirCodigo(db, {
+          usuarioId: userId,
+          nombre: actual.Usuario_Nombre_Completo,
+          correo: correoPendiente,
+          proposito: PROPOSITOS.CAMBIO_CORREO,
+        });
+        verificacionCorreo = {
+          pendiente: true,
+          correoEnmascarado: emitido.correoEnmascarado,
+          minutos: MINUTOS_VALIDEZ_CODIGO,
+          ...(emitido.devCodigo && { devCodigo: emitido.devCodigo }),
+        };
+      } catch (error) {
+        if (!(error instanceof ErrorCodigo)) throw error;
+        // Sin otros cambios, el error del código es la respuesta
+        if (campos.length === 0) return responderErrorCodigo(res, error, 'mensaje');
+        verificacionCorreo = { pendiente: false, error: error.message };
+      }
+    }
 
     const [actualizado] = await db.query('SELECT * FROM usuario WHERE Usuario_Id = ?', [userId]);
     const { Usuario_Contraseña, ...usuario } = actualizado[0];
-    return res.json({ mensaje: 'Cambios guardados correctamente', usuario });
+
+    let mensaje = 'Cambios guardados correctamente';
+    if (verificacionCorreo?.pendiente) {
+      mensaje = `${campos.length > 0 ? 'Cambios guardados. ' : ''}Para cambiar tu correo, ingresa el código que enviamos a ${verificacionCorreo.correoEnmascarado}.`;
+    } else if (verificacionCorreo) {
+      mensaje = `Cambios guardados, pero tu correo no cambió: ${verificacionCorreo.error}`;
+    }
+    return res.json({ mensaje, usuario, ...(verificacionCorreo && { verificacionCorreo }) });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ mensaje: 'No fue posible actualizar tu perfil, reintente más tarde' });
+  }
+};
+
+// CU19: confirma el correo nuevo con el código que se le envió.
+// PUT /api/usuarios/perfil/correo   Body: { codigo }
+const confirmarCorreoPropio = async (req, res) => {
+  const userId = req.user.id;
+  const { codigo } = req.body || {};
+  if (!codigo) return res.status(400).json({ mensaje: 'Ingresa el código que enviamos a tu nuevo correo' });
+
+  try {
+    const fila = await verificarCodigo(db, { usuarioId: userId, proposito: PROPOSITOS.CAMBIO_CORREO, codigo });
+
+    const [rows] = await db.query('SELECT * FROM usuario WHERE Usuario_Id = ?', [userId]);
+    if (rows.length === 0) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+    const columnaCorreo = columnaCorreoPrincipal(rows[0]);
+    if (!columnaCorreo) return res.status(400).json({ mensaje: 'Tu cuenta no tiene un correo que cambiar' });
+
+    const correoNuevo = fila.Codigo_Verificacion_Correo;
+    // Pudo registrarse en otra cuenta mientras llegaba el código
+    const [duplicado] = await db.query(
+      `SELECT Usuario_Id FROM usuario WHERE ${columnaCorreo} = ? AND Usuario_Id != ?`,
+      [correoNuevo, userId]
+    );
+    if (duplicado.length > 0) {
+      return res.status(400).json({ mensaje: 'El correo ingresado ya se encuentra registrado' });
+    }
+
+    // El correo principal queda verificado: el código llegó a esa dirección
+    await db.query(
+      `UPDATE usuario SET ${columnaCorreo} = ?, Usuario_Correo_Verificado = 1 WHERE Usuario_Id = ?`,
+      [correoNuevo, userId]
+    );
+
+    const [actualizado] = await db.query('SELECT * FROM usuario WHERE Usuario_Id = ?', [userId]);
+    const { Usuario_Contraseña, ...usuario } = actualizado[0];
+    return res.json({ mensaje: 'Correo actualizado correctamente', usuario });
+  } catch (error) {
+    if (responderErrorCodigo(res, error, 'mensaje')) return;
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ mensaje: 'El correo ingresado ya se encuentra registrado' });
+    }
+    console.error(error);
+    return res.status(500).json({ mensaje: 'No fue posible actualizar tu correo, reintente más tarde' });
   }
 };
 
@@ -251,11 +359,11 @@ const createUsuario = async (req, res) => {
   if (Es_Docente && !Docente_Correo_Institucional)
     return res.status(400).json({ mensaje: 'El correo institucional del docente es obligatorio' });
   if (Es_Docente && !validarCorreoInstitucional(Docente_Correo_Institucional))
-    return res.status(400).json({ mensaje: 'El correo institucional del docente debe pertenecer al dominio @jacquescousteau.edu' });
+    return res.status(400).json({ mensaje: `El correo institucional del docente debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}` });
   if (Es_Administrador && !Administrador_Correo_Institucional)
     return res.status(400).json({ mensaje: 'El correo institucional del administrador es obligatorio' });
   if (Es_Administrador && !validarCorreoInstitucional(Administrador_Correo_Institucional))
-    return res.status(400).json({ mensaje: 'El correo institucional del administrador debe pertenecer al dominio @jacquescousteau.edu' });
+    return res.status(400).json({ mensaje: `El correo institucional del administrador debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}` });
   if (Es_Apoderado && !Apoderado_Correo_Natural)
     return res.status(400).json({ mensaje: 'El correo del apoderado es obligatorio' });
 
@@ -484,10 +592,10 @@ const updateUsuario = async (req, res) => {
 
     // Validar dominio de correos institucionales si se están actualizando
     if (otrosDatos.Docente_Correo_Institucional && !validarCorreoInstitucional(otrosDatos.Docente_Correo_Institucional)) {
-      return res.status(400).json({ mensaje: 'El correo institucional del docente debe pertenecer al dominio @jacquescousteau.edu' });
+      return res.status(400).json({ mensaje: `El correo institucional del docente debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}` });
     }
     if (otrosDatos.Administrador_Correo_Institucional && !validarCorreoInstitucional(otrosDatos.Administrador_Correo_Institucional)) {
-      return res.status(400).json({ mensaje: 'El correo institucional del administrador debe pertenecer al dominio @jacquescousteau.edu' });
+      return res.status(400).json({ mensaje: `El correo institucional del administrador debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}` });
     }
     if (otrosDatos.Apoderado_Correo_Natural && !validarCorreo(otrosDatos.Apoderado_Correo_Natural)) {
       return res.status(400).json({ mensaje: 'El correo del apoderado debe tener el formato usuario@dominio' });
@@ -517,6 +625,8 @@ const updateUsuario = async (req, res) => {
 
     const campos  = Object.keys(otrosDatos).map(c => `${c} = ?`);
     const valores = Object.values(otrosDatos);
+    const reinicio = setReinicioVerificacion(otrosDatos);
+    if (reinicio) { campos.unshift(reinicio.campo); valores.unshift(...reinicio.valores); }
 
     if (hash) { campos.push('Usuario_Contraseña = ?'); valores.push(hash); }
     if (campos.length === 0 && !especialidades && !disponibilidad) return res.status(400).json({ mensaje: 'No hay campos para actualizar' });
@@ -745,7 +855,7 @@ const asignarRol = async (req, res) => {
       if (!correoDocente)
         return res.status(400).json({ mensaje: 'El correo institucional del docente es obligatorio' });
       if (!validarCorreoInstitucional(correoDocente))
-        return res.status(400).json({ mensaje: 'El correo institucional debe pertenecer al dominio @jacquescousteau.edu' });
+        return res.status(400).json({ mensaje: `El correo institucional debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}` });
       if (!especialidadesRol.ok)
         return res.status(400).json({ mensaje: especialidadesRol.mensaje });
       if (!carga)
@@ -762,7 +872,7 @@ const asignarRol = async (req, res) => {
       if (!correoAdmin)
         return res.status(400).json({ mensaje: 'El correo institucional del administrador es obligatorio' });
       if (!validarCorreoInstitucional(correoAdmin))
-        return res.status(400).json({ mensaje: 'El correo institucional debe pertenecer al dominio @jacquescousteau.edu' });
+        return res.status(400).json({ mensaje: `El correo institucional debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}` });
       const [dup] = await db.query(
         'SELECT Usuario_Id FROM usuario WHERE Administrador_Correo_Institucional = ? AND Usuario_Id != ?',
         [correoAdmin, id]
@@ -818,6 +928,13 @@ const asignarRol = async (req, res) => {
         setValores.push(valor);
       }
     }
+
+    const reinicio = setReinicioVerificacion({
+      ...(rol === 'Docente' && { Docente_Correo_Institucional: correoDocente }),
+      ...(rol === 'Administrador' && { Administrador_Correo_Institucional: correoAdmin }),
+      ...(rol === 'Apoderado' && { Apoderado_Correo_Natural: correoApo }),
+    });
+    if (reinicio) { setCampos.unshift(reinicio.campo); setValores.unshift(...reinicio.valores); }
 
     setValores.push(id);
     await enTransaccion(async (conn) => {
@@ -1209,7 +1326,7 @@ const editarAdministrador = async (req, res) => {
 
     // Excepción 1: validar formato antes de tocar la base de datos
     if (Administrador_Correo_Institucional !== undefined && !validarCorreoInstitucional(Administrador_Correo_Institucional)) {
-      return res.status(400).json({ mensaje: 'Ingresa un correo electrónico insitucional @jacquescousteau' });
+      return res.status(400).json({ mensaje: `Ingresa un correo electrónico institucional ${TEXTO_DOMINIOS_INSTITUCIONALES}` });
     }
     if (Usuario_Telefono !== undefined && !validarTelefonoChileno(Usuario_Telefono)) {
       return res.status(400).json({ mensaje: MENSAJE_TELEFONO_INVALIDO });
@@ -1219,8 +1336,9 @@ const editarAdministrador = async (req, res) => {
     const valores = [];
 
     if (Administrador_Correo_Institucional !== undefined) {
-      campos.push('Administrador_Correo_Institucional = ?');
-      valores.push(Administrador_Correo_Institucional);
+      const reinicio = setReinicioVerificacion({ Administrador_Correo_Institucional });
+      campos.push(reinicio.campo, 'Administrador_Correo_Institucional = ?');
+      valores.push(...reinicio.valores, Administrador_Correo_Institucional);
     }
     if (Usuario_Telefono !== undefined) {
       campos.push('Usuario_Telefono = ?');
@@ -1256,6 +1374,7 @@ module.exports = {
   getUsuarios,
   getUsuarioById,
   editarPerfilPropio, // CU19
+  confirmarCorreoPropio, // CU19: confirmación del correo nuevo con código
   actualizarFotografiaPerfil, // CU20
   createUsuario,
   updateUsuario,
