@@ -88,7 +88,7 @@ function RegisterStudent() {
     try {
       await registrarEstudiante(formData);
       alert("Ficha estudiantil registrada correctamente");
-      navigate("/usuarios");
+      navigate("/estudiantes");
     } catch (err) {
       setError(err.message || "Error al registrar el estudiante");
     } finally {

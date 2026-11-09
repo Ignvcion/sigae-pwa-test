@@ -10,9 +10,26 @@ import "./index.css";
 // ── GLOBAL STATEFUL MOCK STORE (RESILIENT OFFLINE & GH-PAGES DEMO) ───────────
 let _nextIdCounter = 1000;
 const nextId = () => ++_nextIdCounter;
+// ── PERSISTENT STORAGE HELPERS (RETAIN MOCK STATE ACROSS REFRESHES) ─────────
+function loadStore(key, fallback) {
+  try {
+    const raw = typeof window !== "undefined" && window.localStorage ? window.localStorage.getItem(key) : null;
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return fallback;
+}
+
+function saveStore(key, data) {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.setItem(key, JSON.stringify(data));
+    }
+  } catch {}
+}
+
 
 // 1. Usuarios e Institución
-let STORE_USUARIOS = [
+const SEED_USUARIOS = [
   {
     Usuario_Id: 1,
     Usuario_Nombre_Completo: "Esperanza Penelope Gonzales Farias",
@@ -102,8 +119,10 @@ let STORE_USUARIOS = [
   },
 ];
 
+let STORE_USUARIOS = loadStore("SIGAE_USUARIOS", SEED_USUARIOS);
+
 // 2. Eventos Institucionales
-let STORE_EVENTOS = [
+const SEED_EVENTOS = [
   {
     Evento_Institucional_Id: 1,
     Evento_Institucional_Nombre: "Jornada Pedagógica Institucional",
@@ -169,8 +188,10 @@ let STORE_EVENTOS = [
   },
 ];
 
+let STORE_EVENTOS = loadStore("SIGAE_EVENTOS", SEED_EVENTOS);
+
 // 3. Bloques Horarios Institucionales
-let STORE_BLOQUES = [
+const SEED_BLOQUES = [
   {
     Bloque_Horario_Id: 1,
     Bloque_Horario_Hora_Inicio: "08:00:00",
@@ -223,8 +244,10 @@ let STORE_BLOQUES = [
   },
 ];
 
+let STORE_BLOQUES = loadStore("SIGAE_BLOQUES", SEED_BLOQUES);
+
 // 4. Catálogo de Asignaturas
-let STORE_ASIGNATURAS = [
+const SEED_ASIGNATURAS = [
   { Asignatura_Id: 1, Asignatura_Nombre: "Lenguaje y Comunicación", Asignatura_Prioridad_Academica: "Alta" },
   { Asignatura_Id: 2, Asignatura_Nombre: "Matemáticas", Asignatura_Prioridad_Academica: "Alta" },
   { Asignatura_Id: 3, Asignatura_Nombre: "Ciencias Naturales", Asignatura_Prioridad_Academica: "Media" },
@@ -235,8 +258,10 @@ let STORE_ASIGNATURAS = [
   { Asignatura_Id: 8, Asignatura_Nombre: "Música", Asignatura_Prioridad_Academica: "Baja" },
 ];
 
+let STORE_ASIGNATURAS = loadStore("SIGAE_ASIGNATURAS", SEED_ASIGNATURAS);
+
 // 5. Citaciones
-let STORE_CITACIONES = [
+const SEED_CITACIONES = [
   {
     Citacion_Id: 1,
     Citacion_Fecha: "2026-11-12",
@@ -290,8 +315,10 @@ let STORE_CITACIONES = [
   },
 ];
 
+let STORE_CITACIONES = loadStore("SIGAE_CITACIONES", SEED_CITACIONES);
+
 // 6. Horarios de Curso y Docentes
-let STORE_HORARIOS = [
+const SEED_HORARIOS = [
   {
     Horario_Asignatura_Id: 1,
     Curso_Id: 1,
@@ -394,6 +421,504 @@ let STORE_HORARIOS = [
   },
 ];
 
+
+let STORE_HORARIOS = loadStore("SIGAE_HORARIOS", SEED_HORARIOS);
+
+// 7. Cursos Institucionales
+const STORE_CURSOS = [
+  { Curso_Id: 1, Curso_Nombre: "1° Básico A", curso: "1° Básico A", Nivel_Educativo_Id: 1, Nivel_Educativo_Nombre: "1° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
+  { Curso_Id: 2, Curso_Nombre: "2° Básico A", curso: "2° Básico A", Nivel_Educativo_Id: 2, Nivel_Educativo_Nombre: "2° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
+  { Curso_Id: 3, Curso_Nombre: "3° Básico A", curso: "3° Básico A", Nivel_Educativo_Id: 3, Nivel_Educativo_Nombre: "3° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
+  { Curso_Id: 4, Curso_Nombre: "4° Básico A", curso: "4° Básico A", Nivel_Educativo_Id: 4, Nivel_Educativo_Nombre: "4° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
+  { Curso_Id: 5, Curso_Nombre: "5° Básico A", curso: "5° Básico A", Nivel_Educativo_Id: 5, Nivel_Educativo_Nombre: "5° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
+  { Curso_Id: 6, Curso_Nombre: "6° Básico A", curso: "6° Básico A", Nivel_Educativo_Id: 6, Nivel_Educativo_Nombre: "6° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
+];
+
+// 8. Estudiantes (24 estudiantes base vinculados a cursos y apoderados)
+const SEED_ESTUDIANTES = [
+  {
+    "Estudiante_Id": 1,
+    "Estudiante_Nombre_Completo": "Lucas Mateo Fernandez Vera",
+    "Estudiante_RUT": "24111222-3",
+    "Curso_Id": 1,
+    "Curso_Nombre": "1° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "100",
+    "Estudiante_Direccion_Depto": "Dept 1",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "100",
+    "depto": "Dept 1",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Pedro Fernandez",
+    "Apoderado_Usuario_Id": 4,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 2,
+    "Estudiante_Nombre_Completo": "Sofia Valentina Gonzalez Morales",
+    "Estudiante_RUT": "25222333-1",
+    "Curso_Id": 2,
+    "Curso_Nombre": "2° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "115",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "115",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Pedro Fernandez",
+    "Apoderado_Usuario_Id": 4,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 3,
+    "Estudiante_Nombre_Completo": "Benjamin Alonso Castro Rojas",
+    "Estudiante_RUT": "24333444-5",
+    "Curso_Id": 3,
+    "Curso_Nombre": "3° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "130",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "130",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Francisca Soto",
+    "Apoderado_Usuario_Id": 7,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 4,
+    "Estudiante_Nombre_Completo": "Martina Isidora Silva Munoz",
+    "Estudiante_RUT": "24444555-7",
+    "Curso_Id": 4,
+    "Curso_Nombre": "4° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "145",
+    "Estudiante_Direccion_Depto": "Dept 4",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "145",
+    "depto": "Dept 4",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Sin asignar",
+    "Apoderado_Usuario_Id": null,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 5,
+    "Estudiante_Nombre_Completo": "Mateo Nicolas Torres Tapia",
+    "Estudiante_RUT": "24555666-9",
+    "Curso_Id": 5,
+    "Curso_Nombre": "5° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "160",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "160",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Francisca Soto",
+    "Apoderado_Usuario_Id": 7,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 6,
+    "Estudiante_Nombre_Completo": "Florencia Paz Morales Araya",
+    "Estudiante_RUT": "25666777-2",
+    "Curso_Id": 6,
+    "Curso_Nombre": "6° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "175",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "175",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Sin asignar",
+    "Apoderado_Usuario_Id": null,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 7,
+    "Estudiante_Nombre_Completo": "Joaquin Andres Herrera Diaz",
+    "Estudiante_RUT": "24777888-4",
+    "Curso_Id": 1,
+    "Curso_Nombre": "1° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "190",
+    "Estudiante_Direccion_Depto": "Dept 7",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "190",
+    "depto": "Dept 7",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Francisca Soto",
+    "Apoderado_Usuario_Id": 7,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 8,
+    "Estudiante_Nombre_Completo": "Isidora Belen Espinoza Perez",
+    "Estudiante_RUT": "25888999-6",
+    "Curso_Id": 2,
+    "Curso_Nombre": "2° Básico A",
+    "Estudiante_Estado_Academico": "Irregular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "205",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "205",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Sin asignar",
+    "Apoderado_Usuario_Id": null,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 9,
+    "Estudiante_Nombre_Completo": "Tomas Ignacio Alvarez Soto",
+    "Estudiante_RUT": "24999000-8",
+    "Curso_Id": 3,
+    "Curso_Nombre": "3° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "220",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "220",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Francisca Soto",
+    "Apoderado_Usuario_Id": 7,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 10,
+    "Estudiante_Nombre_Completo": "Agustina Javiera Sepulveda Contreras",
+    "Estudiante_RUT": "25000111-0",
+    "Curso_Id": 4,
+    "Curso_Nombre": "4° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "235",
+    "Estudiante_Direccion_Depto": "Dept 10",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "235",
+    "depto": "Dept 10",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Sin asignar",
+    "Apoderado_Usuario_Id": null,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 11,
+    "Estudiante_Nombre_Completo": "Vicente Emilio Carrasco Lopez",
+    "Estudiante_RUT": "24123456-7",
+    "Curso_Id": 5,
+    "Curso_Nombre": "5° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "250",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "250",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Francisca Soto",
+    "Apoderado_Usuario_Id": 7,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 12,
+    "Estudiante_Nombre_Completo": "Emilia Sofia Fuentes Valenzuela",
+    "Estudiante_RUT": "25234567-8",
+    "Curso_Id": 6,
+    "Curso_Nombre": "6° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "265",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "265",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Sin asignar",
+    "Apoderado_Usuario_Id": null,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 13,
+    "Estudiante_Nombre_Completo": "Maximiliano David Reyes Parra",
+    "Estudiante_RUT": "24345678-9",
+    "Curso_Id": 1,
+    "Curso_Nombre": "1° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "280",
+    "Estudiante_Direccion_Depto": "Dept 13",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "280",
+    "depto": "Dept 13",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Francisca Soto",
+    "Apoderado_Usuario_Id": 7,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 14,
+    "Estudiante_Nombre_Completo": "Antonella Millaray Bravo Sandoval",
+    "Estudiante_RUT": "25456789-0",
+    "Curso_Id": 2,
+    "Curso_Nombre": "2° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "295",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "295",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Sin asignar",
+    "Apoderado_Usuario_Id": null,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 15,
+    "Estudiante_Nombre_Completo": "Felipe Ignacio Nunez Gutierrez",
+    "Estudiante_RUT": "24567890-1",
+    "Curso_Id": 3,
+    "Curso_Nombre": "3° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "310",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "310",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Francisca Soto",
+    "Apoderado_Usuario_Id": 7,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 16,
+    "Estudiante_Nombre_Completo": "Catalina Andrea Molina Vergara",
+    "Estudiante_RUT": "25678901-2",
+    "Curso_Id": 4,
+    "Curso_Nombre": "4° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "325",
+    "Estudiante_Direccion_Depto": "Dept 16",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "325",
+    "depto": "Dept 16",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Sin asignar",
+    "Apoderado_Usuario_Id": null,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 17,
+    "Estudiante_Nombre_Completo": "Cristobal Alexis Vega Romero",
+    "Estudiante_RUT": "24789012-3",
+    "Curso_Id": 5,
+    "Curso_Nombre": "5° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "340",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "340",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Francisca Soto",
+    "Apoderado_Usuario_Id": 7,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 18,
+    "Estudiante_Nombre_Completo": "Constanza Leonor Campos Pinto",
+    "Estudiante_RUT": "25890123-4",
+    "Curso_Id": 6,
+    "Curso_Nombre": "6° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "355",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "355",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Sin asignar",
+    "Apoderado_Usuario_Id": null,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 19,
+    "Estudiante_Nombre_Completo": "Alonso Gabriel Castillo Figueroa",
+    "Estudiante_RUT": "24901234-5",
+    "Curso_Id": 1,
+    "Curso_Nombre": "1° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "370",
+    "Estudiante_Direccion_Depto": "Dept 19",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "370",
+    "depto": "Dept 19",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Francisca Soto",
+    "Apoderado_Usuario_Id": 7,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 20,
+    "Estudiante_Nombre_Completo": "Francisca Ignacia Cortes Gallardo",
+    "Estudiante_RUT": "25012345-6",
+    "Curso_Id": 2,
+    "Curso_Nombre": "2° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "385",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "385",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Sin asignar",
+    "Apoderado_Usuario_Id": null,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 21,
+    "Estudiante_Nombre_Completo": "Martin Eduardo Garrido Ortiz",
+    "Estudiante_RUT": "24135790-2",
+    "Curso_Id": 3,
+    "Curso_Nombre": "3° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "400",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "400",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Francisca Soto",
+    "Apoderado_Usuario_Id": 7,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 22,
+    "Estudiante_Nombre_Completo": "Javiera Paz Medina Delgado",
+    "Estudiante_RUT": "25246801-3",
+    "Curso_Id": 4,
+    "Curso_Nombre": "4° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "415",
+    "Estudiante_Direccion_Depto": "Dept 22",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "415",
+    "depto": "Dept 22",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Sin asignar",
+    "Apoderado_Usuario_Id": null,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 23,
+    "Estudiante_Nombre_Completo": "Diego Alejandro Riquelme Cardenas",
+    "Estudiante_RUT": "24357912-4",
+    "Curso_Id": 5,
+    "Curso_Nombre": "5° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "430",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "430",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Francisca Soto",
+    "Apoderado_Usuario_Id": 7,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  },
+  {
+    "Estudiante_Id": 24,
+    "Estudiante_Nombre_Completo": "Valentina Rocio Sanchez Miranda",
+    "Estudiante_RUT": "25468023-5",
+    "Curso_Id": 6,
+    "Curso_Nombre": "6° Básico A",
+    "Estudiante_Estado_Academico": "Regular",
+    "Estudiante_Direccion_Calle": "Av. Las Perdices",
+    "Estudiante_Direccion_Numero": "445",
+    "Estudiante_Direccion_Depto": "",
+    "Estudiante_Direccion_Comuna": "La Florida",
+    "calle": "Av. Las Perdices",
+    "numero": "445",
+    "depto": "",
+    "comuna": "La Florida",
+    "Apoderado_Nombre": "Sin asignar",
+    "Apoderado_Usuario_Id": null,
+    "Usuario_Telefono": "+56 9 3344 5566",
+    "Usuario_Correo": "apoderado@email.cl"
+  }
+];
+let STORE_ESTUDIANTES = loadStore("SIGAE_ESTUDIANTES", SEED_ESTUDIANTES);
+
 // Helper para extraer ID numérico de URL
 function parseUrlId(url) {
   const m = String(url).match(/\/(\d+)(?:[/?#]|$)/);
@@ -413,7 +938,9 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     } catch {}
   }
 
-  // ── 1. MUTACIONES (POST, PUT, PATCH, DELETE) ──────────────────────────────
+  // ═════════════════════════════════════════════════════════════════════════
+  // 1. MUTACIONES (POST, PUT, PATCH, DELETE) CON PERSISTENCIA LOCAL
+  // ═════════════════════════════════════════════════════════════════════════
   if (m === "POST") {
     // Búsqueda de usuarios (acepta POST /api/usuarios/buscar)
     if (p.includes("/usuarios/buscar")) {
@@ -432,22 +959,24 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     if (p.includes("/citaciones")) {
       const nueva = {
         Citacion_Id: nextId(),
-        Citacion_Fecha: b?.fecha || "2026-11-20",
-        Citacion_Hora_Inicio: (b?.tramo || "10:00 - 10:45").split(" - ")[0] || "10:00:00",
-        Citacion_Hora_Fin: (b?.tramo || "10:00 - 10:45").split(" - ")[1] || "10:45:00",
+        Citacion_Fecha: b?.fecha || b?.Citacion_Fecha || "2026-11-20",
+        Citacion_Hora_Inicio: (b?.tramo || b?.Citacion_Tramo_Horario || "10:00 - 10:45").split(" - ")[0] || "10:00:00",
+        Citacion_Hora_Fin: (b?.tramo || b?.Citacion_Tramo_Horario || "10:00 - 10:45").split(" - ")[1] || "10:45:00",
+        Citacion_Tramo_Horario: b?.tramo || b?.Citacion_Tramo_Horario || "10:00 - 10:45",
         Citacion_Estado: "Pendiente",
-        Citacion_Motivo: b?.motivo || "Entrevista con apoderado",
-        Citacion_Modalidad: b?.modalidad || "Presencial",
-        Estudiante_Id: Number(b?.estudianteId) || 1,
-        Estudiante_Nombre_Completo: Number(b?.estudianteId) === 2 ? "Sofia Valentina Gonzalez Morales" : "Lucas Mateo Fernandez Vera",
-        Curso_Nombre: Number(b?.estudianteId) === 2 ? "2° Básico A" : "1° Básico A",
+        Citacion_Motivo: b?.motivo || b?.Citacion_Motivo || "Entrevista con apoderado",
+        Citacion_Modalidad: b?.modalidad || b?.Citacion_Modalidad || "Presencial",
+        Estudiante_Id: Number(b?.estudianteId || b?.Estudiante_Id) || 1,
+        Estudiante_Nombre_Completo: Number(b?.estudianteId || b?.Estudiante_Id) === 2 ? "Sofia Valentina Gonzalez Morales" : "Lucas Mateo Fernandez Vera",
+        Curso_Nombre: Number(b?.estudianteId || b?.Estudiante_Id) === 2 ? "2° Básico A" : "1° Básico A",
         Docente_Nombre: "María Morales",
         Apoderado_Nombre: "Pedro Fernandez",
         historial: [
-          { Historial_Id: nextId(), Historial_Fecha_Registro: new Date().toISOString().slice(0, 10), Historial_Hora_Registro: "10:00:00", Accion: "Citación creada por docente" }
+          { Historial_Id: nextId(), Historial_Fecha_Registro: new Date().toISOString().slice(0, 10), Historial_Hora_Registro: "10:00:00", Accion: "Citación creada por docente", Historial_Descripcion_Cambio: "Citación agendada inicialmente en estado Pendiente" }
         ]
       };
       STORE_CITACIONES.unshift(nueva);
+      saveStore("SIGAE_CITACIONES", STORE_CITACIONES);
       return { ok: true, status: 200, id: nueva.Citacion_Id, mensaje: "Citación creada, pendiente de confirmación" };
     }
 
@@ -470,6 +999,7 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
         dia_semana: "Miércoles"
       };
       STORE_EVENTOS.unshift(nuevo);
+      saveStore("SIGAE_EVENTOS", STORE_EVENTOS);
       return { ok: true, status: 200, id: nuevo.Evento_Institucional_Id, mensaje: "Evento registrado correctamente" };
     }
 
@@ -486,6 +1016,7 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
         activo: 1
       };
       STORE_BLOQUES.push(nuevo);
+      saveStore("SIGAE_BLOQUES", STORE_BLOQUES);
       return { ok: true, status: 200, id: nuevo.Bloque_Horario_Id, mensaje: "Bloque registrado exitosamente" };
     }
 
@@ -497,6 +1028,7 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
         Asignatura_Prioridad_Academica: b?.prioridad || "Media"
       };
       STORE_ASIGNATURAS.push(nueva);
+      saveStore("SIGAE_ASIGNATURAS", STORE_ASIGNATURAS);
       return { ok: true, status: 200, id: nueva.Asignatura_Id, mensaje: "Asignatura registrada correctamente" };
     }
 
@@ -520,7 +1052,58 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
         observaciones: ["Clase programada."]
       };
       STORE_HORARIOS.push(nuevaClase);
+      saveStore("SIGAE_HORARIOS", STORE_HORARIOS);
       return { ok: true, status: 200, id: nuevaClase.Horario_Asignatura_Id, mensaje: "Clase asignada exitosamente" };
+    }
+
+    // Asignar apoderado a uno o más estudiantes
+    if (p.includes("/estudiantes/asignar-apoderado")) {
+      const apoId = Number(b?.apoderadoId);
+      const apo = STORE_USUARIOS.find(u => u.Usuario_Id === apoId);
+      const ids = b?.estudianteIds || [];
+      STORE_ESTUDIANTES = STORE_ESTUDIANTES.map(e => {
+        if (ids.includes(e.Estudiante_Id)) {
+          return {
+            ...e,
+            Apoderado_Usuario_Id: apoId,
+            Apoderado_Nombre: apo?.Usuario_Nombre_Completo || "Apoderado Asignado",
+            Usuario_Telefono: apo?.Usuario_Telefono || e.Usuario_Telefono,
+            Usuario_Correo: apo?.Usuario_Correo || apo?.Apoderado_Correo_Natural || e.Usuario_Correo,
+          };
+        }
+        return e;
+      });
+      saveStore("SIGAE_ESTUDIANTES", STORE_ESTUDIANTES);
+      return { ok: true, status: 200, mensaje: "Estudiantes asignados correctamente" };
+    }
+
+    // Registrar Estudiante (CU Ficha Estudiantil)
+    if (p.includes("/estudiantes")) {
+      const cId = Number(b?.Curso_Id || b?.curso) || 1;
+      const cNombre = STORE_CURSOS.find(c => c.Curso_Id === cId)?.Curso_Nombre || (cId + "° Básico A");
+      const nuevoEst = {
+        Estudiante_Id: nextId(),
+        Estudiante_Nombre_Completo: b?.Estudiante_Nombre_Completo || b?.nombre || "Estudiante Nuevo",
+        Estudiante_RUT: b?.Estudiante_RUT || b?.rut || "25123456-7",
+        Curso_Id: cId,
+        Curso_Nombre: cNombre,
+        Estudiante_Estado_Academico: b?.Estudiante_Estado_Academico || b?.estadoAcademico || "Regular",
+        Estudiante_Direccion_Calle: b?.Estudiante_Calle || b?.calle || "",
+        Estudiante_Direccion_Numero: b?.Estudiante_Numero || b?.numero || "",
+        Estudiante_Direccion_Depto: b?.Estudiante_Depto || b?.depto || "",
+        Estudiante_Direccion_Comuna: b?.Estudiante_Comuna || b?.comuna || "",
+        calle: b?.Estudiante_Calle || b?.calle || "",
+        numero: b?.Estudiante_Numero || b?.numero || "",
+        depto: b?.Estudiante_Depto || b?.depto || "",
+        comuna: b?.Estudiante_Comuna || b?.comuna || "",
+        Apoderado_Nombre: null,
+        Apoderado_Usuario_Id: null,
+        Usuario_Telefono: "",
+        Usuario_Correo: "",
+      };
+      STORE_ESTUDIANTES.unshift(nuevoEst);
+      saveStore("SIGAE_ESTUDIANTES", STORE_ESTUDIANTES);
+      return { ok: true, status: 201, id: nuevoEst.Estudiante_Id, mensaje: "Ficha estudiantil registrada correctamente" };
     }
 
     // Registrar Administrador / Usuario
@@ -539,6 +1122,7 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
         Usuario_Estado_Cuenta: 1
       };
       STORE_USUARIOS.push(nuevoUsuario);
+      saveStore("SIGAE_USUARIOS", STORE_USUARIOS);
       return { ok: true, status: 200, mensaje: "Administrador registrado exitosamente" };
     }
 
@@ -546,16 +1130,49 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   }
 
   if (m === "DELETE") {
+    // Eliminar todas las asociaciones de un apoderado
+    if (p.includes("/estudiantes/apoderado/") && p.includes("/todas")) {
+      const apoId = reqId;
+      STORE_ESTUDIANTES = STORE_ESTUDIANTES.map(e =>
+        e.Apoderado_Usuario_Id === apoId
+          ? { ...e, Apoderado_Usuario_Id: null, Apoderado_Nombre: null }
+          : e
+      );
+      saveStore("SIGAE_ESTUDIANTES", STORE_ESTUDIANTES);
+      return { ok: true, status: 200, mensaje: "Todas las asociaciones fueron eliminadas exitosamente" };
+    }
+
+    // Quitar asociación puntual estudiante-apoderado (/api/estudiantes/:id/apoderado)
+    if (p.includes("/estudiantes") && p.includes("/apoderado") && reqId) {
+      STORE_ESTUDIANTES = STORE_ESTUDIANTES.map(e =>
+        e.Estudiante_Id === reqId
+          ? { ...e, Apoderado_Usuario_Id: null, Apoderado_Nombre: null }
+          : e
+      );
+      saveStore("SIGAE_ESTUDIANTES", STORE_ESTUDIANTES);
+      return { ok: true, status: 200, mensaje: "Asociación eliminada exitosamente" };
+    }
+
+    // Eliminar estudiante
+    if (p.includes("/estudiantes") && reqId) {
+      STORE_ESTUDIANTES = STORE_ESTUDIANTES.filter(e => e.Estudiante_Id !== reqId);
+      saveStore("SIGAE_ESTUDIANTES", STORE_ESTUDIANTES);
+      return { ok: true, status: 200, mensaje: "Estudiante eliminado exitosamente" };
+    }
+
     if (p.includes("/eventos")) {
       if (reqId) STORE_EVENTOS = STORE_EVENTOS.filter(e => e.Evento_Institucional_Id !== reqId);
+      saveStore("SIGAE_EVENTOS", STORE_EVENTOS);
       return { ok: true, status: 200, mensaje: "Evento eliminado correctamente" };
     }
     if (p.includes("/bloques")) {
       if (reqId) STORE_BLOQUES = STORE_BLOQUES.filter(blk => blk.Bloque_Horario_Id !== reqId);
+      saveStore("SIGAE_BLOQUES", STORE_BLOQUES);
       return { ok: true, status: 200, mensaje: "Bloque eliminado exitosamente" };
     }
     if (p.includes("/citaciones")) {
       if (reqId) STORE_CITACIONES = STORE_CITACIONES.filter(c => c.Citacion_Id !== reqId);
+      saveStore("SIGAE_CITACIONES", STORE_CITACIONES);
       return { ok: true, status: 200, mensaje: "Citación cancelada exitosamente" };
     }
     if (p.includes("/horarios")) {
@@ -563,6 +1180,7 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
         STORE_HORARIOS = STORE_HORARIOS.map(h =>
           h.Horario_Asignatura_Id === reqId ? { ...h, estado: "Eliminado", Horario_Estado: "Eliminado", eliminado: 1 } : h
         );
+        saveStore("SIGAE_HORARIOS", STORE_HORARIOS);
       }
       return { ok: true, status: 200, mensaje: "Clase eliminada" };
     }
@@ -570,28 +1188,78 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   }
 
   if (m === "PUT" || m === "PATCH") {
+    // Reasignar apoderado de estudiante (/api/estudiantes/:id/apoderado)
+    if (p.includes("/estudiantes") && p.includes("/apoderado") && reqId) {
+      const apoId = Number(b?.apoderadoId);
+      const apo = STORE_USUARIOS.find(u => u.Usuario_Id === apoId);
+      STORE_ESTUDIANTES = STORE_ESTUDIANTES.map(e =>
+        e.Estudiante_Id === reqId
+          ? {
+              ...e,
+              Apoderado_Usuario_Id: apoId || null,
+              Apoderado_Nombre: apo ? apo.Usuario_Nombre_Completo : null,
+              Usuario_Telefono: apo ? apo.Usuario_Telefono : e.Usuario_Telefono,
+              Usuario_Correo: apo ? (apo.Usuario_Correo || apo.Apoderado_Correo_Natural) : e.Usuario_Correo
+            }
+          : e
+      );
+      saveStore("SIGAE_ESTUDIANTES", STORE_ESTUDIANTES);
+      return { ok: true, status: 200, mensaje: "Asociación actualizada exitosamente" };
+    }
+
+    // Editar estudiante puntual
+    if (p.includes("/estudiantes") && reqId) {
+      STORE_ESTUDIANTES = STORE_ESTUDIANTES.map(e => {
+        if (e.Estudiante_Id === reqId) {
+          const cId = b?.Curso_Id ? Number(b.Curso_Id) : e.Curso_Id;
+          const cNombre = b?.Curso_Nombre || STORE_CURSOS.find(c => c.Curso_Id === cId)?.Curso_Nombre || e.Curso_Nombre;
+          return {
+            ...e,
+            ...b,
+            Curso_Id: cId,
+            Curso_Nombre: cNombre,
+            Estudiante_Estado_Academico: b?.Estudiante_Estado_Academico || b?.estadoAcademico || e.Estudiante_Estado_Academico,
+          };
+        }
+        return e;
+      });
+      saveStore("SIGAE_ESTUDIANTES", STORE_ESTUDIANTES);
+      return { ok: true, status: 200, mensaje: "Estudiante actualizado exitosamente" };
+    }
+
     if (p.includes("/eventos") && reqId) {
       STORE_EVENTOS = STORE_EVENTOS.map(e => e.Evento_Institucional_Id === reqId ? { ...e, ...b } : e);
+      saveStore("SIGAE_EVENTOS", STORE_EVENTOS);
       return { ok: true, status: 200, mensaje: "Evento actualizado correctamente" };
     }
     if (p.includes("/bloques") && reqId) {
       STORE_BLOQUES = STORE_BLOQUES.map(blk => blk.Bloque_Horario_Id === reqId ? { ...blk, ...b } : blk);
+      saveStore("SIGAE_BLOQUES", STORE_BLOQUES);
       return { ok: true, status: 200, mensaje: "Bloque actualizado exitosamente" };
     }
     if (p.includes("/planes/asignaturas") && reqId) {
       STORE_ASIGNATURAS = STORE_ASIGNATURAS.map(a => a.Asignatura_Id === reqId ? { ...a, Asignatura_Nombre: b?.nombre || a.Asignatura_Nombre, Asignatura_Prioridad_Academica: b?.prioridad || a.Asignatura_Prioridad_Academica } : a);
+      saveStore("SIGAE_ASIGNATURAS", STORE_ASIGNATURAS);
       return { ok: true, status: 200, mensaje: "Asignatura actualizada correctamente" };
     }
     if (p.includes("/horarios") && p.includes("/restaurar") && reqId) {
       STORE_HORARIOS = STORE_HORARIOS.map(h =>
         h.Horario_Asignatura_Id === reqId ? { ...h, estado: "Activo", Horario_Estado: "Activo", eliminado: 0 } : h
       );
+      saveStore("SIGAE_HORARIOS", STORE_HORARIOS);
       return { ok: true, status: 200, mensaje: "Clase restaurada exitosamente" };
     }
-    return { ok: true, status: 200, mensaje: "Actualizado con éxito" };
   }
 
-  // ── 2. CONSULTAS (GET) ───────────────────────────────────────────────────
+  // ═════════════════════════════════════════════════════════════════════════
+  // 2. CONSULTAS (GET) DINÁMICAS Y REACTIVAS
+  // ═════════════════════════════════════════════════════════════════════════
+
+  // Bloques afectados por evento (/api/bloques/eventos/:id/afectados o /api/eventos/:id/afectados)
+  if (p.includes("/eventos") && p.includes("/afectados")) {
+    const encontrado = STORE_EVENTOS.find(e => e.Evento_Institucional_Id === reqId) || STORE_EVENTOS[0];
+    return encontrado?.bloques || [];
+  }
 
   // Detalle de evento individual por ID (ej: /api/eventos/1)
   if (p.includes("/eventos") && reqId) {
@@ -610,7 +1278,7 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   }
 
   // Detalle de bloque horario (ej: /api/horarios/bloque-detalle/1)
-  if (p.includes("/bloque-detalle") || p.includes("detalle")) {
+  if (p.includes("/bloque-detalle")) {
     const matchH = (reqId && STORE_HORARIOS.find(h => h.Horario_Asignatura_Id === reqId)) || STORE_HORARIOS[0];
     return {
       curso: matchH.curso || matchH.Curso_Nombre || "1° Básico A",
@@ -631,7 +1299,10 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     };
   }
 
-  // Citaciones de historial
+  // Citaciones de historial y pendientes
+  if (p.includes("/citaciones/pendientes")) {
+    return STORE_CITACIONES.filter(c => c.Citacion_Estado === "Pendiente");
+  }
   if (p.includes("/citaciones/historial")) {
     return STORE_CITACIONES;
   }
@@ -641,12 +1312,14 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     const found = STORE_CITACIONES.find(c => c.Citacion_Id === reqId) || STORE_CITACIONES[0];
     return {
       ...found,
-      historial: found.historial || []
+      historial: found.historial || [
+        { Historial_Id: 1, Historial_Fecha_Registro: found.Citacion_Fecha, Historial_Hora_Registro: found.Citacion_Hora_Inicio, Accion: "Citación creada", Historial_Descripcion_Cambio: "Citación creada" }
+      ]
     };
   }
 
-  // Citaciones activas
-  if (p.includes("/citaciones") && !p.includes("/contactos")) {
+  // Citaciones lista general (agenda para docente, apoderado o administrador)
+  if (p.includes("/citaciones") && !p.includes("/solicitud") && !p.includes("/contactos")) {
     return STORE_CITACIONES;
   }
 
@@ -656,10 +1329,10 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
       titular: {
         Usuario_Id: 4,
         Usuario_Nombre_Completo: "Pedro Fernandez",
-        Usuario_Correo: "p.fernandez@email.cl",
-        Usuario_Telefono: "+56 9 3344 5566",
+        Apoderado_Correo_Natural: "p.fernandez@email.cl",
+        Usuario_Telefono: "+56 9 3344 5566"
       },
-      suplentes: [],
+      suplentes: []
     };
   }
 
@@ -673,59 +1346,84 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     return STORE_ASIGNATURAS;
   }
 
-  // Asignaturas disponibles para asignar a un curso
-  if (p.includes("/asignaturas/disponibles")) {
+  // Planes educativos
+  if (p.includes("/planes")) {
     return [
       {
-        Asignatura_Id: 5,
-        Asignatura_Nombre: "Inglés",
-        nombre: "Inglés",
-        Asignatura_Prioridad_Academica: "Media",
-        Horas_Semanales_Requeridas: 4,
-        horas_semanales: 4,
-        horas: 4,
-        Tipo: "Obligatorio",
-        tipo: "Obligatorio",
-      },
-      {
-        Asignatura_Id: 6,
-        Asignatura_Nombre: "Educación Física",
-        nombre: "Educación Física",
-        Asignatura_Prioridad_Academica: "Baja",
-        Horas_Semanales_Requeridas: 2,
-        horas_semanales: 2,
-        horas: 2,
-        Tipo: "Obligatorio",
-        tipo: "Obligatorio",
-      },
-      {
-        Asignatura_Id: 7,
-        Asignatura_Nombre: "Artes Visuales",
-        nombre: "Artes Visuales",
-        Asignatura_Prioridad_Academica: "Baja",
-        Horas_Semanales_Requeridas: 2,
-        horas_semanales: 2,
-        horas: 2,
-        Tipo: "Complementario",
-        tipo: "Complementario",
-      },
+        Plan_Educativo_Id: 1,
+        Plan_Educativo_Nombre: "Plan General Básica 2026",
+        Nivel_Educativo_Id: 1,
+        Nivel_Educativo_Nombre: "1° Básico",
+        horas_semanales_requeridas: 38,
+        asignaturas: [
+          { Asignatura_Id: 1, Asignatura_Nombre: "Lenguaje y Comunicación", Horas_Semanales: 8, Prioridad_Academica: "Alta", Asignatura_Tipo: "Obligatoria" },
+          { Asignatura_Id: 2, Asignatura_Nombre: "Matemáticas", Horas_Semanales: 8, Prioridad_Academica: "Alta", Asignatura_Tipo: "Obligatoria" },
+          { Asignatura_Id: 3, Asignatura_Nombre: "Ciencias Naturales", Horas_Semanales: 4, Prioridad_Academica: "Media", Asignatura_Tipo: "Obligatoria" },
+          { Asignatura_Id: 4, Asignatura_Nombre: "Historia y Geografía", Horas_Semanales: 4, Prioridad_Academica: "Media", Asignatura_Tipo: "Obligatoria" },
+        ]
+      }
     ];
   }
 
-  // Dashboard Estadísticas
+  // Verificar si RUT de estudiante ya existe (/api/estudiantes/verificar-rut?rut=...)
+  if (p.includes("/estudiantes/verificar-rut")) {
+    try {
+      const urlObj = new URL(urlStr, "http://localhost");
+      const rutQ = (urlObj.searchParams.get("rut") || "").trim().toLowerCase();
+      const existe = STORE_ESTUDIANTES.some(e => (e.Estudiante_RUT || "").toLowerCase() === rutQ);
+      return { existe };
+    } catch {
+      return { existe: false };
+    }
+  }
+
+  // Estudiantes sin apoderado asignado
+  if (p.includes("/estudiantes/sin-apoderado")) {
+    return STORE_ESTUDIANTES.filter(e => !e.Apoderado_Usuario_Id);
+  }
+
+  // Buscar estudiantes por nombre o RUT (/api/estudiantes/buscar?criterio=...)
+  if (p.includes("/estudiantes/buscar")) {
+    try {
+      const urlObj = new URL(urlStr, "http://localhost");
+      const crit = (urlObj.searchParams.get("criterio") || "").trim().toLowerCase();
+      if (!crit) return STORE_ESTUDIANTES;
+      return STORE_ESTUDIANTES.filter(e =>
+        (e.Estudiante_Nombre_Completo || "").toLowerCase().includes(crit) ||
+        (e.Estudiante_RUT || "").toLowerCase().includes(crit)
+      );
+    } catch {
+      return STORE_ESTUDIANTES;
+    }
+  }
+
+  // Estudiantes asociados a apoderado (/api/estudiantes/apoderado/:id/asociados)
+  if (p.includes("/estudiantes/apoderado/") && p.includes("/asociados")) {
+    if (urlStr.includes("/asociados/")) {
+      const parts = urlStr.split("/asociados/");
+      const estId = parseInt(parts[1], 10);
+      return STORE_ESTUDIANTES.find(e => e.Estudiante_Id === estId) || STORE_ESTUDIANTES[0];
+    }
+    if (reqId) {
+      return STORE_ESTUDIANTES.filter(e => e.Apoderado_Usuario_Id === reqId);
+    }
+    return STORE_ESTUDIANTES.filter(e => e.Apoderado_Usuario_Id);
+  }
+
+  // Dashboard Estadísticas - Reactivo y Dinámico
   if (p.includes("/dashboard/stats")) {
     return {
       usuarios: STORE_USUARIOS.length,
       docentes: STORE_USUARIOS.filter(u => u.Es_Docente).length,
       apoderados: STORE_USUARIOS.filter(u => u.Es_Apoderado).length,
-      estudiantes: 24,
-      cursos: 6,
+      estudiantes: STORE_ESTUDIANTES.length,
+      cursos: STORE_CURSOS.length,
       citaciones: STORE_CITACIONES.length,
       totalUsuarios: STORE_USUARIOS.length,
       totalDocentes: STORE_USUARIOS.filter(u => u.Es_Docente).length,
       totalApoderados: STORE_USUARIOS.filter(u => u.Es_Apoderado).length,
-      totalEstudiantes: 24,
-      totalCursos: 6,
+      totalEstudiantes: STORE_ESTUDIANTES.length,
+      totalCursos: STORE_CURSOS.length,
       totalCitaciones: STORE_CITACIONES.length,
     };
   }
@@ -746,32 +1444,50 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     }));
   }
 
-  // Estudiantes
+  // Apoderados (con cálculo dinámico de estudiantes vinculados y filtrado por operador)
+  if (p.includes("/apoderados")) {
+    let lista = STORE_USUARIOS.filter(u => u.Es_Apoderado).map(u => ({
+      ...u,
+      Apoderado_Correo_Natural: u.Usuario_Correo,
+      Total_Estudiantes_Asociados: STORE_ESTUDIANTES.filter(e => e.Apoderado_Usuario_Id === u.Usuario_Id).length,
+    }));
+    try {
+      const urlObj = new URL(urlStr, "http://localhost");
+      const op = urlObj.searchParams.get("operador") || "=";
+      const cantStr = urlObj.searchParams.get("cantidadEstudiantes");
+      if (cantStr !== null && cantStr !== "" && cantStr !== undefined) {
+        const cant = Number(cantStr);
+        if (!isNaN(cant)) {
+          lista = lista.filter(u => {
+            const t = u.Total_Estudiantes_Asociados;
+            if (op === "=") return t === cant;
+            if (op === "!=") return t !== cant;
+            if (op === ">") return t > cant;
+            if (op === "<") return t < cant;
+            if (op === ">=") return t >= cant;
+            if (op === "<=") return t <= cant;
+            return true;
+          });
+        }
+      }
+    } catch {}
+    return lista;
+  }
+
+  // Estudiantes general con filtros curso y estado
   if (p.includes("/estudiantes")) {
-    return [
-      {
-        Estudiante_Id: 1,
-        Estudiante_Nombre_Completo: "Lucas Mateo Fernandez Vera",
-        Estudiante_RUT: "24111222-3",
-        Curso_Nombre: "1° Básico A",
-        Curso_Id: 1,
-        Apoderado_Nombre: "Pedro Fernandez",
-        Apoderado_Usuario_Id: 4,
-        Usuario_Telefono: "+56 9 3344 5566",
-        Usuario_Correo: "p.fernandez@email.cl",
-      },
-      {
-        Estudiante_Id: 2,
-        Estudiante_Nombre_Completo: "Sofia Valentina Gonzalez Morales",
-        Estudiante_RUT: "25222333-1",
-        Curso_Nombre: "2° Básico A",
-        Curso_Id: 2,
-        Apoderado_Nombre: "Pedro Fernandez",
-        Apoderado_Usuario_Id: 4,
-        Usuario_Telefono: "+56 9 3344 5566",
-        Usuario_Correo: "p.fernandez@email.cl",
-      },
-    ];
+    if (reqId) {
+      return STORE_ESTUDIANTES.find(e => e.Estudiante_Id === reqId) || STORE_ESTUDIANTES[0];
+    }
+    let lista = [...STORE_ESTUDIANTES];
+    try {
+      const urlObj = new URL(urlStr, "http://localhost");
+      const curso = urlObj.searchParams.get("curso");
+      const estado = urlObj.searchParams.get("estado");
+      if (curso) lista = lista.filter(e => String(e.Curso_Id) === String(curso) || e.Curso_Nombre === curso);
+      if (estado) lista = lista.filter(e => e.Estudiante_Estado_Academico === estado);
+    } catch {}
+    return lista;
   }
 
   // Cursos
@@ -781,13 +1497,12 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
         { Nivel_Educativo_Id: 1, Nivel_Educativo_Nombre: "1° Básico" },
         { Nivel_Educativo_Id: 2, Nivel_Educativo_Nombre: "2° Básico" },
         { Nivel_Educativo_Id: 3, Nivel_Educativo_Nombre: "3° Básico" },
+        { Nivel_Educativo_Id: 4, Nivel_Educativo_Nombre: "4° Básico" },
+        { Nivel_Educativo_Id: 5, Nivel_Educativo_Nombre: "5° Básico" },
+        { Nivel_Educativo_Id: 6, Nivel_Educativo_Nombre: "6° Básico" },
       ];
     }
-    return [
-      { Curso_Id: 1, Curso_Nombre: "1° Básico A", curso: "1° Básico A", Nivel_Educativo_Id: 1, Nivel_Educativo_Nombre: "1° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
-      { Curso_Id: 2, Curso_Nombre: "2° Básico A", curso: "2° Básico A", Nivel_Educativo_Id: 2, Nivel_Educativo_Nombre: "2° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
-      { Curso_Id: 3, Curso_Nombre: "3° Básico A", curso: "3° Básico A", Nivel_Educativo_Id: 3, Nivel_Educativo_Nombre: "3° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
-    ];
+    return STORE_CURSOS;
   }
 
   // Horario Maestro
