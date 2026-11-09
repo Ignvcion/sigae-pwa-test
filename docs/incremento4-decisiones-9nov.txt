@@ -121,6 +121,8 @@ cliente en latin1 quedan mal codificadas y la base rechaza toda ruta.
 Verificado: el esquema de main + estos ALTER queda idéntico a
 schema_base.sql (columnas, índices, llaves, CHECK y reglas de borrado).
 
+    SET NAMES utf8mb4;  -- los CHECK de ruta llevan tildes
+
     -- (El renombre de la carga horaria, RF04, ya está en ese archivo.)
 
     -- RF54 / CU86 Excepción 2
@@ -261,8 +263,10 @@ schema_base.sql (columnas, índices, llaves, CHECK y reglas de borrado).
     electivos de períodos anteriores se respaldan en el Excel y se eliminan
     junto con los cursos de esos períodos.
 
-5.9 Pendiente: las exportaciones de horario (CU60-CU62) y la Consulta de
-    horarios (CU68) aún no incluyen los electivos.
+5.9 Exportaciones (CU60-CU62) y Consulta de horarios (CU68) incluyen los
+    electivos: el maestro una fila por electivo, el docente sus electivos y
+    el curso de 3° o 4° medio los electivos de ambas rutas. En la Consulta,
+    los filtros se aplican igual y la fila enlaza a la pantalla Electivos.
 
 5.10 API: GET/POST /api/electivos/plan, PUT /api/electivos/plan/:id,
      POST /api/electivos/plan/clonar, GET /api/electivos/programacion,

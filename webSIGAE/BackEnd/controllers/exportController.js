@@ -3,7 +3,8 @@
 // CU 62 — Exportando horario por curso
 
 const pool = require('../config/db');
-const { enPeriodoVigente } = require('../utils/periodos');
+const { enPeriodoVigente, PERIODO_VIGENTE_SQL } = require('../utils/periodos');
+const { cursoConElectivosSQL } = require('../utils/electivos');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 const puppeteer = require('puppeteer');
@@ -41,8 +42,17 @@ async function fetchMaestro() {
     JOIN asignatura     a  ON a.Asignatura_Id      = ha.Asignatura_Id
     LEFT JOIN usuario   u  ON u.Usuario_Id         = ha.Usuario_Id
     WHERE ha.Horario_Asignatura_Estado = 'Activo' AND ${enPeriodoVigente('ha')}
-    ORDER BY FIELD(ha.Horario_Asignatura_Dia_Semana,'Lunes','Martes','Miércoles','Jueves','Viernes'),
-             bh.Bloque_Horario_Hora_Inicio, c.Curso_Nombre
+    UNION ALL
+    -- Electivos (CU106): una fila por electivo, compartido por los cursos de 3° y 4° medio
+    SELECT ce.Clase_Electivo_Dia_Semana, bh.Bloque_Horario_Hora_Inicio, bh.Bloque_Horario_Hora_Fin,
+           '3° y 4° medio (electivo)', CONCAT(a.Asignatura_Nombre, ' · ', ce.Clase_Electivo_Ruta),
+           u.Usuario_Nombre_Completo
+      FROM clase_electivo ce
+      JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ce.Bloque_Horario_Id
+      JOIN asignatura     a  ON a.Asignatura_Id      = ce.Asignatura_Id
+      JOIN usuario        u  ON u.Usuario_Id         = ce.Docente_Usuario_Id
+     WHERE ce.Clase_Electivo_Periodo_Lectivo = ${PERIODO_VIGENTE_SQL}
+    ORDER BY FIELD(dia,'Lunes','Martes','Miércoles','Jueves','Viernes'), hora_inicio, curso
   `);
   return ordenarFilas(rows);
 }
@@ -67,9 +77,16 @@ async function fetchPorDocente(usuarioId) {
      JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
      JOIN asignatura     a  ON a.Asignatura_Id      = ha.Asignatura_Id
      WHERE ha.Usuario_Id = ? AND ha.Horario_Asignatura_Estado = 'Activo' AND ${enPeriodoVigente('ha')}
-     ORDER BY FIELD(ha.Horario_Asignatura_Dia_Semana,'Lunes','Martes','Miércoles','Jueves','Viernes'),
-              bh.Bloque_Horario_Hora_Inicio`,
-    [usuarioId]
+     UNION ALL
+     -- Para el docente, un electivo es una clase más (CU106)
+     SELECT ce.Clase_Electivo_Dia_Semana, bh.Bloque_Horario_Hora_Inicio, bh.Bloque_Horario_Hora_Fin,
+            CONCAT('3° y 4° medio · Ruta ', ce.Clase_Electivo_Ruta), CONCAT(a.Asignatura_Nombre, ' (electivo)')
+       FROM clase_electivo ce
+       JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ce.Bloque_Horario_Id
+       JOIN asignatura     a  ON a.Asignatura_Id      = ce.Asignatura_Id
+      WHERE ce.Docente_Usuario_Id = ? AND ce.Clase_Electivo_Periodo_Lectivo = ${PERIODO_VIGENTE_SQL}
+     ORDER BY FIELD(dia,'Lunes','Martes','Miércoles','Jueves','Viernes'), hora_inicio`,
+    [usuarioId, usuarioId]
   );
   return { docente: docente.Usuario_Nombre_Completo, filas: ordenarFilas(rows) };
 }
@@ -94,9 +111,18 @@ async function fetchPorCurso(cursoId) {
      JOIN asignatura     a  ON a.Asignatura_Id      = ha.Asignatura_Id
      LEFT JOIN usuario   u  ON u.Usuario_Id         = ha.Usuario_Id
      WHERE ha.Curso_Id = ? AND ha.Horario_Asignatura_Estado = 'Activo'
-     ORDER BY FIELD(ha.Horario_Asignatura_Dia_Semana,'Lunes','Martes','Miércoles','Jueves','Viernes'),
-              bh.Bloque_Horario_Hora_Inicio`,
-    [cursoId]
+     UNION ALL
+     -- 3° y 4° medio: electivos del período, con su ruta (CU106)
+     SELECT ce.Clase_Electivo_Dia_Semana, bh.Bloque_Horario_Hora_Inicio, bh.Bloque_Horario_Hora_Fin,
+            CONCAT(a.Asignatura_Nombre, ' · electivo ', ce.Clase_Electivo_Ruta), u.Usuario_Nombre_Completo
+       FROM curso c
+       JOIN clase_electivo ce ON ce.Clase_Electivo_Periodo_Lectivo = c.Curso_Periodo_Lectivo
+       JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ce.Bloque_Horario_Id
+       JOIN asignatura     a  ON a.Asignatura_Id      = ce.Asignatura_Id
+       JOIN usuario        u  ON u.Usuario_Id         = ce.Docente_Usuario_Id
+      WHERE c.Curso_Id = ? AND ${cursoConElectivosSQL('c')}
+     ORDER BY FIELD(dia,'Lunes','Martes','Miércoles','Jueves','Viernes'), hora_inicio`,
+    [cursoId, cursoId]
   );
   return { curso: curso.Curso_Nombre, filas: ordenarFilas(rows) };
 }

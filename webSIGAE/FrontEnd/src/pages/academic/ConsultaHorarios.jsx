@@ -311,13 +311,20 @@ function ConsultaHorarios() {
                         <td>{h.docente}</td>
                         <td style={{ color: h.estado === "Suspendido" ? "#b91c1c" : undefined }}>{h.estado}</td>
                         <td>
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            onClick={() => setDetalleId(h.Horario_Asignatura_Id)}
-                          >
-                            Ver detalle
-                          </button>
+                          {/* Los electivos (CU106) se gestionan en la pantalla de Electivos */}
+                          {Number(h.electivo) === 1 ? (
+                            <a href="/electivos" style={{ fontSize: "0.85rem", color: "#5b21b6", fontWeight: 600 }}>
+                              Ver en Electivos
+                            </a>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={() => setDetalleId(h.Horario_Asignatura_Id)}
+                            >
+                              Ver detalle
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

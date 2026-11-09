@@ -1480,7 +1480,7 @@ const filtrarHorarios = async (req, res) => {
 
     let query = `
       SELECT
-        ha.Horario_Asignatura_Id,
+        CAST(ha.Horario_Asignatura_Id AS SIGNED) AS Horario_Asignatura_Id,
         ha.Horario_Asignatura_Dia_Semana  AS dia,
         ha.Horario_Asignatura_Estado      AS estado,
         ha.Curso_Id                       AS cursoId,
@@ -1498,7 +1498,8 @@ const filtrarHorarios = async (req, res) => {
         ha.Asignatura_Id                  AS asignaturaId,
         a.Asignatura_Nombre               AS asignatura,
         ha.Usuario_Id                     AS docenteId,
-        COALESCE(u.Usuario_Nombre_Completo, 'Sin asignar') AS docente
+        COALESCE(u.Usuario_Nombre_Completo, 'Sin asignar') AS docente,
+        0                                 AS electivo
       FROM horario_asignatura ha
       JOIN curso           c  ON c.Curso_Id           = ha.Curso_Id
       JOIN nivel_educativo ne ON ne.Nivel_Educativo_Id = c.Nivel_Educativo_Id
@@ -1540,8 +1541,40 @@ const filtrarHorarios = async (req, res) => {
       params.push(dia_semana);
     }
 
-    query += ` ORDER BY FIELD(ha.Horario_Asignatura_Dia_Semana, 'Lunes','Martes','Miércoles','Jueves','Viernes'),
-                        bh.Bloque_Horario_Hora_Inicio, c.Curso_Nombre`;
+    // CU106: los electivos aparecen en cada curso de 3° y 4° medio del período, con los mismos filtros.
+    // Siempre están activos: no se incluyen si se filtra por otro estado.
+    if (!estado || estado === 'Todos' || estado === 'Activo') {
+      query += `
+      UNION ALL
+      SELECT -CAST(ce.Clase_Electivo_Id * 1000000 + c.Curso_Id AS SIGNED), ce.Clase_Electivo_Dia_Semana, 'Activo',
+             c.Curso_Id, c.Curso_Nombre, c.Curso_Seccion, c.Curso_Periodo_Lectivo, ${estadoPeriodoCursoSQL('c')},
+             ne.Nivel_Educativo_Id, ne.Nivel_Educativo_Nombre, ce.Bloque_Horario_Id,
+             bh.Bloque_Horario_Hora_Inicio, bh.Bloque_Horario_Hora_Fin, bh.Bloque_Horario_Jornada, bh.Bloque_Horario_Tipo,
+             ce.Asignatura_Id, CONCAT(a.Asignatura_Nombre, ' · electivo ', ce.Clase_Electivo_Ruta),
+             ce.Docente_Usuario_Id, u.Usuario_Nombre_Completo, 1
+        FROM clase_electivo ce
+        JOIN curso           c  ON c.Curso_Periodo_Lectivo = ce.Clase_Electivo_Periodo_Lectivo
+        JOIN nivel_educativo ne ON ne.Nivel_Educativo_Id   = c.Nivel_Educativo_Id
+        JOIN bloque_horario  bh ON bh.Bloque_Horario_Id    = ce.Bloque_Horario_Id
+        JOIN asignatura      a  ON a.Asignatura_Id         = ce.Asignatura_Id
+        JOIN usuario         u  ON u.Usuario_Id            = ce.Docente_Usuario_Id
+       WHERE ${cursoNoArchivado('c')} AND ${cursoConElectivosSQL('c')}`;
+      const filtrosElectivo = [
+        [docente_id, ` AND ce.Docente_Usuario_Id = ? AND ce.Clase_Electivo_Periodo_Lectivo = ${PERIODO_VIGENTE_SQL}`],
+        [curso_id, ' AND c.Curso_Id = ?'],
+        [nivel_educativo_id, ' AND c.Nivel_Educativo_Id = ?'],
+        [asignatura_id, ' AND ce.Asignatura_Id = ?'],
+        [jornada, ' AND bh.Bloque_Horario_Jornada = ?'],
+        [dia_semana, ' AND ce.Clase_Electivo_Dia_Semana = ?'],
+      ];
+      for (const [valor, condicion] of filtrosElectivo) {
+        if (!valor) continue;
+        query += condicion;
+        params.push(valor);
+      }
+    }
+
+    query += ` ORDER BY FIELD(dia, 'Lunes','Martes','Miércoles','Jueves','Viernes'), horaInicio, curso`;
 
     const [rows] = await pool.execute(query, params);
 
