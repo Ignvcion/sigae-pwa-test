@@ -343,6 +343,8 @@ UNLOCK TABLES;
 
 --
 -- Table structure for table `estudiante`
+-- Incremento 4, CU105 (RF23): Estudiante_Ruta_Formacion, decidida en 2° medio (Científica,
+-- Humanística o Técnica). La Técnica es solo una marca, sin efecto en horarios ni electivos.
 --
 
 DROP TABLE IF EXISTS `estudiante`;
@@ -360,12 +362,14 @@ CREATE TABLE `estudiante` (
   `Estudiante_Numero` varchar(10) DEFAULT NULL,
   `Estudiante_Depto` varchar(20) DEFAULT NULL,
   `Estudiante_Comuna` varchar(60) DEFAULT NULL,
+  `Estudiante_Ruta_Formacion` varchar(20) DEFAULT NULL,
   PRIMARY KEY (`Estudiante_Id`),
   UNIQUE KEY `Estudiante_RUT_UNIQUE` (`Estudiante_RUT`),
   KEY `fk_Estudiante_Curso_idx` (`Curso_Id`),
   KEY `fk_Estudiante_Apoderado_idx` (`Apoderado_Usuario_Id`),
   CONSTRAINT `fk_Estudiante_Apoderado` FOREIGN KEY (`Apoderado_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `fk_Estudiante_Curso` FOREIGN KEY (`Curso_Id`) REFERENCES `curso` (`Curso_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
+  CONSTRAINT `fk_Estudiante_Curso` FOREIGN KEY (`Curso_Id`) REFERENCES `curso` (`Curso_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `chk_Estudiante_Ruta_Formacion` CHECK (`Estudiante_Ruta_Formacion` IN ('Científica','Humanística','Técnica'))
 ) ENGINE=InnoDB AUTO_INCREMENT=222222228 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -375,7 +379,7 @@ CREATE TABLE `estudiante` (
 
 LOCK TABLES `estudiante` WRITE;
 /*!40000 ALTER TABLE `estudiante` DISABLE KEYS */;
-INSERT INTO `estudiante` VALUES (222222222,'Diego Martin Perez Castro','268283655','Regular',222,4,NULL,NULL,NULL,NULL,NULL),(222222223,'Valentina Paz Ramos González','212345678-9','Regular',222,4,NULL,NULL,NULL,NULL,NULL),(222222224,'Matías Alejandro Vera López','223456789-0','Regular',223,8,NULL,NULL,NULL,NULL,NULL),(222222225,'Isabella Fernanda Campos Silva','234567890-1','Regular',223,9,NULL,NULL,NULL,NULL,NULL),(222222226,'Sebastián Andrés Torres Díaz','245678901-2','Regular',224,8,NULL,NULL,NULL,NULL,NULL),(222222227,'Catalina Ignacia Morales Vega','256789012-3','Irregular',225,10,NULL,NULL,NULL,NULL,NULL);
+INSERT INTO `estudiante` VALUES (222222222,'Diego Martin Perez Castro','268283655','Regular',222,4,NULL,NULL,NULL,NULL,NULL,NULL),(222222223,'Valentina Paz Ramos González','212345678-9','Regular',222,4,NULL,NULL,NULL,NULL,NULL,NULL),(222222224,'Matías Alejandro Vera López','223456789-0','Regular',223,8,NULL,NULL,NULL,NULL,NULL,NULL),(222222225,'Isabella Fernanda Campos Silva','234567890-1','Regular',223,9,NULL,NULL,NULL,NULL,NULL,NULL),(222222226,'Sebastián Andrés Torres Díaz','245678901-2','Regular',224,8,NULL,NULL,NULL,NULL,NULL,NULL),(222222227,'Catalina Ignacia Morales Vega','256789012-3','Irregular',225,10,NULL,NULL,NULL,NULL,NULL,NULL);
 /*!40000 ALTER TABLE `estudiante` ENABLE KEYS */;
 UNLOCK TABLES;
 
