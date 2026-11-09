@@ -4,6 +4,7 @@ const pool = require('../config/db');
 const { claseVigente } = require('../utils/clasesEliminadas');
 const { buscarClaseEnTramo, describirClase } = require('../utils/disponibilidadDocente');
 const { esApoderadoDelEstudiante } = require('../utils/apoderadosEstudiante');
+const { finDeCitacion, cerrarPorCitacion, moverPorCitacion } = require('../utils/recepcionMensajes');
 
 const ESTADO_PENDIENTE  = 'Pendiente de confirmación';
 const ESTADO_CONFIRMADA = 'Confirmada';
@@ -470,6 +471,8 @@ const cancelarCitacion = async (req, res) => {
       descripcion: `Cancelación de citación. Motivo: ${motivo.trim()}`,
       responsableId: userId,
     });
+    // RF54 / CU86 Excepción 2: si se habilitaron respuestas desde esta citación, se cierran
+    await cerrarPorCitacion(conn, citacion.Citacion_Id);
     await conn.commit();
 
     return res.json({ mensaje: 'Citación cancelada correctamente' });
@@ -545,6 +548,8 @@ const reprogramarCitacion = async (req, res) => {
       descripcion: DESCRIPCION_REPROGRAMACION,
       responsableId: userId,
     });
+    // RF54 / CU86: las respuestas habilitadas desde esta citación duran hasta el nuevo tramo
+    await moverPorCitacion(conn, citacion.Citacion_Id, Citacion_Fecha, Citacion_Tramo_Horario);
     await conn.commit();
 
     return res.json({
@@ -554,6 +559,65 @@ const reprogramarCitacion = async (req, res) => {
     console.error(error);
     if (conn) await conn.rollback().catch(() => {});
     return res.status(500).json({ mensaje: 'No fue posible reprogramar la citación. Intente nuevamente.' });
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
+// ── RF54 / CU86: desde una citación, el docente habilita que el apoderado responda ──
+// ── en su conversación hasta el término de la reunión                             ──
+// POST /api/citaciones/:id/habilitar-respuestas
+const habilitarRespuestasCitacion = async (req, res) => {
+  let conn;
+  try {
+    const citacion = await buscarCitacionDelUsuario(req.params.id, req.user);
+    if (!citacion || Number(citacion.Docente_Usuario_Id) !== Number(req.user.id)
+        || !(req.user.roles || []).includes('Docente')) {
+      return res.status(404).json({ mensaje: 'La citación no existe o no eres el docente citado' });
+    }
+    // CU86 Excepción 2: la citación está cancelada
+    if (esCancelada(citacion)) {
+      return res.status(409).json({ mensaje: 'La citación está cancelada: no se pueden habilitar respuestas desde ella' });
+    }
+    const hasta = finDeCitacion(citacion.Citacion_Fecha, citacion.Citacion_Tramo_Horario);
+    // CU86 Excepción 1: la reunión ya terminó
+    const [[{ futuro }]] = await pool.query('SELECT ? > NOW() AS futuro', [hasta]);
+    if (!hasta || !Number(futuro)) {
+      return res.status(409).json({ mensaje: 'La reunión ya terminó: no se pueden habilitar respuestas hasta ella' });
+    }
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [existentes] = await conn.query(
+      `SELECT Conversacion_Id FROM conversacion
+        WHERE Docente_Usuario_Id = ? AND Apoderado_Usuario_Id = ? AND Conversacion_Estado = 1
+        ORDER BY Conversacion_Id DESC LIMIT 1`,
+      [citacion.Docente_Usuario_Id, citacion.Apoderado_Usuario_Id]
+    );
+    let conversacionId = existentes[0]?.Conversacion_Id;
+    if (!conversacionId) {
+      const [nueva] = await conn.query(
+        `INSERT INTO conversacion (Conversacion_Fecha_Inicio, Conversacion_Estado, Docente_Usuario_Id, Apoderado_Usuario_Id)
+         VALUES (CURDATE(), 1, ?, ?)`,
+        [citacion.Docente_Usuario_Id, citacion.Apoderado_Usuario_Id]
+      );
+      conversacionId = nueva.insertId;
+    }
+    await conn.query(
+      `UPDATE conversacion SET Conversacion_Habilitada_Hasta = ?, Conversacion_Habilitada_Citacion_Id = ?
+        WHERE Conversacion_Id = ?`,
+      [hasta, citacion.Citacion_Id, conversacionId]
+    );
+    await conn.commit();
+    return res.json({
+      mensaje: `El apoderado puede responderte hasta el término de la reunión (${citacion.Citacion_Fecha} ${hasta.slice(11, 16)}).`,
+      conversacionId,
+      Habilitada_Hasta: hasta.slice(0, 16).replace(' ', 'T'),
+    });
+  } catch (error) {
+    console.error(error);
+    if (conn) await conn.rollback().catch(() => {});
+    return res.status(500).json({ mensaje: 'No fue posible habilitar las respuestas del apoderado' });
   } finally {
     if (conn) conn.release();
   }
@@ -648,6 +712,7 @@ const getHistorialCitaciones = async (req, res) => {
  */
 
 module.exports = {
+  habilitarRespuestasCitacion,
   getCitaciones,
   getCitacionesPendientes,
   getDetalleCitacion,

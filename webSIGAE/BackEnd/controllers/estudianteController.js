@@ -5,6 +5,8 @@
 const db = require('../config/db');
 const { registrarHistorial, refPersona, buscarPersonas } = require('../utils/historial');
 const { claseVigente } = require('../utils/clasesEliminadas');
+const { cursoNoArchivado } = require('../utils/periodos');
+const { RUTAS, nivelConRutaSQL, normalizarRuta } = require('../utils/rutaFormacion');
 const { condicionApoderadoAsociado, rolApoderadoSQL, puedeAsociarse, reactivarApoderados } = require('../utils/apoderadosEstudiante');
 const {
   validarRut,
@@ -52,7 +54,7 @@ const getEstudiantes = async (req, res) => {
       const cursoIds = cursos.map((c) => c.Curso_Id);
       let sql = `
         SELECT e.Estudiante_Id, e.Estudiante_Nombre_Completo, e.Estudiante_RUT,
-               e.Estudiante_Estado_Academico, e.Curso_Id, e.Apoderado_Usuario_Id, c.Curso_Nombre,
+               e.Estudiante_Estado_Academico, e.Estudiante_Ruta_Formacion, e.Curso_Id, e.Apoderado_Usuario_Id, c.Curso_Nombre,
                e.Estudiante_Calle, e.Estudiante_Numero, e.Estudiante_Depto, e.Estudiante_Comuna
         FROM estudiante e
         JOIN curso c ON c.Curso_Id = e.Curso_Id
@@ -75,7 +77,7 @@ const getEstudiantes = async (req, res) => {
     } else {
       let sql = `
         SELECT e.Estudiante_Id, e.Estudiante_Nombre_Completo, e.Estudiante_RUT,
-               e.Estudiante_Estado_Academico, e.Curso_Id, e.Apoderado_Usuario_Id, c.Curso_Nombre,
+               e.Estudiante_Estado_Academico, e.Estudiante_Ruta_Formacion, e.Curso_Id, e.Apoderado_Usuario_Id, c.Curso_Nombre,
                e.Estudiante_Calle, e.Estudiante_Numero, e.Estudiante_Depto, e.Estudiante_Comuna
         FROM estudiante e
         JOIN curso c ON c.Curso_Id = e.Curso_Id
@@ -158,7 +160,7 @@ const buscarEstudiantes = async (req, res) => {
       const cursoIds = cursos.map((c) => c.Curso_Id);
       [rows] = await db.query(
         `SELECT e.Estudiante_Id, e.Estudiante_Nombre_Completo, e.Estudiante_RUT,
-                e.Estudiante_Estado_Academico, e.Curso_Id, e.Apoderado_Usuario_Id, c.Curso_Nombre,
+                e.Estudiante_Estado_Academico, e.Estudiante_Ruta_Formacion, e.Curso_Id, e.Apoderado_Usuario_Id, c.Curso_Nombre,
                 e.Estudiante_Calle, e.Estudiante_Numero, e.Estudiante_Depto, e.Estudiante_Comuna
          FROM estudiante e
          JOIN curso c ON c.Curso_Id = e.Curso_Id
@@ -170,7 +172,7 @@ const buscarEstudiantes = async (req, res) => {
     } else {
       [rows] = await db.query(
         `SELECT e.Estudiante_Id, e.Estudiante_Nombre_Completo, e.Estudiante_RUT,
-                e.Estudiante_Estado_Academico, e.Curso_Id, e.Apoderado_Usuario_Id, c.Curso_Nombre,
+                e.Estudiante_Estado_Academico, e.Estudiante_Ruta_Formacion, e.Curso_Id, e.Apoderado_Usuario_Id, c.Curso_Nombre,
                 e.Estudiante_Calle, e.Estudiante_Numero, e.Estudiante_Depto, e.Estudiante_Comuna
          FROM estudiante e
          JOIN curso c ON c.Curso_Id = e.Curso_Id
@@ -250,10 +252,15 @@ const createEstudiante = async (req, res) => {
       return res.status(400).json({ mensaje: 'Ya existe un estudiante con ese RUT' });
     }
 
-    // Verificar que el curso existe
-    const [curso] = await db.query('SELECT Curso_Id FROM curso WHERE Curso_Id = ?', [Curso_Id]);
+    // RF06 / CU6: el curso debe existir y estar activo en el período vigente o, con el
+    // cierre iniciado, en el siguiente (no en un período anterior)
+    const [curso] = await db.query(
+      `SELECT c.Curso_Id FROM curso c WHERE c.Curso_Id = ? AND ${cursoNoArchivado('c')}`, [Curso_Id]
+    );
     if (curso.length === 0) {
-      return res.status(404).json({ mensaje: `No se encontró el curso con Id ${Curso_Id}` });
+      return res.status(404).json({
+        mensaje: `No se encontró el curso con Id ${Curso_Id} en el período vigente ni en el siguiente`,
+      });
     }
 
     const [resultado] = await db.query(
@@ -294,6 +301,7 @@ const CAMPOS_EDITABLES_ESTUDIANTE = new Set([
   'Estudiante_RUT',
   'Curso_Id',
   'Estudiante_Estado_Academico',
+  'Estudiante_Ruta_Formacion', // RF23 / CU105
   'Apoderado_Usuario_Id',
   ...Object.values(CAMPOS_DIRECCION_ESTUDIANTE),
 ]);
@@ -341,9 +349,33 @@ const updateEstudiante = async (req, res) => {
       Object.prototype.hasOwnProperty.call(datosFiltrados, 'Curso_Id') &&
       String(datosFiltrados.Curso_Id) !== String(actual.Curso_Id)
     ) {
-      const [curso] = await db.query('SELECT Curso_Id FROM curso WHERE Curso_Id = ?', [datosFiltrados.Curso_Id]);
+      // CU38: el curso debe existir y estar activo en el período vigente o siguiente
+      const [curso] = await db.query(
+        `SELECT c.Curso_Id FROM curso c WHERE c.Curso_Id = ? AND ${cursoNoArchivado('c')}`, [datosFiltrados.Curso_Id]
+      );
       if (curso.length === 0) {
-        return res.status(400).json({ mensaje: 'El curso seleccionado no existe o se encuentra inactivo' });
+        return res.status(400).json({ mensaje: 'El curso seleccionado no existe o no está activo en el período vigente ni en el siguiente' });
+      }
+    }
+
+    // RF23 / CU105: ruta de formación válida y solo para 2°, 3° y 4° medio (vacía la quita)
+    if (Object.prototype.hasOwnProperty.call(datosFiltrados, 'Estudiante_Ruta_Formacion')) {
+      const valor = datosFiltrados.Estudiante_Ruta_Formacion;
+      if (valor === null || valor === '') {
+        datosFiltrados.Estudiante_Ruta_Formacion = null;
+      } else {
+        const ruta = normalizarRuta(valor);
+        if (!ruta) return res.status(400).json({ mensaje: `La ruta debe ser ${RUTAS.join(', ')}` });
+        const cursoFinal = datosFiltrados.Curso_Id ?? actual.Curso_Id;
+        const [[nivel]] = await db.query(
+          `SELECT ${nivelConRutaSQL('n')} AS permite FROM curso c
+             JOIN nivel_educativo n ON n.Nivel_Educativo_Id = c.Nivel_Educativo_Id WHERE c.Curso_Id = ?`,
+          [cursoFinal]
+        );
+        if (!nivel || Number(nivel.permite) !== 1) {
+          return res.status(400).json({ mensaje: 'La ruta de formación solo se asigna a estudiantes de 2°, 3° y 4° medio' });
+        }
+        datosFiltrados.Estudiante_Ruta_Formacion = ruta;
       }
     }
 
@@ -362,6 +394,19 @@ const updateEstudiante = async (req, res) => {
       `UPDATE estudiante SET ${campos.join(', ')} WHERE Estudiante_Id = ?`,
       valores
     );
+
+    // CU105: el cambio de ruta queda en el historial con su valor anterior
+    if (Object.prototype.hasOwnProperty.call(datosFiltrados, 'Estudiante_Ruta_Formacion')
+        && (actual.Estudiante_Ruta_Formacion ?? null) !== datosFiltrados.Estudiante_Ruta_Formacion) {
+      await registrarHistorial(db, {
+        atributo: 'Estudiante_Ruta_Formacion',
+        anterior: actual.Estudiante_Ruta_Formacion,
+        nuevo: datosFiltrados.Estudiante_Ruta_Formacion,
+        descripcion: 'RF23: ruta de formación editada en la ficha',
+        estudianteId: Number(id),
+        responsableId: req.user.id,
+      });
+    }
 
     const [actualizado] = await db.query('SELECT * FROM estudiante WHERE Estudiante_Id = ?', [id]);
     res.json({ mensaje: 'Ficha actualizada correctamente', estudiante: actualizado[0] });

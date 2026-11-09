@@ -1,0 +1,343 @@
+/* CU107: disponibilidad laboral semanal del docente (tramos por día + vista por bloques) */
+.disp-semanal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.disp-semanal .disp-encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.disp-semanal .disp-periodo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.disp-semanal .disp-periodo select {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.disp-semanal .disp-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.disp-semanal button.disp-accion,
+.disp-semanal button.disp-agregar {
+  padding: 5px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #334155;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.disp-semanal button.disp-agregar {
+  border-style: dashed;
+  color: #475569;
+}
+
+.disp-semanal button.disp-accion:hover:not(:disabled),
+.disp-semanal button.disp-agregar:hover {
+  background: #f1f5f9;
+}
+
+.disp-semanal button.disp-accion:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Tramos por día */
+.disp-semanal .disp-dias {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.disp-semanal .disp-dia {
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+}
+
+.disp-semanal .disp-dia + .disp-dia {
+  border-top: 1px solid #f1f5f9;
+}
+
+.disp-semanal .disp-dia-nombre {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.disp-semanal .disp-dia-horas {
+  font-size: 0.8rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.disp-semanal .disp-tramos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.disp-semanal .disp-tramo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 8px;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  background: #f0fdf4;
+  font-size: 0.85rem;
+  color: #166534;
+}
+
+.disp-semanal .disp-tramo--lectura {
+  padding: 3px 10px;
+  font-weight: 600;
+}
+
+.disp-semanal .disp-tramo input[type="time"] {
+  padding: 2px 4px;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.85rem;
+  color: #14532d;
+}
+
+.disp-semanal button.disp-quitar {
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  color: #166534;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.disp-semanal button.disp-quitar:hover {
+  opacity: 1;
+}
+
+.disp-semanal .disp-sin-tramos {
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+@media (max-width: 560px) {
+  .disp-semanal .disp-dia {
+    grid-template-columns: 1fr auto;
+  }
+
+  .disp-semanal .disp-tramos {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* Vista por bloques de 45 minutos */
+.disp-semanal .disp-vista-bloques summary {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+}
+
+.disp-semanal .disp-tabla-wrap {
+  overflow-x: auto;
+}
+
+.disp-semanal .disp-tabla {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 4px;
+  font-size: 0.8rem;
+}
+
+.disp-semanal .disp-tabla th {
+  font-weight: 600;
+  color: #475569;
+  text-align: center;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.disp-semanal .disp-tabla td {
+  padding: 0;
+}
+
+.disp-semanal .disp-etiqueta-recreo {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.disp-semanal .disp-celda {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 44px;
+  height: 30px;
+  padding: 0 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.75rem;
+  box-sizing: border-box;
+}
+
+.disp-semanal .disp-fila-recreo .disp-celda {
+  height: 18px;
+  border-style: dashed;
+}
+
+.disp-semanal button.disp-celda {
+  cursor: pointer;
+}
+
+.disp-semanal button.disp-celda:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.disp-semanal .disp-celda--on {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+  font-weight: 600;
+}
+
+.disp-semanal .disp-celda--fuera {
+  background: #fef3c7;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.disp-semanal button:focus-visible,
+.disp-semanal input:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+.disp-semanal .disp-resumen {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.disp-semanal p {
+  margin: 0;
+}
+
+.disp-semanal .disp-aviso {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+
+.disp-semanal .disp-nota {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+/* Horario de atención de apoderados (RF55) y estados extra de la vista por bloques */
+.disp-semanal .disp-tramo--atencion {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.disp-semanal .disp-tramo--atencion input[type="time"] {
+  border-color: #bfdbfe;
+  color: #1e3a8a;
+}
+
+.disp-semanal .disp-tramo--atencion button.disp-quitar {
+  color: #1e40af;
+}
+
+.disp-semanal .disp-celda--atencion {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+.disp-semanal .disp-celda--clase {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #334155;
+  font-weight: 600;
+}
+
+.disp-semanal .disp-celda--bloqueada {
+  background: repeating-linear-gradient(45deg, #f8fafc, #f8fafc 4px, #eef2f7 4px, #eef2f7 8px);
+  border-color: #e2e8f0;
+}
+
+.disp-semanal .disp-celda--parcial {
+  background: linear-gradient(90deg, #dbeafe 50%, #f8fafc 50%);
+}
+
+.disp-semanal .disp-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 6px 0;
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.disp-semanal .disp-leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.disp-semanal .disp-muestra {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+}
+
+.disp-semanal .disp-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.disp-semanal .msg-error-form ul {
+  margin: 6px 0 0 18px;
+}

@@ -13,6 +13,7 @@ import {
   formatearDireccion,
   COLUMNAS_DIRECCION_ESTUDIANTE,
 } from "../../utils/validaciones";
+import { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
 
 // Campos de la dirección separada del estudiante (Incremento 3)
 const CAMPOS_DIRECCION_FICHA = [
@@ -22,7 +23,11 @@ const CAMPOS_DIRECCION_FICHA = [
   { clave: "comuna", label: "Comuna",                 maxLength: 60 },
 ];
 
-const ESTADOS_ACADEMICOS = ["Regular", "Irregular", "Retirado", "Egresado"];
+// CU35, CU37 y CU38: estados de registro académico. Egresado, En práctica y Retirado
+// resultan de aplicar la situación final (RF61); CU38 permite pasar de En práctica a Egresado.
+const ESTADOS_ACADEMICOS = ["Regular", "Irregular", "En práctica", "Egresado", "Retirado"];
+// CU105: rutas de formación (la Técnica es solo una marca)
+const RUTAS_FORMACION = ["Científica", "Humanística", "Técnica"];
 
 function Estudiantes() {
   const { usuario } = useAuth();
@@ -44,7 +49,7 @@ function Estudiantes() {
   const [cursosOpciones, setCursosOpciones] = useState([]);
   const [editando, setEditando] = useState(null);
   const [form, setForm] = useState({
-    Curso_Id: "", Estudiante_Estado_Academico: "", calle: "", numero: "", depto: "", comuna: "",
+    Curso_Id: "", Estudiante_Estado_Academico: "", Estudiante_Ruta_Formacion: "", calle: "", numero: "", depto: "", comuna: "",
   });
   const [guardando, setGuardando] = useState(false);
   const [msgErrorForm, setMsgErrorForm] = useState("");
@@ -78,7 +83,9 @@ function Estudiantes() {
         // para que no se reduzcan a medida que se aplican filtros posteriores.
         if (esInicial) {
           setCursosDisponibles([...new Set(data.map((e) => e.Curso_Nombre).filter(Boolean))].sort());
-          setEstadosDisponibles([...new Set(data.map((e) => e.Estudiante_Estado_Academico).filter(Boolean))].sort());
+          // El filtro ofrece siempre todos los estados (CU35, CU37) y además cualquier otro presente
+          const presentes = data.map((e) => e.Estudiante_Estado_Academico).filter(Boolean);
+          setEstadosDisponibles([...new Set([...ESTADOS_ACADEMICOS, ...presentes])]);
         }
       } else {
         // Excepciones: sin estudiantes registrados / sin coincidencias / docente sin cursos asignados
@@ -147,6 +154,7 @@ function Estudiantes() {
     setForm({
       Curso_Id: estudiante.Curso_Id ?? "",
       Estudiante_Estado_Academico: estudiante.Estudiante_Estado_Academico ?? "",
+      Estudiante_Ruta_Formacion: estudiante.Estudiante_Ruta_Formacion ?? "",
       calle:  estudiante.Estudiante_Calle  ?? "",
       numero: estudiante.Estudiante_Numero ?? "",
       depto:  estudiante.Estudiante_Depto  ?? "",
@@ -178,6 +186,7 @@ function Estudiantes() {
       const data = await editarEstudiante(editando.Estudiante_Id, {
         Curso_Id: Number(form.Curso_Id),
         Estudiante_Estado_Academico: form.Estudiante_Estado_Academico,
+        Estudiante_Ruta_Formacion: form.Estudiante_Ruta_Formacion || null,
         ...(incluyeDireccion && Object.fromEntries(
           CAMPOS_DIRECCION_FICHA.map(({ clave }) => [COLUMNAS_DIRECCION_ESTUDIANTE[clave], form[clave]])
         )),
@@ -372,7 +381,7 @@ function Estudiantes() {
                 >
                   <option value="">Selecciona un curso...</option>
                   {cursosOpciones.map((c) => (
-                    <option key={c.Curso_Id} value={c.Curso_Id}>{c.Curso_Nombre}</option>
+                    <option key={c.Curso_Id} value={c.Curso_Id}>{c.Curso_Nombre}{textoPeriodo(c.Curso_Periodo_Lectivo, c.Curso_Periodo_Estado)}</option>
                   ))}
                 </select>
               </div>
@@ -389,6 +398,21 @@ function Estudiantes() {
                     <option key={estado} value={estado}>{estado}</option>
                   ))}
                 </select>
+              </div>
+
+              {/* RF23 / CU105: ruta de formación, decidida en 2° medio */}
+              <div className="campo-pwd">
+                <label>Ruta de formación</label>
+                <select
+                  className="usuarios-select"
+                  value={form.Estudiante_Ruta_Formacion}
+                  onChange={(e) => setForm((f) => ({ ...f, Estudiante_Ruta_Formacion: e.target.value }))}
+                  style={{ width: "100%" }}
+                >
+                  <option value="">Sin ruta</option>
+                  {RUTAS_FORMACION.map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <span className="etiquetas-ayuda">Solo para 2°, 3° y 4° medio. La Técnica no afecta horarios ni electivos.</span>
               </div>
 
               {/* Incremento 3: dirección separada del estudiante */}

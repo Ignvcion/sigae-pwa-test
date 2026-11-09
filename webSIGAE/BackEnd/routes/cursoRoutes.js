@@ -1,6 +1,6 @@
 const express = require('express');
 const { getCursos, getNiveles, crearCurso, getAsignaturasDeCurso, getAsignaturasDisponibles, asignarAsignaturas } = require('../controllers/cursoController');
-const { designarProfesorJefe, retirarProfesorJefe, getEstudiantesDeCurso, getMisJefaturas } = require('../controllers/profesorJefeController');
+const { designarProfesorJefe, retirarProfesorJefe, getEstudiantesDeCurso, getMisJefaturas, asignarRutaFormacion } = require('../controllers/profesorJefeController');
 const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
 const router = express.Router();
 
@@ -18,5 +18,7 @@ router.post('/:id/asignaturas', verifyToken, verifyAdmin, asignarAsignaturas);
 router.put('/:id/profesor-jefe', verifyToken, verifyAdmin, designarProfesorJefe);
 router.delete('/:id/profesor-jefe', verifyToken, verifyAdmin, retirarProfesorJefe);
 router.get('/:id/estudiantes', verifyToken, getEstudiantesDeCurso);
+// CU105: ruta de formación de estudiantes de 2°, 3° y 4° medio
+router.put('/:id/ruta-formacion', verifyToken, verifyAdmin, asignarRutaFormacion);
 
 module.exports = router;

@@ -12,6 +12,10 @@ function proximoDia(diaSemana) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// CU107: período vigente y disponibilidad laboral del docente (vacía = sin restricción)
+const PERIODO = [[{ Parametro_Institucional_Id: 1, Parametro_Institucional_Periodo_Vigente: '2026', Parametro_Institucional_Periodo_Siguiente: null }]];
+const SIN_DISPONIBILIDAD = [[]];
+
 const bloqueBD = (extra = {}) => ({
   Horario_Atencion_Id: 1,
   Horario_Atencion_Dia_Semana: 'Martes',
@@ -50,12 +54,20 @@ describe('Pruebas Unitarias - CU87/CU88: Horario de atención de apoderados (RF5
       expect(errores.horaFin).toBe('La hora de inicio debe ser anterior a la hora de término');
     });
 
-    test('rechaza sábado, horas fuera de 08:00–18:00 y horas que no son tramos de 30 minutos', () => {
+    test('rechaza sábado, horas fuera de 08:00–18:00 y bloques sin espacio para una citación de 30 minutos', () => {
       expect(controller.validarBloque({ dia: 'Sábado', horaInicio: '10:00', horaFin: '11:00' }).errores.dia).toBeDefined();
       expect(controller.validarBloque({ dia: 'Lunes', horaInicio: '17:30', horaFin: '18:30' }).errores.horaInicio)
         .toBe('El horario de atención debe estar entre las 08:00 y las 18:00');
-      expect(controller.validarBloque({ dia: 'Lunes', horaInicio: '10:15', horaFin: '11:00' }).errores.horaInicio)
-        .toBe('Las horas deben ser en punto o y media (tramos de 30 minutos)');
+      // 10:15–10:50 no contiene ningún tramo 10:30–11:00
+      expect(controller.validarBloque({ dia: 'Lunes', horaInicio: '10:15', horaFin: '10:50' }).errores.horaFin)
+        .toBe('El bloque debe incluir al menos una citación de 30 minutos (en punto o y media)');
+    });
+
+    test('acepta tramos que no empiezan en punto ni y media (bloques de 45 minutos)', () => {
+      // 09:15–10:00 contiene la citación 09:30–10:00
+      expect(controller.validarBloque({ dia: 'Lunes', horaInicio: '09:15', horaFin: '10:00' }).errores).toBeNull();
+      expect(controller.alcanzaParaCitacion(555, 600)).toBe(true);
+      expect(controller.alcanzaParaCitacion(555, 585)).toBe(false);
     });
   });
 
@@ -80,13 +92,15 @@ describe('Pruebas Unitarias - CU87/CU88: Horario de atención de apoderados (RF5
     pool.query
       .mockResolvedValueOnce([[]])            // clases del docente en el intervalo
       .mockResolvedValueOnce([[bloqueBD()]])  // otros bloques (martes, no choca)
+      .mockResolvedValueOnce(PERIODO)
+      .mockResolvedValueOnce(SIN_DISPONIBILIDAD)
       .mockResolvedValueOnce([{ insertId: 7 }]);
 
     await controller.crearBloqueAtencion(req, res);
 
     expect(pool.query.mock.calls[0][1]).toEqual([3, 'Lunes', '16:00', '15:00']);
-    expect(pool.query.mock.calls[2][0]).toContain('INSERT INTO horario_atencion');
-    expect(pool.query.mock.calls[2][1]).toEqual(['Lunes', '15:00', '16:00', 3]);
+    expect(pool.query.mock.calls[4][0]).toContain('INSERT INTO horario_atencion');
+    expect(pool.query.mock.calls[4][1]).toEqual(['Lunes', '15:00', '16:00', 3]);
     expect(res.status).toHaveBeenCalledWith(201);
   });
 
@@ -116,7 +130,8 @@ describe('Pruebas Unitarias - CU87/CU88: Horario de atención de apoderados (RF5
 
   test('CU88: un bloque contiguo (termina cuando empieza otro) no se considera superpuesto', async () => {
     req.body = { dia: 'Martes', horaInicio: '16:00', horaFin: '17:00' };
-    pool.query.mockResolvedValueOnce([[]]).mockResolvedValueOnce([[bloqueBD()]]).mockResolvedValueOnce([{ insertId: 8 }]);
+    pool.query.mockResolvedValueOnce([[]]).mockResolvedValueOnce([[bloqueBD()]])
+      .mockResolvedValueOnce(PERIODO).mockResolvedValueOnce(SIN_DISPONIBILIDAD).mockResolvedValueOnce([{ insertId: 8 }]);
 
     await controller.crearBloqueAtencion(req, res);
 
@@ -142,6 +157,8 @@ describe('Pruebas Unitarias - CU87/CU88: Horario de atención de apoderados (RF5
       .mockResolvedValueOnce([[bloqueBD()]])  // bloque propio
       .mockResolvedValueOnce([[]])            // clases
       .mockResolvedValueOnce([[bloqueBD()]])  // bloques (se excluye a sí mismo)
+      .mockResolvedValueOnce(PERIODO)
+      .mockResolvedValueOnce(SIN_DISPONIBILIDAD)
       .mockResolvedValueOnce([[
         // queda dentro del nuevo intervalo: no se informa
         { Citacion_Id: 1, Citacion_Fecha: martes, Citacion_Tramo_Horario: '14:00 - 14:30', Citacion_Estado: 'Confirmada' },
@@ -157,7 +174,7 @@ describe('Pruebas Unitarias - CU87/CU88: Horario de atención de apoderados (RF5
     const respuesta = res.json.mock.calls[0][0];
     expect(respuesta.requiereConfirmacion).toBe(true);
     expect(respuesta.citaciones.map((c) => c.Citacion_Id)).toEqual([2]);
-    expect(pool.query).toHaveBeenCalledTimes(4); // sin UPDATE
+    expect(pool.query).toHaveBeenCalledTimes(6); // sin UPDATE
   });
 
   test('CU88: con confirmación se modifica el bloque aunque tenga citaciones a futuro', async () => {
@@ -167,6 +184,8 @@ describe('Pruebas Unitarias - CU87/CU88: Horario de atención de apoderados (RF5
       .mockResolvedValueOnce([[bloqueBD()]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[bloqueBD()]])
+      .mockResolvedValueOnce(PERIODO)
+      .mockResolvedValueOnce(SIN_DISPONIBILIDAD)
       .mockResolvedValueOnce([[
         { Citacion_Id: 2, Citacion_Fecha: proximoDia(2), Citacion_Tramo_Horario: '15:30 - 16:00', Citacion_Estado: 'Confirmada' },
       ]])
@@ -174,7 +193,7 @@ describe('Pruebas Unitarias - CU87/CU88: Horario de atención de apoderados (RF5
 
     await controller.actualizarBloqueAtencion(req, res);
 
-    expect(pool.query.mock.calls[4][0]).toContain('UPDATE horario_atencion');
+    expect(pool.query.mock.calls[6][0]).toContain('UPDATE horario_atencion');
     expect(res.json).toHaveBeenCalledWith({ mensaje: 'Bloque de atención actualizado' });
   });
 
@@ -209,5 +228,99 @@ describe('Pruebas Unitarias - CU87/CU88: Horario de atención de apoderados (RF5
 
     await controller.eliminarBloqueAtencion(req, res);
     expect(pool.query.mock.calls[2][0]).toContain('DELETE FROM horario_atencion');
+  });
+
+  test('CU107: un bloque de atención fuera de la disponibilidad laboral se rechaza', async () => {
+    req.body = { dia: 'Lunes', horaInicio: '15:00', horaFin: '16:00' };
+    pool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce(PERIODO)
+      .mockResolvedValueOnce([[{ dia: 'Lunes', hora_inicio: '08:00:00', hora_fin: '13:00:00' }]]);
+
+    await controller.crearBloqueAtencion(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json.mock.calls[0][0].mensaje).toContain('queda fuera de tu disponibilidad laboral');
+    expect(res.json.mock.calls[0][0].mensaje).toContain('08:00–13:00');
+  });
+
+  describe('Semana completa (PUT /api/horario-atencion/semana)', () => {
+    const conn = () => {
+      const c = {
+        query: jest.fn(),
+        beginTransaction: jest.fn().mockResolvedValue(),
+        commit: jest.fn().mockResolvedValue(),
+        rollback: jest.fn().mockResolvedValue(),
+        release: jest.fn(),
+      };
+      pool.getConnection = jest.fn().mockResolvedValue(c);
+      return c;
+    };
+
+    test('rechaza tramos superpuestos o sin espacio para una citación', async () => {
+      req.body = { tramos: [
+        { dia: 'Lunes', hora_inicio: '14:00', hora_fin: '16:00' },
+        { dia: 'Lunes', hora_inicio: '15:00', hora_fin: '17:00' },
+      ] };
+      await controller.guardarSemanaAtencion(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].mensaje).toContain('se superponen');
+
+      res.status.mockClear(); res.json.mockClear();
+      req.body = { tramos: [{ dia: 'Lunes', hora_inicio: '10:10', hora_fin: '10:55' }] };
+      await controller.guardarSemanaAtencion(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].mensaje).toContain('ninguna citación de 30 minutos');
+    });
+
+    test('CU87 Excepción 2: informa todos los tramos que chocan con clases y no guarda', async () => {
+      const c = conn();
+      req.body = { tramos: [{ dia: 'Lunes', hora_inicio: '09:00', hora_fin: '10:30' }] };
+      c.query
+        .mockResolvedValueOnce([[{ curso: '1ero Básico A', asignatura: 'Matemática', horaInicio: '09:15:00', horaFin: '10:00:00' }]])
+        .mockResolvedValueOnce(PERIODO)
+        .mockResolvedValueOnce(SIN_DISPONIBILIDAD);
+      await controller.guardarSemanaAtencion(req, res);
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json.mock.calls[0][0].conflictos[0]).toContain('1ero Básico A — Matemática (09:15–10:00)');
+      expect(c.rollback).toHaveBeenCalled();
+      expect(c.query.mock.calls.some(([sql]) => /DELETE FROM horario_atencion/.test(sql))).toBe(false);
+    });
+
+    test('CU88 Excepción 1: pide confirmación si una citación futura queda fuera y luego reemplaza la semana', async () => {
+      const martes = proximoDia(2);
+      const citacion = { Citacion_Id: 5, Citacion_Fecha: martes, Citacion_Tramo_Horario: '15:30 - 16:00', Citacion_Estado: 'Confirmada' };
+      const preparar = () => {
+        const c = conn();
+        c.query
+          .mockResolvedValueOnce([[]])               // clases del tramo nuevo
+          .mockResolvedValueOnce(PERIODO)
+          .mockResolvedValueOnce(SIN_DISPONIBILIDAD)
+          .mockResolvedValueOnce([[bloqueBD()]])     // bloques actuales (martes 14:00–16:00)
+          .mockResolvedValueOnce([[citacion]])       // citaciones futuras
+          .mockResolvedValue([{ affectedRows: 1 }]);
+        pool.query = jest.fn().mockResolvedValue([[bloqueBD({ Horario_Atencion_Hora_Fin: '15:00:00' })]]);
+        return c;
+      };
+      req.body = { tramos: [{ dia: 'Martes', hora_inicio: '14:00', hora_fin: '15:00' }] };
+
+      const c1 = preparar();
+      await controller.guardarSemanaAtencion(req, res);
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json.mock.calls[0][0].citaciones.map((x) => x.Citacion_Id)).toEqual([5]);
+      expect(c1.commit).not.toHaveBeenCalled();
+
+      res.status.mockClear(); res.json.mockClear();
+      req.body.confirmar = true;
+      const c2 = preparar();
+      await controller.guardarSemanaAtencion(req, res);
+      const sqls = c2.query.mock.calls.map(([sql]) => sql);
+      expect(sqls.some((q) => /DELETE FROM horario_atencion WHERE Docente_Usuario_Id/.test(q))).toBe(true);
+      const insert = c2.query.mock.calls.find(([sql]) => /INSERT INTO horario_atencion/.test(sql));
+      expect(insert[1]).toEqual([[['Martes', '14:00', '15:00', 3]]]);
+      expect(c2.commit).toHaveBeenCalled();
+      expect(res.json.mock.calls[0][0].mensaje).toContain('Horario de atención guardado');
+    });
   });
 });

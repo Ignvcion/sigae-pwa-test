@@ -79,6 +79,8 @@ UNLOCK TABLES;
 
 --
 -- Table structure for table `asignatura`
+-- Incremento 4, CU47 (RF28): Asignatura_Es_Electiva marca las asignaturas electivas de 3° y 4°
+-- medio: solo van en el plan de electivos, no en planes regulares ni en cursos (RF27, RF33).
 --
 
 DROP TABLE IF EXISTS `asignatura`;
@@ -88,9 +90,10 @@ CREATE TABLE `asignatura` (
   `Asignatura_Id` int unsigned NOT NULL AUTO_INCREMENT,
   `Asignatura_Nombre` varchar(100) NOT NULL,
   `Asignatura_Prioridad_Academica` varchar(50) NOT NULL,
+  `Asignatura_Es_Electiva` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`Asignatura_Id`),
   UNIQUE KEY `Asignatura_Nombre_UNIQUE` (`Asignatura_Nombre`)
-) ENGINE=InnoDB AUTO_INCREMENT=2227 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2231 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -99,7 +102,7 @@ CREATE TABLE `asignatura` (
 
 LOCK TABLES `asignatura` WRITE;
 /*!40000 ALTER TABLE `asignatura` DISABLE KEYS */;
-INSERT INTO `asignatura` VALUES (2222,'Matemática','Alta'),(2223,'Lenguaje y Comunicación','Alta'),(2224,'Historia, Geografía y Ciencias Sociales','Media'),(2225,'Ciencias Naturales','Media'),(2226,'Inglés','Media');
+INSERT INTO `asignatura` VALUES (2222,'Matemática','Alta',0),(2223,'Lenguaje y Comunicación','Alta',0),(2224,'Historia, Geografía y Ciencias Sociales','Media',0),(2225,'Ciencias Naturales','Media',0),(2226,'Inglés','Media',0),(2227,'Biología de los Ecosistemas','Media',1),(2228,'Física','Media',1),(2229,'Comprensión Histórica del Presente','Media',1),(2230,'Filosofía Política','Media',1);
 /*!40000 ALTER TABLE `asignatura` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -175,7 +178,51 @@ INSERT INTO `citacion` VALUES (33,'17:00 - 17:30','2026-06-20','Bullying',NULL,N
 UNLOCK TABLES;
 
 --
+-- Table structure for table `clase_electivo`
+-- Incremento 4, CU106 (RF34, RF35): electivos de 3° y 4° medio. Se programan en bloques compartidos
+-- por todos los cursos de ambos niveles del período; un bloque admite varios electivos simultáneos
+-- (de la misma o de distinta ruta): no son conflicto para el curso (RNF17).
+--
+
+DROP TABLE IF EXISTS `clase_electivo`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `clase_electivo` (
+  `Clase_Electivo_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Clase_Electivo_Periodo_Lectivo` varchar(10) NOT NULL,
+  `Clase_Electivo_Dia_Semana` varchar(20) NOT NULL,
+  `Bloque_Horario_Id` int unsigned NOT NULL,
+  `Asignatura_Id` int unsigned NOT NULL,
+  `Clase_Electivo_Ruta` varchar(20) NOT NULL,
+  `Docente_Usuario_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Clase_Electivo_Id`),
+  UNIQUE KEY `Clase_Electivo_UNIQUE` (`Clase_Electivo_Periodo_Lectivo`,`Clase_Electivo_Dia_Semana`,`Bloque_Horario_Id`,`Asignatura_Id`,`Clase_Electivo_Ruta`),
+  KEY `fk_Clase_Electivo_Bloque_idx` (`Bloque_Horario_Id`),
+  KEY `fk_Clase_Electivo_Asignatura_idx` (`Asignatura_Id`),
+  KEY `fk_Clase_Electivo_Docente_idx` (`Docente_Usuario_Id`),
+  CONSTRAINT `fk_Clase_Electivo_Asignatura` FOREIGN KEY (`Asignatura_Id`) REFERENCES `asignatura` (`Asignatura_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Clase_Electivo_Bloque` FOREIGN KEY (`Bloque_Horario_Id`) REFERENCES `bloque_horario` (`Bloque_Horario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Clase_Electivo_Docente` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `chk_Clase_Electivo_Ruta` CHECK (`Clase_Electivo_Ruta` IN ('Científica','Humanística'))
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `clase_electivo`
+--
+
+LOCK TABLES `clase_electivo` WRITE;
+/*!40000 ALTER TABLE `clase_electivo` DISABLE KEYS */;
+INSERT INTO `clase_electivo` VALUES (1,'2026','Miércoles',11111113,2227,'Científica',7),(2,'2026','Miércoles',11111113,2229,'Humanística',6);
+/*!40000 ALTER TABLE `clase_electivo` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `conversacion`
+-- Incremento 4, RF54 (CU85, CU86): usuario.Docente_Recepcion_Mensajes es la recepción general
+-- del docente; Conversacion_Habilitada_Hasta abre las respuestas del apoderado en esta conversación
+-- hasta esa fecha y hora, y Conversacion_Habilitada_Citacion_Id la citación desde la que se
+-- habilitó (si se cancela, el período se cierra).
 --
 
 DROP TABLE IF EXISTS `conversacion`;
@@ -188,9 +235,12 @@ CREATE TABLE `conversacion` (
   `Docente_Usuario_Id` int unsigned NOT NULL,
   `Apoderado_Usuario_Id` int unsigned NOT NULL,
   `Conversacion_Habilitada_Hasta` datetime DEFAULT NULL,
+  `Conversacion_Habilitada_Citacion_Id` int unsigned DEFAULT NULL,
   PRIMARY KEY (`Conversacion_Id`),
   KEY `fk Conversacion_Usuario_idx` (`Docente_Usuario_Id`),
   KEY `fk Conversacion_Apoderado_idx` (`Apoderado_Usuario_Id`),
+  KEY `fk_Conversacion_Habilitada_Citacion_idx` (`Conversacion_Habilitada_Citacion_Id`),
+  CONSTRAINT `fk_Conversacion_Habilitada_Citacion` FOREIGN KEY (`Conversacion_Habilitada_Citacion_Id`) REFERENCES `citacion` (`Citacion_Id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_Conversacion_Apoderado` FOREIGN KEY (`Apoderado_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_Conversacion_Docente` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=1115 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -202,7 +252,7 @@ CREATE TABLE `conversacion` (
 
 LOCK TABLES `conversacion` WRITE;
 /*!40000 ALTER TABLE `conversacion` DISABLE KEYS */;
-INSERT INTO `conversacion` VALUES (1111,'2026-04-11',0,3,4,NULL),(1112,'2026-04-15',1,5,4,NULL),(1113,'2026-05-01',1,3,8,NULL);
+INSERT INTO `conversacion` VALUES (1111,'2026-04-11',0,3,4,NULL,NULL),(1112,'2026-04-15',1,5,4,NULL,NULL),(1113,'2026-05-01',1,3,8,NULL,NULL);
 /*!40000 ALTER TABLE `conversacion` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -229,7 +279,7 @@ CREATE TABLE `curso` (
   KEY `fk_Curso_Profesor_Jefe_Usuario_idx` (`Curso_Profesor_Jefe_Usuario_Id`),
   CONSTRAINT `fk_Curso_Nivel_Educativo` FOREIGN KEY (`Nivel_Educativo_Id`) REFERENCES `nivel_educativo` (`Nivel_Educativo_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_Curso_Profesor_Jefe_Usuario` FOREIGN KEY (`Curso_Profesor_Jefe_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=227 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=229 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -238,12 +288,106 @@ CREATE TABLE `curso` (
 
 LOCK TABLES `curso` WRITE;
 /*!40000 ALTER TABLE `curso` DISABLE KEYS */;
-INSERT INTO `curso` VALUES (222,'A','1ero Básico A',24,3,'2026'),(223,'B','1ero Básico B',24,5,'2026'),(224,'A','2do Básico A',25,NULL,'2026'),(225,'A','1ero Medio A',32,NULL,'2026'),(226,'A','2do Medio A',33,NULL,'2026');
+INSERT INTO `curso` VALUES (222,'A','1ero Básico A',24,3,'2026'),(223,'B','1ero Básico B',24,5,'2026'),(224,'A','2do Básico A',25,NULL,'2026'),(225,'A','1ero Medio A',32,NULL,'2026'),(226,'A','2do Medio A',33,NULL,'2026'),(227,'A','3ero Medio A',34,NULL,'2026'),(228,'A','4to Medio A',35,NULL,'2026');
 /*!40000 ALTER TABLE `curso` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
+-- Table structure for table `disponibilidad_docente`
+-- Incremento 4, CU107 (RF04, RF35): disponibilidad laboral del docente. Patrón semanal
+-- por período: cada fila es un tramo horario (desde-hasta) de un día en que el docente
+-- trabaja en el colegio, con recreos y horas sin clases incluidos. Un bloque de clase
+-- está disponible si cae completo dentro de un tramo. Sin filas en un período: sin restricción.
+--
+
+DROP TABLE IF EXISTS `disponibilidad_docente`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `disponibilidad_docente` (
+  `Disponibilidad_Docente_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Disponibilidad_Docente_Periodo_Lectivo` varchar(10) NOT NULL,
+  `Disponibilidad_Docente_Dia_Semana` varchar(20) NOT NULL,
+  `Disponibilidad_Docente_Hora_Inicio` time NOT NULL,
+  `Disponibilidad_Docente_Hora_Fin` time NOT NULL,
+  `Docente_Usuario_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Disponibilidad_Docente_Id`),
+  UNIQUE KEY `Disponibilidad_Docente_UNIQUE` (`Docente_Usuario_Id`,`Disponibilidad_Docente_Periodo_Lectivo`,`Disponibilidad_Docente_Dia_Semana`,`Disponibilidad_Docente_Hora_Inicio`),
+  KEY `Disponibilidad_Docente_Periodo_idx` (`Disponibilidad_Docente_Periodo_Lectivo`),
+  CONSTRAINT `fk_Disponibilidad_Docente_Usuario` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `disponibilidad_docente`
+--
+
+LOCK TABLES `disponibilidad_docente` WRITE;
+/*!40000 ALTER TABLE `disponibilidad_docente` DISABLE KEYS */;
+INSERT INTO `disponibilidad_docente` VALUES (1,'2026','Lunes','09:00:00','12:00:00',5),(2,'2026','Martes','09:00:00','12:00:00',5),(3,'2026','Miércoles','09:00:00','12:00:00',5),(4,'2026','Jueves','09:00:00','12:00:00',5);
+/*!40000 ALTER TABLE `disponibilidad_docente` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `docente_especialidad`
+-- Incremento 4, RF04: especialidades de cada docente (etiquetas del catálogo `especialidad`).
+-- usuario.Docente_Especialidad guarda el resumen en texto ("A, B") para los listados.
+--
+
+DROP TABLE IF EXISTS `docente_especialidad`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `docente_especialidad` (
+  `Docente_Usuario_Id` int unsigned NOT NULL,
+  `Especialidad_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Docente_Usuario_Id`,`Especialidad_Id`),
+  KEY `fk_Docente_Especialidad_Especialidad_idx` (`Especialidad_Id`),
+  CONSTRAINT `fk_Docente_Especialidad_Especialidad` FOREIGN KEY (`Especialidad_Id`) REFERENCES `especialidad` (`Especialidad_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Docente_Especialidad_Usuario` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `docente_especialidad`
+--
+
+LOCK TABLES `docente_especialidad` WRITE;
+/*!40000 ALTER TABLE `docente_especialidad` DISABLE KEYS */;
+INSERT INTO `docente_especialidad` VALUES (3,1),(5,2),(6,3),(7,4),(10,5);
+/*!40000 ALTER TABLE `docente_especialidad` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `especialidad`
+-- Incremento 4, RF04: catálogo de especialidades docentes. Se llena solo al asignar
+-- especialidades a un docente (como etiquetas); el nombre es único sin distinguir
+-- mayúsculas ni tildes (collation utf8mb4_unicode_ci).
+--
+
+DROP TABLE IF EXISTS `especialidad`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `especialidad` (
+  `Especialidad_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Especialidad_Nombre` varchar(40) NOT NULL,
+  PRIMARY KEY (`Especialidad_Id`),
+  UNIQUE KEY `Especialidad_Nombre_UNIQUE` (`Especialidad_Nombre`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `especialidad`
+--
+
+LOCK TABLES `especialidad` WRITE;
+/*!40000 ALTER TABLE `especialidad` DISABLE KEYS */;
+INSERT INTO `especialidad` VALUES (1,'Matemáticas'),(2,'Lenguaje'),(3,'Historia'),(4,'Ciencias'),(5,'Inglés');
+/*!40000 ALTER TABLE `especialidad` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `estudiante`
+-- Incremento 4, CU105 (RF23): Estudiante_Ruta_Formacion, decidida en 2° medio (Científica,
+-- Humanística o Técnica). La Técnica es solo una marca, sin efecto en horarios ni electivos.
 --
 
 DROP TABLE IF EXISTS `estudiante`;
@@ -261,13 +405,15 @@ CREATE TABLE `estudiante` (
   `Estudiante_Numero` varchar(10) DEFAULT NULL,
   `Estudiante_Depto` varchar(20) DEFAULT NULL,
   `Estudiante_Comuna` varchar(60) DEFAULT NULL,
+  `Estudiante_Ruta_Formacion` varchar(20) DEFAULT NULL,
   PRIMARY KEY (`Estudiante_Id`),
   UNIQUE KEY `Estudiante_RUT_UNIQUE` (`Estudiante_RUT`),
   KEY `fk_Estudiante_Curso_idx` (`Curso_Id`),
   KEY `fk_Estudiante_Apoderado_idx` (`Apoderado_Usuario_Id`),
   CONSTRAINT `fk_Estudiante_Apoderado` FOREIGN KEY (`Apoderado_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `fk_Estudiante_Curso` FOREIGN KEY (`Curso_Id`) REFERENCES `curso` (`Curso_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=222222228 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  CONSTRAINT `fk_Estudiante_Curso` FOREIGN KEY (`Curso_Id`) REFERENCES `curso` (`Curso_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `chk_Estudiante_Ruta_Formacion` CHECK (`Estudiante_Ruta_Formacion` IN ('Científica','Humanística','Técnica'))
+) ENGINE=InnoDB AUTO_INCREMENT=222222230 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -276,7 +422,7 @@ CREATE TABLE `estudiante` (
 
 LOCK TABLES `estudiante` WRITE;
 /*!40000 ALTER TABLE `estudiante` DISABLE KEYS */;
-INSERT INTO `estudiante` VALUES (222222222,'Diego Martin Perez Castro','268283655','Regular',222,4,NULL,NULL,NULL,NULL,NULL),(222222223,'Valentina Paz Ramos González','212345678-9','Regular',222,4,NULL,NULL,NULL,NULL,NULL),(222222224,'Matías Alejandro Vera López','223456789-0','Regular',223,8,NULL,NULL,NULL,NULL,NULL),(222222225,'Isabella Fernanda Campos Silva','234567890-1','Regular',223,9,NULL,NULL,NULL,NULL,NULL),(222222226,'Sebastián Andrés Torres Díaz','245678901-2','Regular',224,8,NULL,NULL,NULL,NULL,NULL),(222222227,'Catalina Ignacia Morales Vega','256789012-3','Irregular',225,10,NULL,NULL,NULL,NULL,NULL);
+INSERT INTO `estudiante` VALUES (222222222,'Diego Martin Perez Castro','268283655','Regular',222,4,NULL,NULL,NULL,NULL,NULL,NULL),(222222223,'Valentina Paz Ramos González','212345678-9','Regular',222,4,NULL,NULL,NULL,NULL,NULL,NULL),(222222224,'Matías Alejandro Vera López','223456789-0','Regular',223,8,NULL,NULL,NULL,NULL,NULL,NULL),(222222225,'Isabella Fernanda Campos Silva','234567890-1','Regular',223,9,NULL,NULL,NULL,NULL,NULL,NULL),(222222226,'Sebastián Andrés Torres Díaz','245678901-2','Regular',224,8,NULL,NULL,NULL,NULL,NULL,NULL),(222222227,'Catalina Ignacia Morales Vega','256789012-3','Irregular',225,10,NULL,NULL,NULL,NULL,NULL,NULL),(222222228,'Tomás Ignacio Rojas Pérez','20123456-7','Regular',227,9,NULL,NULL,NULL,NULL,NULL,'Científica'),(222222229,'Florencia Andrea Soto Muñoz','19876543-2','Regular',228,9,NULL,NULL,NULL,NULL,NULL,'Humanística');
 /*!40000 ALTER TABLE `estudiante` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -585,6 +731,8 @@ UNLOCK TABLES;
 -- Table structure for table `parametro_institucional`
 -- Incremento 4, RF61: Periodo_Vigente es el año escolar en curso; Periodo_Siguiente se llena
 -- con "Iniciar cierre" y vuelve a NULL con "Iniciar nuevo período"
+-- Incremento 4 (cambios de esquema, punto 1): Estado_Cierre es una columna generada a partir
+-- de Periodo_Siguiente: 'Cierre iniciado' mientras existe un período siguiente.
 --
 
 DROP TABLE IF EXISTS `parametro_institucional`;
@@ -599,6 +747,7 @@ CREATE TABLE `parametro_institucional` (
   `Parametro_Institucional_Duracion_Recreo` int NOT NULL,
   `Parametro_Institucional_Periodo_Vigente` varchar(10) DEFAULT NULL,
   `Parametro_Institucional_Periodo_Siguiente` varchar(10) DEFAULT NULL,
+  `Parametro_Institucional_Estado_Cierre` varchar(20) GENERATED ALWAYS AS (if(`Parametro_Institucional_Periodo_Siguiente` is null,'Sin cierre','Cierre iniciado')) VIRTUAL,
   PRIMARY KEY (`Parametro_Institucional_Id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=111114 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -609,7 +758,7 @@ CREATE TABLE `parametro_institucional` (
 
 LOCK TABLES `parametro_institucional` WRITE;
 /*!40000 ALTER TABLE `parametro_institucional` DISABLE KEYS */;
-INSERT INTO `parametro_institucional` VALUES (111111,45,'08:30:00','16:30:00',8,15,'2026',NULL);
+INSERT INTO `parametro_institucional` VALUES (111111,45,'08:30:00','16:30:00',8,15,'2026',NULL,DEFAULT);
 /*!40000 ALTER TABLE `parametro_institucional` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -638,6 +787,95 @@ LOCK TABLES `plan_educativo` WRITE;
 /*!40000 ALTER TABLE `plan_educativo` DISABLE KEYS */;
 INSERT INTO `plan_educativo` VALUES (2222222,'2026',24),(2222223,'2026',25),(2222224,'2026',32),(2222225,'2026',33);
 /*!40000 ALTER TABLE `plan_educativo` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `plan_electivos`
+-- Incremento 4, CU108 (RF27): plan de electivos, único por período y común a 3° y 4° medio.
+--
+
+DROP TABLE IF EXISTS `plan_electivos`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `plan_electivos` (
+  `Plan_Electivos_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Plan_Electivos_Periodo_Lectivo` varchar(10) NOT NULL,
+  PRIMARY KEY (`Plan_Electivos_Id`),
+  UNIQUE KEY `Plan_Electivos_Periodo_UNIQUE` (`Plan_Electivos_Periodo_Lectivo`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `plan_electivos`
+--
+
+LOCK TABLES `plan_electivos` WRITE;
+/*!40000 ALTER TABLE `plan_electivos` DISABLE KEYS */;
+INSERT INTO `plan_electivos` VALUES (1,'2026');
+/*!40000 ALTER TABLE `plan_electivos` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `plan_electivos_asignatura`
+-- Incremento 4, CU108: asignaturas electivas del plan por ruta (Científica o Humanística) y sus horas
+-- semanales. Ambas rutas ocupan los mismos bloques, por eso deberían sumar las mismas horas.
+--
+
+DROP TABLE IF EXISTS `plan_electivos_asignatura`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `plan_electivos_asignatura` (
+  `Plan_Electivos_Asignatura_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Plan_Electivos_Id` int unsigned NOT NULL,
+  `Asignatura_Id` int unsigned NOT NULL,
+  `Plan_Electivos_Asignatura_Ruta` varchar(20) NOT NULL,
+  `Plan_Electivos_Asignatura_Horas` int NOT NULL,
+  PRIMARY KEY (`Plan_Electivos_Asignatura_Id`),
+  UNIQUE KEY `Plan_Electivos_Asignatura_UNIQUE` (`Plan_Electivos_Id`,`Asignatura_Id`,`Plan_Electivos_Asignatura_Ruta`),
+  KEY `fk_Plan_Electivos_Asignatura_Asignatura_idx` (`Asignatura_Id`),
+  CONSTRAINT `fk_Plan_Electivos_Asignatura_Asignatura` FOREIGN KEY (`Asignatura_Id`) REFERENCES `asignatura` (`Asignatura_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Plan_Electivos_Asignatura_Plan` FOREIGN KEY (`Plan_Electivos_Id`) REFERENCES `plan_electivos` (`Plan_Electivos_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `chk_Plan_Electivos_Asignatura_Ruta` CHECK (`Plan_Electivos_Asignatura_Ruta` IN ('Científica','Humanística')),
+  CONSTRAINT `chk_Plan_Electivos_Asignatura_Horas` CHECK (`Plan_Electivos_Asignatura_Horas` >= 1)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `plan_electivos_asignatura`
+--
+
+LOCK TABLES `plan_electivos_asignatura` WRITE;
+/*!40000 ALTER TABLE `plan_electivos_asignatura` DISABLE KEYS */;
+INSERT INTO `plan_electivos_asignatura` VALUES (1,1,2227,'Científica',3),(2,1,2228,'Científica',3),(3,1,2229,'Humanística',3),(4,1,2230,'Humanística',3);
+/*!40000 ALTER TABLE `plan_electivos_asignatura` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `plan_electivos_docente`
+-- Incremento 4, CU108: docentes habilitados para cada asignatura y ruta del plan de electivos.
+--
+
+DROP TABLE IF EXISTS `plan_electivos_docente`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `plan_electivos_docente` (
+  `Plan_Electivos_Asignatura_Id` int unsigned NOT NULL,
+  `Docente_Usuario_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Plan_Electivos_Asignatura_Id`,`Docente_Usuario_Id`),
+  KEY `fk_Plan_Electivos_Docente_Usuario_idx` (`Docente_Usuario_Id`),
+  CONSTRAINT `fk_Plan_Electivos_Docente_Asignatura` FOREIGN KEY (`Plan_Electivos_Asignatura_Id`) REFERENCES `plan_electivos_asignatura` (`Plan_Electivos_Asignatura_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Plan_Electivos_Docente_Usuario` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `plan_electivos_docente`
+--
+
+LOCK TABLES `plan_electivos_docente` WRITE;
+/*!40000 ALTER TABLE `plan_electivos_docente` DISABLE KEYS */;
+INSERT INTO `plan_electivos_docente` VALUES (1,7),(2,7),(3,6),(4,6);
+/*!40000 ALTER TABLE `plan_electivos_docente` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -790,8 +1028,8 @@ CREATE TABLE `usuario` (
   `Usuario_Contraseña` varchar(200) NOT NULL,
   `Usuario_Foto_Perfil` varchar(255) DEFAULT NULL,
   `Es_Docente` tinyint(1) NOT NULL,
-  `Docente_Carga_Horaria_Maxima` int DEFAULT NULL,
-  `Docente_Especialidad` varchar(100) DEFAULT NULL,
+  `Docente_Carga_Horaria_Semanal` int DEFAULT NULL,
+  `Docente_Especialidad` varchar(255) DEFAULT NULL,
   `Docente_Correo_Institucional` varchar(100) DEFAULT NULL,
   `Es_Administrador` tinyint(1) NOT NULL,
   `Administrador_Tipo` varchar(20) DEFAULT NULL,

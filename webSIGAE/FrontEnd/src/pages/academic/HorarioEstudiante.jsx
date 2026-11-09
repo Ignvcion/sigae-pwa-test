@@ -55,11 +55,15 @@ function HorarioEstudiante() {
     dia: h.dia,
     horaInicio: h.horaInicio,
     horaFin: h.horaFin,
-    titulo: h.asignatura,
-    lineas: [h.docente || "Docente por asignar"],
+    titulo: Number(h.electivo) === 1 ? `Electivo · ${h.asignatura}` : h.asignatura,
+    // 3° y 4° medio: los electivos muestran su ruta (solo los de la ruta del estudiante, si la tiene)
+    lineas: Number(h.electivo) === 1
+      ? [h.docente || "Docente por asignar", `Ruta ${h.ruta}`]
+      : [h.docente || "Docente por asignar"],
     colorKey: h.asignaturaId,
     estado: h.estado,
     pendiente: Boolean(Number(h.pendiente)),
+    electivo: Number(h.electivo) === 1,
   }));
 
   return (

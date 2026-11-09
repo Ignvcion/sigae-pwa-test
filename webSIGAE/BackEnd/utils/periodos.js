@@ -41,6 +41,16 @@ const enPeriodoVigente = (alias = 'ha') =>
 /** Condición sobre la tabla curso `alias`: no es de un período antiguo. Sin parámetros. */
 const cursoNoArchivado = (alias = 'c') => `${alias}.Curso_Periodo_Lectivo >= ${PERIODO_VIGENTE_SQL}`;
 
+/**
+ * 'Vigente', 'Futuro' (período siguiente, durante el cierre) o 'Anterior', para
+ * identificar el período de cada curso en las vistas de gestión (RF36, RF38, RF43, RF44).
+ */
+const estadoPeriodoCursoSQL = (alias = 'c') => `CASE
+    WHEN ${alias}.Curso_Periodo_Lectivo = ${PERIODO_VIGENTE_SQL} THEN 'Vigente'
+    WHEN ${alias}.Curso_Periodo_Lectivo > ${PERIODO_VIGENTE_SQL} THEN 'Futuro'
+    ELSE 'Anterior'
+  END`;
+
 const anioActual = () => String(new Date().getFullYear());
 
 /** "2026" -> "2027". */
@@ -53,7 +63,7 @@ const periodoSiguienteDe = (periodo) => String(Number(periodo) + 1);
 async function obtenerPeriodos(conn, { bloquear = false } = {}) {
   const [filas] = await conn.query(
     `SELECT Parametro_Institucional_Id, Parametro_Institucional_Periodo_Vigente,
-            Parametro_Institucional_Periodo_Siguiente
+            Parametro_Institucional_Periodo_Siguiente, Parametro_Institucional_Estado_Cierre
        FROM parametro_institucional ORDER BY Parametro_Institucional_Id LIMIT 1${bloquear ? ' FOR UPDATE' : ''}`
   );
   const fila = Array.isArray(filas) ? filas[0] : undefined;
@@ -63,6 +73,8 @@ async function obtenerPeriodos(conn, { bloquear = false } = {}) {
     vigente,
     siguiente,
     cierreIniciado: Boolean(siguiente),
+    // Columna generada (cambios de esquema, punto 1); se deriva igual si no viene
+    estadoCierre: fila?.Parametro_Institucional_Estado_Cierre || (siguiente ? 'Cierre iniciado' : 'Sin cierre'),
     parametroId: fila?.Parametro_Institucional_Id ?? null,
   };
 }
@@ -72,6 +84,7 @@ module.exports = {
   mismoPeriodoQueCurso,
   enPeriodoVigente,
   cursoNoArchivado,
+  estadoPeriodoCursoSQL,
   periodoSiguienteDe,
   obtenerPeriodos,
   anioActual,

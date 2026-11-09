@@ -271,6 +271,8 @@ const updateBloque = async (req, res) => {
   }
 };
 
+const MSG_BLOQUE_CON_ELECTIVOS = 'El bloque tiene electivos de 3° y 4° medio programados: quítalos desde Electivos antes de eliminarlo';
+
 const deleteBloque = async (req, res) => {
   const { id } = req.params;
   try {
@@ -303,6 +305,10 @@ const deleteBloque = async (req, res) => {
     res.json({ mensaje: 'Bloque eliminado exitosamente' });
   } catch (err) {
     if (err.code === 'ER_ROW_IS_REFERENCED_2') {
+      // CU106: un bloque con electivos programados se libera desde Electivos
+      if (String(err.message || '').includes('clase_electivo')) {
+        return res.status(409).json({ error: MSG_BLOQUE_CON_ELECTIVOS, codigo: 'TIENE_ELECTIVOS' });
+      }
       return res.status(409).json({ error: 'No se puede eliminar: el bloque está referenciado por otros registros' });
     }
     // CU50 - Excepción "Error durante la eliminación en BD"
@@ -362,6 +368,9 @@ const deleteMultiplesBloques = async (req, res) => {
     res.json({ mensaje: 'Bloques eliminados exitosamente' });
   } catch (err) {
     await conn.rollback();
+    if (err.code === 'ER_ROW_IS_REFERENCED_2' && String(err.message || '').includes('clase_electivo')) {
+      return res.status(409).json({ error: MSG_BLOQUE_CON_ELECTIVOS, codigo: 'TIENE_ELECTIVOS' });
+    }
     console.error('deleteMultiplesBloques:', err);
     res.status(500).json({ error: 'Ocurrió un error al eliminar' });
   } finally {

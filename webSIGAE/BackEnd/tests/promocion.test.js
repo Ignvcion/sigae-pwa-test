@@ -30,7 +30,9 @@ describe('utils/situacionFinal', () => {
   test('Efectos: promovido y repitente cambian de curso; el resto cambia el estado académico', () => {
     expect(EFECTOS.Promovido.destino).toBe('siguiente');
     expect(EFECTOS.Repitente.destino).toBe('mismo');
-    expect(EFECTOS.Egresado).toEqual({ destino: null, estadoAcademico: 'Egresado' });
+    expect(EFECTOS.Egresado).toEqual({ destino: null, estadoAcademico: 'Egresado', sinCierre: false });
+    // Punto abierto 2: solo Retirado se aplica sin cierre
+    expect(Object.keys(EFECTOS).filter((v) => EFECTOS[v].sinCierre)).toEqual(['Retirado']);
     expect(EFECTOS.Retirado.estadoAcademico).toBe('Retirado');
   });
 });
@@ -77,6 +79,21 @@ describe('CU100: promover curso', () => {
     await promoverCurso(req(), res);
     expect(res.status).toHaveBeenCalledWith(409);
     expect(conn.rollback).toHaveBeenCalled();
+  });
+
+  test('Punto abierto 2: sin cierre, egresados y en práctica tampoco se aplican (409)', async () => {
+    for (const valor of ['Egresado', 'En práctica']) {
+      res.status.mockClear();
+      const conn = mockConexion([
+        [/FROM curso c\s+JOIN nivel_educativo n/, CURSO],
+        [/FROM parametro_institucional/, periodos(null)],
+        [/FROM situacion_final sf/, [[sit(1, valor)]]],
+      ]);
+      await promoverCurso(req({ estudianteIds: [1] }), res);
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json.mock.calls.at(-1)[0].mensaje).toContain('solo se pueden aplicar retiros');
+      expect(conn.commit).not.toHaveBeenCalled();
+    }
   });
 
   test('Sin cierre, un retiro sí se aplica: cambia el estado académico y queda Aplicado', async () => {

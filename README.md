@@ -257,7 +257,7 @@ cd webSIGAE/BackEnd && PUPPETEER_SKIP_DOWNLOAD=true npm ci --omit=dev
   `GRANT SELECT, INSERT, UPDATE, DELETE ON sigae.* TO 'sigae_app'@'%';` (restringe el host a la subred de la EC2 si puedes).
 - Después del esquema, carga **una vez** los niveles educativos con su orden (sin ellos no funciona la promoción): `mariadb -h <endpoint> -u <admin> -p < webSIGAE/Database/catalogos_base.sql`. Es idempotente (`INSERT IGNORE`).
 - El resto parte vacío: parámetros institucionales y bloques, asignaturas, planes, cursos y horarios se cargan desde la aplicación. Al guardar los parámetros institucionales queda fijado el período vigente (el año actual).
-- El primer administrador real se crea con un script puntual (contraseña hasheada con bcrypt); **no** con `hashPasswords.js`.
+- El primer administrador real (y los super administradores adicionales) se crean con `node scripts/crearSuperAdmin.js --rut 12345678-9 --nombre "Ana Pérez" --telefono 912345678 --correo an.perez@jacquescousteau.edu`, desde `webSIGAE/BackEnd` y con el `.env` de producción. La contraseña se pide por consola (o se toma de `SUPERADMIN_PASSWORD`) y se guarda con bcrypt. **No** se usa `hashPasswords.js`.
 
 ### 3. `.env` de producción
 

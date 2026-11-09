@@ -1,0 +1,221 @@
+SIGAE - Incremento 4
+Disponibilidad laboral del docente (CU107), horario de atención de apoderados
+(RF55, RF56 / CU87, CU88, CU89) y especialidades como etiquetas (RF04)
+Fecha: 2026-11-06
+
+======================================================================
+1. DISPONIBILIDAD LABORAL SEMANAL (CU107; RF04, RF35)
+======================================================================
+
+1.1 Es un patrón SEMANAL por período lectivo: por cada día (lunes a viernes),
+    uno o más TRAMOS "desde–hasta" en que el docente está en el colegio
+    (por ejemplo, lunes 08:00–13:00 y 14:00–17:30). Los tramos incluyen
+    recreos y horas sin clases (corregir pruebas, reuniones), no solo los
+    bloques de clase. Se repite todas las semanas del período, igual que la
+    carga horaria, que también es semanal (RF04, glosario: la columna
+    usuario.Docente_Carga_Horaria_Maxima pasó a llamarse
+    Docente_Carga_Horaria_Semanal, "carga horaria semanal contratada").
+
+1.2 Las clases se siguen asignando por bloques de 45 minutos: un bloque está
+    disponible si cae COMPLETO dentro de un tramo (los tramos contiguos se
+    unen). La "Vista por bloques de clase" muestra qué bloques quedan
+    cubiertos, y un clic en un bloque libre lo suma a los tramos.
+
+1.3 Reglas de los tramos: entre 06:00 y 23:00, de al menos 15 minutos, sin
+    superponerse en el mismo día y hasta 6 por día.
+
+1.4 Solo el administrador la edita, y la carga horaria semanal también. Se
+    configura al registrar un docente y en el bloque "Disponibilidad laboral
+    semanal" de su perfil. El docente la ve (solo lectura) en "Mi
+    disponibilidad laboral" de su propio perfil.
+
+1.5 Un docente sin tramos registrados en un período NO tiene restricción:
+    puede asignarse en cualquier bloque. Así siguen funcionando los
+    horarios ya armados y los docentes registrados antes de este cambio.
+
+1.6 Asignar una clase fuera de la disponibilidad se BLOQUEA (crear o editar
+    una clase, edición masiva CU63/CU64, migrar clases CU81); el mensaje dice
+    qué tramos tiene libres ese día. El bloqueo se levanta editando la
+    disponibilidad. Solo se valida cuando cambia el docente, el día, el
+    bloque o el curso de la clase.
+
+1.7 Horas disponibles = suma de los tramos de la semana (con recreos y horas
+    sin clases). Horas adeudadas = carga horaria semanal − horas disponibles.
+    Solo ADVIERTE; no impide armar el horario.
+
+1.8 Si al editar la disponibilidad una clase ya asignada queda fuera de los
+    tramos, la clase se mantiene y se informa con advertencia.
+
+1.9 Al iniciar un nuevo período se borra la disponibilidad de los períodos
+    anteriores al nuevo vigente. Durante el cierre se puede registrar la
+    del período siguiente (selector de período).
+
+======================================================================
+1B. HORARIO DE ATENCIÓN DE APODERADOS (RF55, RF56 / CU87, CU88, CU89)
+======================================================================
+
+1B.1 El DOCENTE configura su horario de atención con la misma interfaz que la
+     disponibilidad laboral: tramos "desde–hasta" por día y la vista por
+     bloques de 45 minutos (un clic en un bloque libre lo suma). Se edita en
+     "Mi horario" (vía de CU87) y en "Mi horario de atención de apoderados"
+     de su perfil; ambos usan el mismo componente. La semana se guarda
+     completa (PUT /api/horario-atencion/semana); los endpoints por bloque
+     (POST/PUT/DELETE /api/horario-atencion) se mantienen.
+
+1B.2 Reglas que lo enlazan con el resto del sistema:
+       - Entre 08:00 y 18:00 (rango de los tramos de citación).
+       - Cada tramo debe incluir al menos una citación de 30 minutos en punto
+         o y media. Ya no se exige que el tramo empiece en punto o y media:
+         puede seguir los bloques de 45 minutos (p. ej. 09:15–10:00 ofrece la
+         citación 09:30–10:00).
+       - CU87 Excepción 2: no se superpone con sus clases del período vigente.
+       - CU87 Excepción 3: no se superpone con otro tramo de atención.
+       - NUEVO, CU107: debe quedar dentro de la disponibilidad laboral del
+         docente en el período vigente, si la tiene registrada.
+       - CU88 Excepción 1: si el cambio deja fuera citaciones a futuro
+         (pendientes o confirmadas), se listan y se pide confirmación; las
+         citaciones se mantienen.
+
+1B.3 Si el administrador reduce la disponibilidad laboral y un tramo de
+     atención queda fuera, se guarda igual con advertencia (como las clases)
+     y el docente debe ajustarlo: su editor marca el tramo y no deja guardar
+     hasta corregirlo. La vista de disponibilidad muestra la atención.
+
+1B.4 CU89: al solicitar una citación, el apoderado ve el horario de atención
+     semanal del docente ("Lunes 10:00–11:00 · Martes 14:00–16:00 …") y,
+     debajo, los tramos de 30 minutos libres de las próximas semanas.
+
+1B.5 Las citaciones siguen durando 30 minutos (Citacion_Tramo_Horario
+     "HH:MM - HH:MM"); no se cambiaron a 45 minutos.
+
+======================================================================
+1C. TEXTO PROPUESTO PARA DOCUMENTO 0 (alinear CU con lo implementado)
+======================================================================
+
+  CU107, Descripciones: "El actor abre el perfil del docente (o lo registra)
+    y, en Disponibilidad laboral semanal, define por día uno o más tramos
+    desde–hasta en que el docente está en el colegio, incluidos recreos y
+    horas sin clases. El sistema muestra la vista por bloques de 45 minutos
+    con los bloques cubiertos, las clases y el horario de atención [...]".
+    Excepción 2: agregar "o tramos de atención de apoderados".
+    Agregar: "El docente ve su disponibilidad en su perfil, sin editarla."
+    Pendiente: el indicador "debe horas" en el horario por docente y en el
+    horario maestro (hoy se muestra en el creador de horarios y en el perfil).
+
+  CU87, Descripciones: "El docente accede a su horario o a su perfil y
+    define, por día, tramos desde–hasta de atención [...]. El sistema valida
+    que no se superpongan con sus clases del período vigente [Excepción 2]
+    ni entre sí [Excepción 3], que queden dentro de su disponibilidad laboral
+    [Excepción 4] y que incluyan al menos una citación de 30 minutos
+    [Excepción 1]". Nueva Excepción 4: "El tramo queda fuera de la
+    disponibilidad laboral del docente. El sistema lo rechaza e indica los
+    tramos disponibles de ese día." Dependencias: agregar RF04 (CU107).
+
+  CU88, Excepción 2: agregar "o quedan fuera de la disponibilidad laboral".
+
+  CU89, Descripciones: "El sistema muestra el horario de atención semanal
+    del docente y los tramos de 30 minutos disponibles [Excepción 2]".
+
+======================================================================
+2. ESPECIALIDADES COMO ETIQUETAS (RF04)
+======================================================================
+
+2.1 Un docente puede tener de 1 a 6 especialidades. Se eligen como
+    etiquetas (al estilo Notion): al escribir se sugieren las existentes y
+    se puede crear una nueva con Enter.
+
+2.2 El catálogo `especialidad` se arma solo con las etiquetas que se
+    asignan. El nombre es único sin distinguir mayúsculas ni tildes:
+    "matematicas" reutiliza "Matemáticas". Las etiquetas que quedan sin
+    docentes se eliminan del catálogo.
+
+2.3 usuario.Docente_Especialidad guarda el resumen en texto
+    ("Matemáticas, Física") que usan los listados, la mensajería y el
+    creador de horarios. Lo escribe solo utils/especialidades.js.
+
+2.4 El listado de docentes filtra por etiqueta del catálogo (CU31) y el
+    creador de horarios recomienda al docente si alguna de sus etiquetas
+    coincide con la asignatura.
+
+======================================================================
+3. ESQUEMA (SIGAE.sql y schema_base.sql regenerado)
+======================================================================
+
+  - disponibilidad_docente (docente, período, día, hora de inicio y de
+    término del tramo), con CASCADE al borrar el docente.
+  - especialidad (catálogo) y docente_especialidad (docente ↔ etiqueta).
+  - usuario.Docente_Especialidad pasa de varchar(100) a varchar(255).
+  - usuario.Docente_Carga_Horaria_Maxima se renombra a Docente_Carga_Horaria_Semanal.
+
+  Si la base de la RDS ya está cargada, aplicar a mano (MariaDB):
+
+    ALTER TABLE usuario MODIFY Docente_Especialidad varchar(255) DEFAULT NULL;
+
+    -- RF04 y glosario: "Carga horaria máxima" pasa a "Carga horaria semanal"
+    ALTER TABLE usuario CHANGE Docente_Carga_Horaria_Maxima Docente_Carga_Horaria_Semanal int DEFAULT NULL;
+
+    CREATE TABLE especialidad (
+      Especialidad_Id int unsigned NOT NULL AUTO_INCREMENT,
+      Especialidad_Nombre varchar(40) NOT NULL,
+      PRIMARY KEY (Especialidad_Id),
+      UNIQUE KEY Especialidad_Nombre_UNIQUE (Especialidad_Nombre)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE docente_especialidad (
+      Docente_Usuario_Id int unsigned NOT NULL,
+      Especialidad_Id int unsigned NOT NULL,
+      PRIMARY KEY (Docente_Usuario_Id, Especialidad_Id),
+      KEY fk_Docente_Especialidad_Especialidad_idx (Especialidad_Id),
+      CONSTRAINT fk_Docente_Especialidad_Especialidad FOREIGN KEY (Especialidad_Id)
+        REFERENCES especialidad (Especialidad_Id) ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT fk_Docente_Especialidad_Usuario FOREIGN KEY (Docente_Usuario_Id)
+        REFERENCES usuario (Usuario_Id) ON DELETE CASCADE ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE disponibilidad_docente (
+      Disponibilidad_Docente_Id int unsigned NOT NULL AUTO_INCREMENT,
+      Disponibilidad_Docente_Periodo_Lectivo varchar(10) NOT NULL,
+      Disponibilidad_Docente_Dia_Semana varchar(20) NOT NULL,
+      Disponibilidad_Docente_Hora_Inicio time NOT NULL,
+      Disponibilidad_Docente_Hora_Fin time NOT NULL,
+      Docente_Usuario_Id int unsigned NOT NULL,
+      PRIMARY KEY (Disponibilidad_Docente_Id),
+      UNIQUE KEY Disponibilidad_Docente_UNIQUE (Docente_Usuario_Id, Disponibilidad_Docente_Periodo_Lectivo,
+        Disponibilidad_Docente_Dia_Semana, Disponibilidad_Docente_Hora_Inicio),
+      KEY Disponibilidad_Docente_Periodo_idx (Disponibilidad_Docente_Periodo_Lectivo),
+      CONSTRAINT fk_Disponibilidad_Docente_Usuario FOREIGN KEY (Docente_Usuario_Id)
+        REFERENCES usuario (Usuario_Id) ON DELETE CASCADE ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    -- Pasar las especialidades existentes al catálogo (una por docente):
+    INSERT IGNORE INTO especialidad (Especialidad_Nombre)
+      SELECT DISTINCT TRIM(Docente_Especialidad) FROM usuario
+       WHERE Es_Docente = 1 AND TRIM(COALESCE(Docente_Especialidad, '')) <> '';
+    INSERT IGNORE INTO docente_especialidad (Docente_Usuario_Id, Especialidad_Id)
+      SELECT u.Usuario_Id, e.Especialidad_Id FROM usuario u
+        JOIN especialidad e ON e.Especialidad_Nombre = TRIM(u.Docente_Especialidad)
+       WHERE u.Es_Docente = 1;
+
+======================================================================
+4. DÓNDE ESTÁ
+======================================================================
+
+  - Reglas: BackEnd/utils/disponibilidadLaboral.js, utils/especialidades.js.
+  - API (administrador, salvo donde se indica):
+      GET /api/especialidades
+      GET /api/usuarios/disponibilidad/opciones
+      GET /api/usuarios/:id/disponibilidad?periodo=  (también el propio docente)
+      POST /api/usuarios y PUT /api/usuarios/:id reciben
+        Docente_Especialidades: ["Matemáticas", ...] y
+        Docente_Disponibilidad: { periodo?, tramos: [{ dia, hora_inicio: "08:00", hora_fin: "13:00" }] }
+  - Validación al asignar: horarioController (crear, editar, edición
+    masiva, docentes-disponibles) y conflictosHorarioController (migrar).
+  - Horario de atención: GET/PUT /api/horario-atencion/semana (docente);
+    reglas en BackEnd/controllers/horarioAtencionController.js.
+  - Pantallas: Registrar docente, Editar datos (perfil del docente),
+    Mi disponibilidad laboral (perfil propio del docente, solo lectura),
+    Mi horario de atención de apoderados (perfil del docente y Mi horario),
+    Solicitar citación (apoderado: horario de atención del docente),
+    Gestión de roles (etiquetas), Docentes (filtro por etiqueta),
+    creador de horarios (motivo "fuera de su disponibilidad laboral" y
+    aviso de horas adeudadas).

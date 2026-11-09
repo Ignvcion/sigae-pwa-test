@@ -10,6 +10,8 @@ const pool = require('../config/db');
 const { mismoPeriodoQueCurso } = require('../utils/periodos');
 const { condicionDesajustado, motivoDesajuste } = require('../utils/bloquesDesajustados');
 const { claseVigente, purgarClasesEliminadas } = require('../utils/clasesEliminadas');
+const { periodoDelCurso, validarDisponibilidad } = require('../utils/disponibilidadLaboral');
+const { cursoConElectivosSQL } = require('../utils/electivos');
 
 const ORDEN_DIAS = `FIELD(ha.Horario_Asignatura_Dia_Semana, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes')`;
 
@@ -141,13 +143,15 @@ async function limpiarBloqueVacio(conn, bloqueId) {
     `SELECT ${condicionDesajustado('bh')} AS Desajustado,
             (SELECT COUNT(*) FROM horario_asignatura x
               WHERE x.Bloque_Horario_Id = bh.Bloque_Horario_Id AND ${claseVigente('x')}) AS Clases,
-            (SELECT COUNT(*) FROM afecta af WHERE af.Bloque_Horario_Id = bh.Bloque_Horario_Id) AS Eventos
+            (SELECT COUNT(*) FROM afecta af WHERE af.Bloque_Horario_Id = bh.Bloque_Horario_Id) AS Eventos,
+            (SELECT COUNT(*) FROM clase_electivo ce WHERE ce.Bloque_Horario_Id = bh.Bloque_Horario_Id) AS Electivos
        FROM bloque_horario bh
       WHERE bh.Bloque_Horario_Id = ?`,
     [bloqueId]
   );
 
-  if (!bloque || Number(bloque.Desajustado) !== 1 || Number(bloque.Clases) > 0 || Number(bloque.Eventos) > 0) {
+  if (!bloque || Number(bloque.Desajustado) !== 1 || Number(bloque.Clases) > 0 || Number(bloque.Eventos) > 0
+      || Number(bloque.Electivos || 0) > 0) {
     return false;
   }
 
@@ -228,6 +232,43 @@ const migrarClase = async (req, res) => {
         await conn.rollback();
         return res.status(409).json({ error: `El docente ya tiene clase con ${choqueDocente.Curso_Nombre} en ese horario el ${clase.Dia}` });
       }
+
+      // CU107: el bloque de destino debe estar en la disponibilidad laboral del docente.
+      // Si los bloques se redefinieron, hay que actualizar también su disponibilidad.
+      const fueraDisponibilidad = await validarDisponibilidad(conn, {
+        docenteId: clase.Usuario_Id, periodo: await periodoDelCurso(conn, clase.Curso_Id),
+        dia: clase.Dia, horaInicio: destino.Bloque_Horario_Hora_Inicio, horaFin: destino.Bloque_Horario_Hora_Fin,
+      });
+      if (fueraDisponibilidad) {
+        await conn.rollback();
+        return res.status(422).json({ error: fueraDisponibilidad });
+      }
+    }
+
+    // CU54 / CU106: el destino no puede cruzarse con electivos de 3° y 4° medio (si el curso
+    // es de esos niveles) ni con un electivo del docente ese día
+    const filasElectivo = await conn.query(
+      `SELECT a.Asignatura_Nombre, ce.Clase_Electivo_Ruta AS Ruta,
+              (ce.Docente_Usuario_Id <=> ?) AS DelDocente
+         FROM curso c
+         JOIN clase_electivo ce ON ce.Clase_Electivo_Periodo_Lectivo = c.Curso_Periodo_Lectivo
+         JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ce.Bloque_Horario_Id
+         JOIN asignatura a      ON a.Asignatura_Id      = ce.Asignatura_Id
+        WHERE c.Curso_Id = ? AND ce.Clase_Electivo_Dia_Semana = ?
+          AND bh.Bloque_Horario_Hora_Inicio < ? AND bh.Bloque_Horario_Hora_Fin > ?
+          AND (${cursoConElectivosSQL('c')} OR ce.Docente_Usuario_Id <=> ?)
+        LIMIT 1`,
+      [clase.Usuario_Id || null, clase.Curso_Id, clase.Dia, destino.Bloque_Horario_Hora_Fin,
+        destino.Bloque_Horario_Hora_Inicio, clase.Usuario_Id || null]
+    );
+    const [choqueElectivo] = Array.isArray(filasElectivo?.[0]) ? filasElectivo[0] : [];
+    if (choqueElectivo) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: Number(choqueElectivo.DelDocente) === 1
+          ? `El docente tiene el electivo ${choqueElectivo.Asignatura_Nombre} (${choqueElectivo.Ruta}) en ese horario el ${clase.Dia}`
+          : `Ese horario del ${clase.Dia} está ocupado por electivos de 3° y 4° medio`,
+      });
     }
 
     await conn.query(

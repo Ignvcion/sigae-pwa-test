@@ -3,6 +3,9 @@ const express = require('express');
 const router = express.Router();
 
 const {
+  obtenerRecepcion,
+  actualizarRecepcion,
+  habilitarConversacion,
   obtenerConversaciones,
   obtenerMensajes,
   enviarMensaje,
@@ -18,6 +21,13 @@ const { verifyToken } = require('../middleware/authMiddleware');
 // participación en la conversación se resuelve dentro del controlador.
 router.use(verifyToken);
 
+
+// RF54 / CU85: recepción general de mensajes de apoderados (docente)
+router.get('/recepcion', obtenerRecepcion);
+router.put('/recepcion', actualizarRecepcion);
+
+// RF54 / CU86: habilitar respuestas del apoderado en una conversación hasta una fecha y hora
+router.put('/conversaciones/:id/habilitacion', habilitarConversacion);
 
 // Contactos válidos según la relación docente-apoderado (?rol=)
 router.get('/contactos', obtenerContactos);

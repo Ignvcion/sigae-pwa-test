@@ -1,0 +1,274 @@
+SIGAE - Incremento 4
+Decisiones y ajustes del 9 de noviembre (contraste con "SIGAE Incremento 4. Ajustes a
+Documento 0 y nuevos RF y CU", 6-nov)
+
+======================================================================
+1. RF54 / CU85, CU86: RECEPCIÓN DE MENSAJES DE APODERADOS (implementado)
+======================================================================
+
+1.1 CU85: en Mensajes, el docente ve el estado de su recepción general
+    (usuario.Docente_Recepcion_Mensajes) y lo cambia con confirmación.
+    Deshabilitada, sus apoderados pueden leer los mensajes pero no responder.
+    Excepción 1: si falla al guardar, se informa y se mantiene el estado.
+    Excepción 2: si un apoderado intenta enviar, el servidor responde 403
+    ("El docente no está recibiendo mensajes...") y la pantalla del
+    apoderado reemplaza el campo de respuesta por ese aviso.
+
+1.2 CU86: con la recepción general deshabilitada, el docente habilita que
+    un apoderado responda en una conversación hasta una fecha y hora
+    (conversacion.Conversacion_Habilitada_Hasta), desde la conversación o
+    desde el detalle de una citación ("Habilitar respuestas hasta la
+    reunión": hasta el término del tramo de la citación).
+    - Excepción 1: un término anterior a la fecha y hora actual se rechaza
+      (máximo un año).
+    - Al vencer el período, la recepción se cierra sola (se compara con
+      la hora del servidor de base de datos).
+    - Excepción 2: si la citación se cancela, el período se cierra. Nueva
+      columna conversacion.Conversacion_Habilitada_Citacion_Id. Si la
+      citación se reprograma, el término se mueve al nuevo tramo.
+
+1.3 El docente siempre puede escribir. Un apoderado no puede abrir una
+    conversación nueva con un docente que no recibe mensajes; si ya existe
+    una, la abre para leer. En "+ Nueva", el apoderado ve "No está
+    recibiendo mensajes" junto al docente.
+
+1.4 API: GET/PUT /api/mensajes/recepcion,
+    PUT /api/mensajes/conversaciones/:id/habilitacion { hasta | null },
+    POST /api/citaciones/:id/habilitar-respuestas.
+    Reglas en BackEnd/utils/recepcionMensajes.js.
+
+======================================================================
+2. AJUSTES PEDIDOS AL CONTRASTAR CON EL DOCUMENTO
+======================================================================
+
+2.1 Carga horaria semanal (RF04, glosario): la columna
+    usuario.Docente_Carga_Horaria_Maxima se renombró a
+    Docente_Carga_Horaria_Semanal y todos los textos dicen "Carga horaria
+    semanal". Exceder la carga sigue bloqueando la asignación.
+
+2.2 RF35 / CU56, especialidad: DECIDIDO que es una SUGERENCIA, no un
+    bloqueo. El servidor calcula si alguna especialidad (etiqueta) del
+    docente coincide con la asignatura (sin mayúsculas ni tildes, y
+    aceptando que una contenga a la otra). El creador de horarios ordena y
+    marca a los "Sugeridos"; al guardar una clase o validar una edición
+    masiva (CU63, CU64) se informa la sugerencia y se puede seguir.
+    Texto propuesto para CU56: "El sistema valida el choque de horario
+    dentro del mismo período, la carga horaria semanal y la disponibilidad
+    laboral del docente; si alguna no se cumple, bloquea la asignación. La
+    especialidad se muestra como sugerencia: si no coincide con la
+    asignatura, el sistema lo informa y permite continuar."
+
+2.3 CU35, CU37, CU38: el filtro por estado de registro académico ofrece
+    siempre Regular, Irregular, En práctica, Egresado y Retirado (antes solo
+    mostraba los estados presentes en los datos), y la edición de la ficha
+    permite En práctica.
+
+2.4 RF36, RF38, RF43, RF44: en Gestión de horarios, Consulta de horarios y
+    Horario maestro cada curso lleva una etiqueta en una esquina:
+    "Vigente 2026" o "Futuro 2027" (período siguiente durante el cierre);
+    en los selectores, el texto " · Vigente 2026". La consulta y el horario
+    maestro ya no incluyen cursos de períodos archivados.
+
+2.5 Punto abierto 2: CONFIRMADO por el PO que solo Retirado se aplica sin el
+    cierre iniciado. Promovido, Repitente, Egresado y En práctica esperan el
+    cierre (CU100, CU101). Corregido en el código.
+
+2.6 Punto abierto 13: CONFIRMADO. Un administrador (o super administrador)
+    no puede ser además docente ni apoderado; el código ya lo impedía y se
+    mantiene. Documento 0 debe quitar el supuesto contrario de RF17 y CU103
+    ("se quita el rol de apoderado a usuarios que también son docentes o
+    administradores" → "...que también son docentes").
+
+2.7 Autenticación (sección 1.3, punto 3): el sistema autentica con RUT y
+    contraseña. Documento 0 debe unificar UR 1.9 y el glosario de
+    autenticación con RF09: "El usuario se autentica con su RUT y su
+    contraseña". El correo se usa solo para recuperar la contraseña.
+
+======================================================================
+3. ESTADO DEL CIERRE (punto 1 de cambios de esquema): PROPUESTA
+======================================================================
+
+Hoy el cierre se deduce de que parametro_institucional.Periodo_Siguiente
+tenga valor: "Iniciar cierre" lo llena y "Iniciar nuevo período" lo vacía.
+Funciona y no puede quedar inconsistente, pero el documento pide un "estado
+del cierre" explícito en los parámetros institucionales.
+
+Propuesta: agregar una columna GENERADA (calculada por la base, no editable):
+
+    ALTER TABLE parametro_institucional
+      ADD COLUMN Parametro_Institucional_Estado_Cierre varchar(20)
+        AS (IF(Parametro_Institucional_Periodo_Siguiente IS NULL,
+               'Sin cierre', 'Cierre iniciado')) VIRTUAL;
+
+- Cumple el punto 1 al pie de la letra y queda visible en la tabla y en los
+  respaldos, sin una segunda fuente de verdad que pueda desincronizarse.
+- No cambia el código: la API ya expone cierreIniciado.
+- Alternativa descartada: una columna normal, que habría que mantener a
+  mano y podría quedar en "Cierre iniciado" sin período siguiente.
+APLICADA (commit 31f2a2b): la columna está en SIGAE.sql y la API la expone como
+estadoCierre. El ALTER para la RDS está en la sección 4.
+
+======================================================================
+4. ESQUEMA (SIGAE.sql y schema_base.sql regenerado)
+======================================================================
+
+Si la base de la RDS ya está cargada, aplicar además de los ALTER de
+docs/disponibilidad-y-especialidades-docente.txt (MariaDB):
+
+IMPORTANTE: conectarse con  mariadb --default-character-set=utf8mb4 ...
+Las restricciones CHECK de las rutas llevan tildes ('Científica'); con un
+cliente en latin1 quedan mal codificadas y la base rechaza toda ruta.
+Verificado: el esquema de main + estos ALTER queda idéntico a
+schema_base.sql (columnas, índices, llaves, CHECK y reglas de borrado).
+
+    SET NAMES utf8mb4;  -- los CHECK de ruta llevan tildes
+
+    -- (El renombre de la carga horaria, RF04, ya está en ese archivo.)
+
+    -- RF54 / CU86 Excepción 2
+    ALTER TABLE conversacion
+      ADD COLUMN Conversacion_Habilitada_Citacion_Id int unsigned DEFAULT NULL,
+      ADD KEY fk_Conversacion_Habilitada_Citacion_idx (Conversacion_Habilitada_Citacion_Id),
+      ADD CONSTRAINT fk_Conversacion_Habilitada_Citacion FOREIGN KEY (Conversacion_Habilitada_Citacion_Id)
+        REFERENCES citacion (Citacion_Id) ON DELETE SET NULL ON UPDATE CASCADE;
+
+    -- Estado del cierre (sección 3, columna generada)
+    ALTER TABLE parametro_institucional
+      ADD COLUMN Parametro_Institucional_Estado_Cierre varchar(20)
+        AS (IF(Parametro_Institucional_Periodo_Siguiente IS NULL,
+               'Sin cierre', 'Cierre iniciado')) VIRTUAL;
+
+    -- CU105 / RF23: ruta de formación del estudiante (2°, 3° y 4° medio)
+    ALTER TABLE estudiante
+      ADD COLUMN Estudiante_Ruta_Formacion varchar(20) DEFAULT NULL,
+      ADD CONSTRAINT chk_Estudiante_Ruta_Formacion
+        CHECK (Estudiante_Ruta_Formacion IN ('Científica','Humanística','Técnica'));
+
+    -- Electivos de 3° y 4° medio (sección 5)
+    ALTER TABLE asignatura ADD COLUMN Asignatura_Es_Electiva tinyint(1) NOT NULL DEFAULT 0;
+
+    CREATE TABLE plan_electivos (
+      Plan_Electivos_Id int unsigned NOT NULL AUTO_INCREMENT,
+      Plan_Electivos_Periodo_Lectivo varchar(10) NOT NULL,
+      PRIMARY KEY (Plan_Electivos_Id),
+      UNIQUE KEY Plan_Electivos_Periodo_UNIQUE (Plan_Electivos_Periodo_Lectivo)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE plan_electivos_asignatura (
+      Plan_Electivos_Asignatura_Id int unsigned NOT NULL AUTO_INCREMENT,
+      Plan_Electivos_Id int unsigned NOT NULL,
+      Asignatura_Id int unsigned NOT NULL,
+      Plan_Electivos_Asignatura_Ruta varchar(20) NOT NULL,
+      Plan_Electivos_Asignatura_Horas int NOT NULL,
+      PRIMARY KEY (Plan_Electivos_Asignatura_Id),
+      UNIQUE KEY Plan_Electivos_Asignatura_UNIQUE (Plan_Electivos_Id, Asignatura_Id, Plan_Electivos_Asignatura_Ruta),
+      KEY fk_Plan_Electivos_Asignatura_Asignatura_idx (Asignatura_Id),
+      CONSTRAINT fk_Plan_Electivos_Asignatura_Asignatura FOREIGN KEY (Asignatura_Id)
+        REFERENCES asignatura (Asignatura_Id) ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT fk_Plan_Electivos_Asignatura_Plan FOREIGN KEY (Plan_Electivos_Id)
+        REFERENCES plan_electivos (Plan_Electivos_Id) ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT chk_Plan_Electivos_Asignatura_Ruta CHECK (Plan_Electivos_Asignatura_Ruta IN ('Científica','Humanística')),
+      CONSTRAINT chk_Plan_Electivos_Asignatura_Horas CHECK (Plan_Electivos_Asignatura_Horas >= 1)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE plan_electivos_docente (
+      Plan_Electivos_Asignatura_Id int unsigned NOT NULL,
+      Docente_Usuario_Id int unsigned NOT NULL,
+      PRIMARY KEY (Plan_Electivos_Asignatura_Id, Docente_Usuario_Id),
+      KEY fk_Plan_Electivos_Docente_Usuario_idx (Docente_Usuario_Id),
+      CONSTRAINT fk_Plan_Electivos_Docente_Asignatura FOREIGN KEY (Plan_Electivos_Asignatura_Id)
+        REFERENCES plan_electivos_asignatura (Plan_Electivos_Asignatura_Id) ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT fk_Plan_Electivos_Docente_Usuario FOREIGN KEY (Docente_Usuario_Id)
+        REFERENCES usuario (Usuario_Id) ON DELETE CASCADE ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE clase_electivo (
+      Clase_Electivo_Id int unsigned NOT NULL AUTO_INCREMENT,
+      Clase_Electivo_Periodo_Lectivo varchar(10) NOT NULL,
+      Clase_Electivo_Dia_Semana varchar(20) NOT NULL,
+      Bloque_Horario_Id int unsigned NOT NULL,
+      Asignatura_Id int unsigned NOT NULL,
+      Clase_Electivo_Ruta varchar(20) NOT NULL,
+      Docente_Usuario_Id int unsigned NOT NULL,
+      PRIMARY KEY (Clase_Electivo_Id),
+      UNIQUE KEY Clase_Electivo_UNIQUE (Clase_Electivo_Periodo_Lectivo, Clase_Electivo_Dia_Semana,
+                                        Bloque_Horario_Id, Asignatura_Id, Clase_Electivo_Ruta),
+      KEY fk_Clase_Electivo_Bloque_idx (Bloque_Horario_Id),
+      KEY fk_Clase_Electivo_Asignatura_idx (Asignatura_Id),
+      KEY fk_Clase_Electivo_Docente_idx (Docente_Usuario_Id),
+      CONSTRAINT fk_Clase_Electivo_Asignatura FOREIGN KEY (Asignatura_Id)
+        REFERENCES asignatura (Asignatura_Id) ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT fk_Clase_Electivo_Bloque FOREIGN KEY (Bloque_Horario_Id)
+        REFERENCES bloque_horario (Bloque_Horario_Id) ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT fk_Clase_Electivo_Docente FOREIGN KEY (Docente_Usuario_Id)
+        REFERENCES usuario (Usuario_Id) ON DELETE RESTRICT ON UPDATE CASCADE,
+      CONSTRAINT chk_Clase_Electivo_Ruta CHECK (Clase_Electivo_Ruta IN ('Científica','Humanística'))
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+======================================================================
+5. ELECTIVOS DE 3° Y 4° MEDIO (RF27, RF28, RF33-RF35; CU47, CU53, CU54,
+   CU106, CU108; RNF17)
+======================================================================
+
+5.1 CU47 / RF28: en Asignaturas, una asignatura se marca como "Asignatura
+    electiva de 3° y 4° medio" (asignatura.Asignatura_Es_Electiva). La
+    marca no se cambia mientras la asignatura esté en uso con su tipo
+    actual (planes educativos o cursos; o plan de electivos).
+
+5.2 RF27 / RF33: una electiva no entra en planes educativos regulares
+    (crear, editar, clonar; el clonado omite las que hoy son electivas) ni
+    se asocia a cursos (CU53). Plan Educativo no las ofrece.
+
+5.3 CU108: Gestión Académica > Electivos 3° y 4° medio > "Plan del período".
+    Un plan por período, común a 3° y 4° medio, con asignaturas por ruta
+    (Científica o Humanística; la Técnica no tiene electivos), horas
+    semanales enteras y docentes habilitados.
+    - Excepción 1: clonar sin plan del año anterior se rechaza.
+    - Excepción 2: datos inválidos (asignatura no electiva, ruta, horas,
+      repetidos, docentes inactivos).
+    - Excepción 3: ya existe plan del período: se informa y se abre para
+      editarlo.
+    - Al editar no se puede quitar una asignatura con clases programadas
+      ni dejarle menos horas que las programadas.
+    - Si las rutas no suman las mismas horas, se advierte (no bloquea).
+
+5.4 CU106: pestaña "Programación". Los electivos se programan en bloques
+    COMPARTIDOS por todos los cursos de 3° y 4° medio del período; un
+    bloque admite varios electivos a la vez (RNF17: no son tope).
+    - Excepción 1: la asignatura debe estar en el plan para esa ruta.
+    - Excepción 2: ruta Científica o Humanística.
+    - Excepción 3: no supera las horas semanales del plan.
+    - Excepción 4: el bloque no puede tener clases regulares de 3° o 4°
+      medio, y viceversa (CU54 lo valida al crear, editar, editar en forma
+      masiva y migrar clases).
+    - Excepción 5: el docente debe estar habilitado en el plan, sin otra
+      clase ese día y bloque, dentro de su disponibilidad laboral y de su
+      carga horaria semanal. La especialidad es solo una sugerencia (CU56).
+
+5.5 Para el docente un electivo es una clase normal: aparece en su horario,
+    choca con sus clases regulares y suma en su carga horaria semanal
+    (también en "docentes disponibles" y en la edición masiva).
+
+5.6 Vistas: el horario del estudiante muestra los electivos de su ruta (o
+    todos si aún no la tiene); el horario maestro los muestra en cada curso
+    de 3° y 4° medio (el total de clases los cuenta una vez); Gestión de
+    horarios marca esos bloques en morado y no permite usarlos.
+
+5.7 Completitud (listado de cursos y cierre de período): a cada curso de 3°
+    y 4° medio se suman las horas de una ruta del plan de electivos y las
+    horas de los bloques de electivos (cada bloque cuenta una vez).
+
+5.8 Bloques: un bloque con electivos no se puede eliminar (se avisa que se
+    quiten desde Electivos). Cambio de período: el plan y las clases de
+    electivos de períodos anteriores se respaldan en el Excel y se eliminan
+    junto con los cursos de esos períodos.
+
+5.9 Exportaciones (CU60-CU62) y Consulta de horarios (CU68) incluyen los
+    electivos: el maestro una fila por electivo, el docente sus electivos y
+    el curso de 3° o 4° medio los electivos de ambas rutas. En la Consulta,
+    los filtros se aplican igual y la fila enlaza a la pantalla Electivos.
+
+5.10 API: GET/POST /api/electivos/plan, PUT /api/electivos/plan/:id,
+     POST /api/electivos/plan/clonar, GET /api/electivos/programacion,
+     POST /api/electivos/clases, DELETE /api/electivos/clases/:id,
+     GET /api/electivos/curso/:cursoId. Reglas en BackEnd/utils/electivos.js.

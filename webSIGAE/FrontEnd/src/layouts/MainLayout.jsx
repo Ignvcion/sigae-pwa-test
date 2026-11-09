@@ -223,6 +223,10 @@ function MainLayout() {
                         Plan Educativo
                       </Link>
 
+                      <Link to="/electivos">
+                        Electivos 3° y 4° medio
+                      </Link>
+
                       <Link to="/asignaturas">
                         Asignaturas
                       </Link>

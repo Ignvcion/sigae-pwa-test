@@ -62,7 +62,9 @@ const citacionRoutes    = require('./routes/citacionRoutes');
 const mensajeRoutes = require('./routes/mensajeRoutes');
 const promocionRoutes   = require('./routes/promocionRoutes');
 const horarioAtencionRoutes = require('./routes/horarioAtencionRoutes');
+const especialidadRoutes = require('./routes/especialidadRoutes');
 const evaluacionRoutes = require('./routes/evaluacionRoutes');
+const electivoRoutes = require('./routes/electivoRoutes');
 
 app.use('/api/auth',        authRoutes);
 app.use('/api/usuarios',    usuarioRoutes);
@@ -76,7 +78,9 @@ app.use('/api/citaciones',  citacionRoutes);
 app.use('/api/mensajes', mensajeRoutes);
 app.use('/api/promocion',   promocionRoutes);
 app.use('/api/horario-atencion', horarioAtencionRoutes);
+app.use('/api/especialidades', especialidadRoutes);
 app.use('/api/evaluaciones', evaluacionRoutes);
+app.use('/api/electivos', electivoRoutes);
 
 // 404
 app.use((req, res) => {

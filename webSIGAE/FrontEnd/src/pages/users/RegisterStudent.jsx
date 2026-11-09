@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { registrarEstudiante, verificarRutEstudiante } from "../../services/api";
 import { validarRut, normalizarRut, validarDireccion } from "../../utils/validaciones";
 import CamposDireccion, { CAMPOS_DIRECCION, errorCampoDireccion } from "../../components/CamposDireccion";
+import { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
 
 function RegisterStudent() {
   const navigate = useNavigate();
@@ -141,7 +142,7 @@ function RegisterStudent() {
             <option value="">Seleccione un curso</option>
             {cursos.map((c) => (
               <option key={c.Curso_Id} value={c.Curso_Id}>
-                {c.Curso_Nombre}
+                {c.Curso_Nombre}{textoPeriodo(c.Curso_Periodo_Lectivo, c.Curso_Periodo_Estado)}
               </option>
             ))}
           </select>

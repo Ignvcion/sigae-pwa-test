@@ -46,6 +46,9 @@ export const designarProfesorJefe = (cursoId, cuerpo) => json("PUT", `/api/curso
 export const retirarProfesorJefe = (cursoId, cuerpo = {}) => json("DELETE", `/api/cursos/${cursoId}/profesor-jefe`, cuerpo);
 export const getEstudiantesDeCurso = (cursoId) => json("GET", `/api/cursos/${cursoId}/estudiantes`);
 export const getMisJefaturas = () => json("GET", "/api/cursos/mis-jefaturas");
+// CU105: ruta de formación de estudiantes de 2°, 3° y 4° medio
+export const asignarRutaFormacion = (cursoId, estudianteIds, ruta) =>
+  json("PUT", `/api/cursos/${cursoId}/ruta-formacion`, { estudianteIds, ruta });
 
 // ── RF61: situación final (CU98, CU99) y promoción (CU100) ──
 export const getSituaciones = (cursoId) => json("GET", `/api/promocion/cursos/${cursoId}/situaciones`);

@@ -1,6 +1,8 @@
 const express = require('express');
 const { verifyToken } = require('../middleware/authMiddleware');
 const {
+  getSemanaAtencion,
+  guardarSemanaAtencion,
   getMiHorarioAtencion,
   crearBloqueAtencion,
   actualizarBloqueAtencion,
@@ -12,6 +14,9 @@ const router = express.Router();
 // RF55: el rol Docente se valida dentro del controlador; cada docente gestiona solo sus bloques.
 router.use(verifyToken);
 
+// CU87 / CU88: semana completa (tramos por día y vista por bloques de 45 minutos)
+router.get('/semana', getSemanaAtencion);
+router.put('/semana', guardarSemanaAtencion);
 // CU87 / CU88: bloques de atención del docente autenticado
 router.get('/', getMiHorarioAtencion);
 // CU87: registrar bloque

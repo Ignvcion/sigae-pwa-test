@@ -1,0 +1,40 @@
+/* Edición de usuario en bloques (perfil visto por el administrador).
+   La sección ocupa todo el ancho del perfil y ordena sus propios bloques:
+   título, bloques de datos lado a lado y la disponibilidad a lo ancho. */
+.editar-seccion {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  align-items: start;
+  min-width: 0;
+}
+
+.editar-seccion .perfil-card {
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+.editar-seccion-titulo {
+  grid-column: 1 / -1;
+  margin: 12px 0 0;
+  font-size: 1.15rem;
+  color: #0f172a;
+}
+
+.editar-bloque--ancho {
+  grid-column: 1 / -1;
+}
+
+.editar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px 16px;
+}
+
+.editar-subtitulo {
+  margin: 6px 0 -4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}

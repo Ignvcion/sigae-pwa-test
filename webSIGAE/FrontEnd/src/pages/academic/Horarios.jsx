@@ -3,7 +3,9 @@ import { useAuth } from "../context/AuthContext";
 import ExportMenu from "../../components/ExportMenu";
 import DetalleBloqueModal from "../../components/horarios/DetalleBloqueModal";
 import PanelConflictos from "../../components/horarios/PanelConflictos";
+import EtiquetaPeriodo, { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
 import { COLOR_PENDIENTE } from "../../utils/horarios";
+import { getElectivosDeCurso } from "../../services/api";
 
 const API = "/api";
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
@@ -166,8 +168,9 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
             const barColor = pct >= 100 ? "#22c55e" : pct > 50 ? "#6366f1" : "#f59e0b";
 
             return (
-              <div key={curso.Curso_Id} style={{ background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", padding: "0.5rem 0.6rem" }}>
-                <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div key={curso.Curso_Id} style={{ position: "relative", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", padding: "0.5rem 0.6rem" }}>
+                <EtiquetaPeriodo periodo={curso.Curso_Periodo_Lectivo} estado={curso.Curso_Periodo_Estado} esquina />
+                <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 92 }}>
                   {curso.Curso_Nombre}
                 </div>
                 <div style={{ fontSize: "0.67rem", color: "#64748b", marginBottom: 5 }}>{curso.Nivel_Educativo_Nombre}</div>
@@ -246,6 +249,8 @@ export default function Horarios() {
   // Listado sidebar
   const [listadoAbierto, setListadoAbierto] = useState(false);
   const [resumenCursos, setResumenCursos] = useState([]);
+  // CU106: en 3° y 4° medio, los bloques de electivos (compartidos) no admiten clases regulares
+  const [electivosCurso, setElectivosCurso] = useState([]);
 
   // Sidebar collapse
   useEffect(() => {
@@ -322,6 +327,17 @@ export default function Horarios() {
   useEffect(() => {
     if (listadoAbierto) cargarResumenCursos();
   }, [listadoAbierto, cargarResumenCursos]);
+
+  useEffect(() => {
+    let vigente = true;
+    const pedir = esAdmin && cursoSeleccionado
+      ? getElectivosDeCurso(cursoSeleccionado).then((d) => d?.clases || [])
+      : Promise.resolve([]);
+    pedir
+      .then((clases) => { if (vigente) setElectivosCurso(clases); })
+      .catch(() => { if (vigente) setElectivosCurso([]); });
+    return () => { vigente = false; };
+  }, [esAdmin, cursoSeleccionado]);
 
   const alResolverConflicto = () => {
     recargarBloques();
@@ -419,6 +435,12 @@ export default function Horarios() {
       cerrarPanel();
       cargarHorarios(cursoSeleccionado);
       cargarAsignaturas(cursoSeleccionado);
+      // CU107: horas adeudadas (advierte) y CU56: especialidad que no coincide (sugerencia)
+      const avisos = [data.advertencia && `⚠ ${data.advertencia}`, data.sugerencia && `💡 ${data.sugerencia}`].filter(Boolean);
+      if (avisos.length > 0) {
+        setExito(`${data.mensaje} ${avisos.join(" ")}`);
+        setTimeout(() => setExito(""), 8000);
+      }
     } catch (e) {
       setErrorPanel(e.message || "Error al guardar");
     } finally {
@@ -602,7 +624,7 @@ export default function Horarios() {
             <option value="">— Selecciona un curso —</option>
             {cursos.map((c) => (
               <option key={c.Curso_Id} value={c.Curso_Id}>
-                {c.Curso_Nombre} — {c.Nivel_Educativo_Nombre}
+                {c.Curso_Nombre} — {c.Nivel_Educativo_Nombre}{textoPeriodo(c.Curso_Periodo_Lectivo, c.Curso_Periodo_Estado)}
               </option>
             ))}
           </select>
@@ -650,8 +672,9 @@ export default function Horarios() {
                   Asignaturas
                 </span>
                 {cursoObj && (
-                  <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>
+                  <span style={{ fontSize: "0.72rem", color: "#6b7280", display: "inline-flex", gap: 6, alignItems: "center" }}>
                     {cursoObj.Curso_Nombre}
+                    <EtiquetaPeriodo periodo={cursoObj.Curso_Periodo_Lectivo} estado={cursoObj.Curso_Periodo_Estado} />
                   </span>
                 )}
               </div>
@@ -814,9 +837,16 @@ export default function Horarios() {
               </div>
             )}
 
+            {electivosCurso.length > 0 && (
+              <p style={{ margin: "0 0 0.6rem", fontSize: "0.8rem", color: "#5b21b6" }}>
+                Los bloques morados son electivos de 3° y 4° medio, compartidos por todos esos cursos; se gestionan en{" "}
+                <a href="/electivos" style={{ color: "#5b21b6", fontWeight: 700 }}>Electivos</a>.
+              </p>
+            )}
             <VistaBloqueGrid
               bloques={bloques}
               horarios={horariosVigentes}
+              electivos={electivosCurso}
               esAdmin={esAdmin}
               asignaturaActiva={asignaturaActiva}
               colorMap={colorMap}
@@ -918,6 +948,7 @@ export default function Horarios() {
 function VistaBloqueGrid({
   bloques,
   horarios,
+  electivos = [],
   esAdmin,
   asignaturaActiva,
   colorMap,
@@ -949,6 +980,11 @@ function VistaBloqueGrid({
   const cellMap = {};
   horarios.forEach((h) => {
     cellMap[`${h.Bloque_Horario_Id}_${h.dia}`] = h;
+  });
+  // Electivos del bloque (varios a la vez: uno por asignatura y ruta)
+  const electivosMap = {};
+  electivos.forEach((e) => {
+    (electivosMap[`${e.Bloque_Horario_Id}_${e.dia}`] ||= []).push(e);
   });
 
   // Bloques reemplazados o fuera de la jornada: solo se muestran si este curso
@@ -1083,7 +1119,8 @@ function VistaBloqueGrid({
               const isHovered =
                 hoveredCell?.bloqueId === bloque.Bloque_Horario_Id &&
                 hoveredCell?.dia === dia;
-              const canClick = esAdmin && !esRecreo && !desajustado && !h && !!onCelda && !modoSeleccion;
+              const enElectivo = electivosMap[key] || [];
+              const canClick = esAdmin && !esRecreo && !desajustado && !h && enElectivo.length === 0 && !!onCelda && !modoSeleccion;
               const seleccionado = !!h && seleccionados.includes(h.Horario_Asignatura_Id);
               const asigColor = h ? colorMap[h.Asignatura_Id] || ASIG_COLORS[0] : null;
 
@@ -1309,6 +1346,31 @@ function VistaBloqueGrid({
                     </div>
                   )}
 
+                  {/* CU106: bloque ocupado por electivos de 3° y 4° medio */}
+                  {!h && enElectivo.length > 0 && (
+                    <div
+                      title={enElectivo.map((e) => `${e.asignatura} (${e.ruta}) · ${e.docente}`).join("\n")}
+                      style={{
+                        background: "#f5f3ff",
+                        border: "1px solid #ddd6fe",
+                        borderRadius: 6,
+                        padding: "3px 6px",
+                        fontSize: "0.66rem",
+                        lineHeight: 1.3,
+                        color: "#5b21b6",
+                        height: "100%",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      <strong style={{ display: "block", fontSize: "0.7rem" }}>Electivos</strong>
+                      {enElectivo.map((e) => (
+                        <span key={e.Clase_Electivo_Id} style={{ display: "block", overflowWrap: "anywhere" }}>
+                          {e.asignatura} · {e.ruta === "Científica" ? "C" : "H"}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Hover "add" hint for empty cell */}
                   {!h && !esRecreo && isHovered && canClick && !isPreview && (
                     <div
@@ -1527,21 +1589,14 @@ function PanelForm({
       dia: form.Horario_Asignatura_Dia_Semana,
     });
     if (modoEdicion && idEditando) params.append("horario_id", idEditando);
+    if (form.Curso_Id) params.append("curso_id", form.Curso_Id); // período del curso (CU107)
 
     fetch(`/api/horarios/docentes-disponibles?${params}`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => {
-        const asig = asignaturasCurso.find((a) => a.Asignatura_Id === Number(form.Asignatura_Id));
-        const asigLow = (asig?.Asignatura_Nombre || "").toLowerCase();
-        const enriched = data.map((d) => {
-          const espLow = (d.Docente_Especialidad || "").toLowerCase();
-          return {
-            ...d,
-            coincide_especialidad:
-              espLow.length > 0 &&
-              (asigLow.includes(espLow) || espLow.includes(asigLow)),
-          };
-        });
+        // CU56: el servidor indica si alguna especialidad (etiqueta) coincide con la asignatura;
+        // es solo una sugerencia para ordenar y recomendar, no impide asignar.
+        const enriched = data.map((d) => ({ ...d, coincide_especialidad: Boolean(d.coincide_especialidad) }));
         enriched.sort((a, b) => {
           const sA = (a.disponible ? 10 : 0) + (a.coincide_especialidad ? 5 : 0);
           const sB = (b.disponible ? 10 : 0) + (b.coincide_especialidad ? 5 : 0);
@@ -1551,7 +1606,7 @@ function PanelForm({
       })
       .catch(() => setDocentesInfo([]))
       .finally(() => setCargandoDoc(false));
-  }, [form.Asignatura_Id, form.Bloque_Horario_Id, form.Horario_Asignatura_Dia_Semana, modoEdicion, idEditando]);
+  }, [form.Asignatura_Id, form.Bloque_Horario_Id, form.Horario_Asignatura_Dia_Semana, form.Curso_Id, modoEdicion, idEditando]);
 
   const sugeridos = docentesInfo.filter((d) => d.disponible && d.coincide_especialidad);
   const disponibles = docentesInfo.filter((d) => d.disponible && !d.coincide_especialidad);
@@ -1713,12 +1768,12 @@ function PanelForm({
               {camposListos && docentesInfo.length > 0 && (
                 <>
                   {sugeridos.length > 0 && (
-                    <optgroup label="⭐ Recomendados — especialidad coincide">
+                    <optgroup label="⭐ Sugeridos — su especialidad coincide">
                       {sugeridos.map((d) => (
                         <option key={d.Usuario_Id} value={d.Usuario_Id}>
                           {d.Usuario_Nombre_Completo} — {d.Docente_Especialidad}
-                          {d.Docente_Carga_Horaria_Maxima != null
-                            ? ` (${d.carga_actual}h/${d.Docente_Carga_Horaria_Maxima}h)`
+                          {d.Docente_Carga_Horaria_Semanal != null
+                            ? ` (${d.carga_actual}h/${d.Docente_Carga_Horaria_Semanal}h)`
                             : ""}
                         </option>
                       ))}
@@ -1730,8 +1785,8 @@ function PanelForm({
                         <option key={d.Usuario_Id} value={d.Usuario_Id}>
                           {d.Usuario_Nombre_Completo}
                           {d.Docente_Especialidad ? ` — ${d.Docente_Especialidad}` : ""}
-                          {d.Docente_Carga_Horaria_Maxima != null
-                            ? ` (${d.carga_actual}h/${d.Docente_Carga_Horaria_Maxima}h)`
+                          {d.Docente_Carga_Horaria_Semanal != null
+                            ? ` (${d.carga_actual}h/${d.Docente_Carga_Horaria_Semanal}h)`
                             : ""}
                         </option>
                       ))}
@@ -1744,7 +1799,9 @@ function PanelForm({
                           {d.Usuario_Nombre_Completo} —{" "}
                           {d.conflicto_horario
                             ? "conflicto de horario"
-                            : `carga máxima (${d.carga_actual}h/${d.Docente_Carga_Horaria_Maxima}h)`}
+                            : d.fuera_disponibilidad
+                            ? "fuera de su disponibilidad laboral"
+                            : `carga semanal completa (${d.carga_actual}h/${d.Docente_Carga_Horaria_Semanal}h)`}
                         </option>
                       ))}
                     </optgroup>
@@ -1766,14 +1823,19 @@ function PanelForm({
                 }}
               >
                 {docSel.coincide_especialidad
-                  ? `✓ Especialidad "${docSel.Docente_Especialidad}" coincide.`
+                  ? `✓ Sugerido: su especialidad (${docSel.Docente_Especialidad}) coincide con la asignatura.`
                   : docSel.Docente_Especialidad
-                  ? `⚠ Especialidad "${docSel.Docente_Especialidad}" no coincide.`
+                  ? `💡 Sugerencia: su especialidad (${docSel.Docente_Especialidad}) no coincide con la asignatura. Puedes asignarlo igual.`
                   : "ℹ Sin especialidad registrada."}
-                {docSel.Docente_Carga_Horaria_Maxima != null && (
+                {docSel.Docente_Carga_Horaria_Semanal != null && (
                   <span style={{ marginLeft: 8, color: "#64748b" }}>
-                    Carga: {docSel.carga_nueva}h / {docSel.Docente_Carga_Horaria_Maxima}h sem.
+                    Carga semanal: {docSel.carga_nueva}h / {docSel.Docente_Carga_Horaria_Semanal}h
                   </span>
+                )}
+                {docSel.horas_adeudadas > 0 && (
+                  <div style={{ marginTop: 4, color: "#92400e" }}>
+                    ⚠ Disponible {docSel.horas_disponibles}h a la semana: debe {docSel.horas_adeudadas}h de su carga semanal.
+                  </div>
                 )}
               </div>
             )}
@@ -1859,6 +1921,7 @@ function hhmm(t) {
 function useFlujoMasivo({ urlValidar, urlAplicar, onExito }) {
   const [paso, setPaso] = useState("formulario"); // formulario | resumen
   const [resumen, setResumen] = useState([]);
+  const [sugerencias, setSugerencias] = useState([]);
   const [error, setError] = useState("");
   const [conflictos, setConflictos] = useState([]);
   const [enviando, setEnviando] = useState(false);
@@ -1890,6 +1953,7 @@ function useFlujoMasivo({ urlValidar, urlAplicar, onExito }) {
     const data = await enviar(urlValidar, "POST", body);
     if (data) {
       setResumen(data.resumen || []);
+      setSugerencias(data.sugerencias || []); // CU56: no bloquean la confirmación
       setPaso("resumen");
     }
   };
@@ -1905,7 +1969,7 @@ function useFlujoMasivo({ urlValidar, urlAplicar, onExito }) {
   };
 
   return {
-    paso, resumen, error, conflictos, enviando,
+    paso, resumen, sugerencias, error, conflictos, enviando,
     validar, confirmar, mostrarError,
     volver: () => setPaso("formulario"),
   };
@@ -1975,6 +2039,16 @@ function ValorCambio({ antes, despues }) {
       {" → "}
       <strong style={{ color: "#5b21b6" }}>{despues}</strong>
     </span>
+  );
+}
+
+// CU56: la especialidad que no coincide se informa como sugerencia; se puede confirmar igual
+function SugerenciasMasivo({ sugerencias }) {
+  if (!sugerencias || sugerencias.length === 0) return null;
+  return (
+    <div style={{ marginTop: 10, padding: "8px 12px", borderRadius: 8, background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e", fontSize: "0.85rem" }}>
+      {sugerencias.map((t) => <div key={t}>💡 {t}</div>)}
+    </div>
   );
 }
 
@@ -2085,6 +2159,7 @@ function ReasignarDocenteModal({ seleccion, onClose, onExito }) {
         <>
           <p className="modal-subtitulo">Revisa los cambios antes de confirmar la reasignación.</p>
           <ResumenCambios resumen={flujo.resumen} />
+          <SugerenciasMasivo sugerencias={flujo.sugerencias} />
         </>
       )}
 
@@ -2312,6 +2387,7 @@ function EditarMultiplesModal({ seleccion, onClose, onExito }) {
         <>
           <p className="modal-subtitulo">Revisa los cambios antes de confirmar la modificación.</p>
           <ResumenCambios resumen={flujo.resumen} />
+          <SugerenciasMasivo sugerencias={flujo.sugerencias} />
         </>
       )}
 

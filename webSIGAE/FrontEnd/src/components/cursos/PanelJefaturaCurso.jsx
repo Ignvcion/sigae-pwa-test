@@ -1,17 +1,25 @@
 // RF60: profesor jefe del curso (CU95, CU96) y estudiantes del curso (CU97).
+// CU105: en 2°, 3° y 4° medio, el administrador asigna la ruta de formación a uno o más estudiantes.
 import { useEffect, useState } from "react";
 import {
   getDocentesActivos,
   designarProfesorJefe,
   retirarProfesorJefe,
   getEstudiantesDeCurso,
+  asignarRutaFormacion,
 } from "../../services/promocion";
+
+const RUTAS = ["Científica", "Humanística", "Técnica"];
 
 export default function PanelJefaturaCurso({ curso, esAdmin, onCambio }) {
   const [docentes, setDocentes] = useState([]);
   const [docenteId, setDocenteId] = useState("");
   const [estudiantes, setEstudiantes] = useState([]);
   const [mensajeEstudiantes, setMensajeEstudiantes] = useState("");
+  const [permiteRuta, setPermiteRuta] = useState(false);
+  const [seleccion, setSeleccion] = useState([]);
+  const [ruta, setRuta] = useState("");
+  const [msgRuta, setMsgRuta] = useState({ tipo: "", texto: "" });
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -23,6 +31,7 @@ export default function PanelJefaturaCurso({ curso, esAdmin, onCambio }) {
         if (!vivo || !d) return;
         setEstudiantes(d.estudiantes || []);
         setMensajeEstudiantes(d.mensaje || "");
+        setPermiteRuta(Boolean(d.curso?.Permite_Ruta));
       })
       .catch((e) => vivo && setMensajeEstudiantes(e.message));
     if (esAdmin) {
@@ -63,6 +72,30 @@ export default function PanelJefaturaCurso({ curso, esAdmin, onCambio }) {
       setEnviando(false);
     }
   };
+
+  // CU105: registrar la ruta de los estudiantes seleccionados
+  const registrarRuta = async () => {
+    if (seleccion.length === 0 || !ruta) {
+      setMsgRuta({ tipo: "error", texto: "Selecciona estudiantes y una ruta" });
+      return;
+    }
+    setEnviando(true);
+    setMsgRuta({ tipo: "", texto: "" });
+    try {
+      const r = await asignarRutaFormacion(curso.Curso_Id, seleccion, ruta);
+      setEstudiantes((lista) => lista.map((e) => (seleccion.includes(e.Estudiante_Id) ? { ...e, Estudiante_Ruta_Formacion: r.ruta } : e)));
+      setSeleccion([]);
+      setMsgRuta({ tipo: "exito", texto: r.mensaje });
+    } catch (e) {
+      setMsgRuta({ tipo: "error", texto: e.message });
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const alternarSeleccion = (id) =>
+    setSeleccion((sel) => (sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]));
+  const puedeAsignarRuta = esAdmin && permiteRuta;
 
   const retirar = async () => {
     if (!window.confirm(`¿Retirar a ${curso.Profesor_Jefe_Nombre} como profesor jefe de ${curso.Curso_Nombre}?`)) return;
@@ -120,16 +153,53 @@ export default function PanelJefaturaCurso({ curso, esAdmin, onCambio }) {
         <p>{mensajeEstudiantes || "Cargando..."}</p>
       ) : (
         <div style={{ overflowX: "auto" }}>
+          {puedeAsignarRuta && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center", margin: "0.5rem 0" }}>
+              <span style={{ fontSize: "0.9rem" }}>Ruta de formación para {seleccion.length} seleccionado(s):</span>
+              <select value={ruta} onChange={(e) => setRuta(e.target.value)} aria-label="Ruta de formación">
+                <option value="">Elegir ruta...</option>
+                {RUTAS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+              <button className="btn-primary" onClick={registrarRuta} disabled={enviando || seleccion.length === 0 || !ruta}>
+                Asignar ruta
+              </button>
+            </div>
+          )}
+          {msgRuta.texto && <p className={msgRuta.tipo === "error" ? "msg-error" : "msg-exito"}>{msgRuta.texto}</p>}
           <table className="tabla-asignaturas">
             <thead>
-              <tr><th>Nombre</th><th>RUT</th><th>Estado académico</th></tr>
+              <tr>
+                {puedeAsignarRuta && (
+                  <th>
+                    <input
+                      type="checkbox"
+                      aria-label="Seleccionar todos"
+                      checked={seleccion.length > 0 && seleccion.length === estudiantes.length}
+                      onChange={(e) => setSeleccion(e.target.checked ? estudiantes.map((x) => x.Estudiante_Id) : [])}
+                    />
+                  </th>
+                )}
+                <th>Nombre</th><th>RUT</th><th>Estado académico</th>
+                {permiteRuta && <th>Ruta de formación</th>}
+              </tr>
             </thead>
             <tbody>
               {estudiantes.map((e) => (
                 <tr key={e.Estudiante_Id}>
+                  {puedeAsignarRuta && (
+                    <td>
+                      <input
+                        type="checkbox"
+                        aria-label={`Seleccionar a ${e.Estudiante_Nombre_Completo}`}
+                        checked={seleccion.includes(e.Estudiante_Id)}
+                        onChange={() => alternarSeleccion(e.Estudiante_Id)}
+                      />
+                    </td>
+                  )}
                   <td>{e.Estudiante_Nombre_Completo}</td>
                   <td>{e.Estudiante_RUT}</td>
                   <td>{e.Estudiante_Estado_Academico}</td>
+                  {permiteRuta && <td>{e.Estudiante_Ruta_Formacion || "Sin ruta"}</td>}
                 </tr>
               ))}
             </tbody>

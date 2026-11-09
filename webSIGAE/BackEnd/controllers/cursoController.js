@@ -1,5 +1,5 @@
 const pool = require('../config/db');
-const { cursoNoArchivado, obtenerPeriodos } = require('../utils/periodos');
+const { cursoNoArchivado, obtenerPeriodos, estadoPeriodoCursoSQL } = require('../utils/periodos');
 
 // GET /api/cursos
 // Cursos del período vigente y, durante el cierre, del período siguiente. Los
@@ -10,6 +10,7 @@ const getCursos = async (req, res) => {
       SELECT c.Curso_Id, c.Curso_Seccion, c.Curso_Nombre,
              c.Nivel_Educativo_Id, n.Nivel_Educativo_Nombre, n.Nivel_Educativo_Orden,
              c.Curso_Periodo_Lectivo,
+             ${estadoPeriodoCursoSQL('c')} AS Curso_Periodo_Estado,
              c.Curso_Profesor_Jefe_Usuario_Id,
              pj.Usuario_Nombre_Completo AS Profesor_Jefe_Nombre,
              COUNT(ta.Asignatura_Id) AS Total_Asignaturas_Activas
@@ -147,6 +148,7 @@ const getAsignaturasDisponibles = async (req, res) => {
       FROM incluyeasig ia
       JOIN asignatura a ON ia.Asignatura_Id = a.Asignatura_Id
       WHERE ia.Plan_Educativo_Id = ?
+        AND a.Asignatura_Es_Electiva = 0  -- RF33: las electivas no se asocian a cursos
         AND a.Asignatura_Id NOT IN (
           SELECT Asignatura_Id FROM tieneasig
           WHERE Curso_Id = ? AND Estado_Asignacion = 'Activa'
@@ -187,8 +189,11 @@ const asignarAsignaturas = async (req, res) => {
     }
     const planId = planes[0].Plan_Educativo_Id;
 
+    // RF33: una asignatura electiva no se asocia a cursos (va en el plan de electivos)
     const [asignaturasDelPlan] = await pool.execute(
-      'SELECT Asignatura_Id FROM incluyeasig WHERE Plan_Educativo_Id = ?', [planId]
+      `SELECT ia.Asignatura_Id FROM incluyeasig ia
+         JOIN asignatura a ON a.Asignatura_Id = ia.Asignatura_Id
+        WHERE ia.Plan_Educativo_Id = ? AND a.Asignatura_Es_Electiva = 0`, [planId]
     );
     const idsValidos = new Set(asignaturasDelPlan.map(a => a.Asignatura_Id));
 

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { apiFetch } from "../../services/api";
+import { apiFetch, getEspecialidades } from "../../services/api";
+import EtiquetasInput, { separarEtiquetas } from "../../components/EtiquetasInput";
 import {
   normalizarTexto,
   validarCorreoInstitucional,
@@ -36,6 +37,10 @@ function BadgesRol({ u }) {
 
 /* ── Campos específicos por rol ─────────────────────── */
 function CamposDocente({ datos, errores, onChange }) {
+  const [catalogo, setCatalogo] = useState([]);
+  useEffect(() => {
+    getEspecialidades().then((d) => setCatalogo((d || []).map((e) => e.Especialidad_Nombre))).catch(() => {});
+  }, []);
   return (
     <>
       <div className="campo-pwd">
@@ -53,21 +58,25 @@ function CamposDocente({ datos, errores, onChange }) {
         )}
       </div>
       <div className="campo-pwd">
-        <label>Especialidad</label>
-        <input
-          name="Docente_Especialidad"
-          value={datos.Docente_Especialidad || ""}
-          onChange={onChange}
+        <label htmlFor="rol-especialidades">Especialidades</label>
+        <EtiquetasInput
+          id="rol-especialidades"
+          valores={datos.Docente_Especialidades || []}
+          opciones={catalogo}
+          invalido={!!errores.Docente_Especialidades}
           placeholder="Ej: Matemáticas"
-          required
+          onChange={(valores) => onChange({ target: { name: "Docente_Especialidades", value: valores } })}
         />
+        {errores.Docente_Especialidades && (
+          <span className="input-error-msg">{errores.Docente_Especialidades}</span>
+        )}
       </div>
       <div className="campo-pwd">
-        <label>Carga horaria máxima (hrs)</label>
+        <label>Carga horaria semanal (hrs)</label>
         <input
           type="number"
-          name="Docente_Carga_Horaria_Maxima"
-          value={datos.Docente_Carga_Horaria_Maxima || ""}
+          name="Docente_Carga_Horaria_Semanal"
+          value={datos.Docente_Carga_Horaria_Semanal || ""}
           onChange={onChange}
           min="1"
           max="44"
@@ -316,6 +325,8 @@ function GestionRoles() {
       );
       return validarDireccion(direccion)[COLUMNAS_DIRECCION[name]] || "";
     }
+    if (name === "Docente_Especialidades")
+      return value.length === 0 ? "Agrega al menos una especialidad" : "";
     if (!value) return "";
     if (name === "Docente_Correo_Institucional" || name === "Administrador_Correo_Institucional")
       return !validarCorreoInstitucional(value)
@@ -346,8 +357,8 @@ function GestionRoles() {
     if (nuevoRol === "Docente") {
       setDatosRol({
         Docente_Correo_Institucional: seleccionado.Docente_Correo_Institucional || "",
-        Docente_Especialidad:         seleccionado.Docente_Especialidad         || "",
-        Docente_Carga_Horaria_Maxima: seleccionado.Docente_Carga_Horaria_Maxima || "",
+        Docente_Especialidades:       separarEtiquetas(seleccionado.Docente_Especialidad),
+        Docente_Carga_Horaria_Semanal: seleccionado.Docente_Carga_Horaria_Semanal || "",
       });
     } else if (nuevoRol === "Administrador") {
       setDatosRol({

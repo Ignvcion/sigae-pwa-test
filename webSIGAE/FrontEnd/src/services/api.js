@@ -120,7 +120,7 @@ export async function registrarAdmin({ nombre, rut, correo, telefono, password, 
 }
 
 // ── DOCENTE ──────────────────────────────────
-export async function registrarDocente({ nombre, rut, correo, telefono, password, especialidad, cargaHoraria, estado, calle, numero, depto, comuna }) {
+export async function registrarDocente({ nombre, rut, correo, telefono, password, especialidades, cargaHoraria, disponibilidad, estado, calle, numero, depto, comuna }) {
   const res = await fetch(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
@@ -131,8 +131,9 @@ export async function registrarDocente({ nombre, rut, correo, telefono, password
       Usuario_Contraseña           : password,
       Usuario_Estado_Cuenta        : estado === 'Activo' ? 1 : 0,
       Es_Docente                   : 1,
-      Docente_Especialidad         : especialidad,
-      Docente_Carga_Horaria_Maxima : parseInt(cargaHoraria, 10),
+      Docente_Especialidades       : especialidades,
+      Docente_Carga_Horaria_Semanal : parseInt(cargaHoraria, 10), // carga horaria semanal
+      Docente_Disponibilidad       : { tramos: disponibilidad || [] }, // CU107: tramos desde–hasta por día
       Docente_Correo_Institucional : correo,
       ...columnasDireccionUsuario({ calle, numero, depto, comuna }),
       Es_Administrador             : 0,
@@ -246,14 +247,43 @@ export async function getUsuariosPorFiltro({ rol, estado } = {}) {
 
 // ── CU30 y CU31: Listado y filtros de docentes ──
 
-export async function getDocentes({ especialidad, estado } = {}) {
+export async function getDocentes({ especialidad, especialidadId, estado } = {}) {
   const params = new URLSearchParams();
   if (especialidad) params.set('especialidad', especialidad);
+  if (especialidadId) params.set('especialidadId', especialidadId);
   if (estado !== undefined && estado !== '') params.set('estado', estado);
   const query = params.toString();
   const res = await fetch(`${BASE_URL}/usuarios/docentes${query ? `?${query}` : ''}`, {
     headers: authHeaders(),
   });
+  return handleResponse(res);
+}
+
+// ── RF04: catálogo de especialidades (etiquetas) ──
+export async function getEspecialidades() {
+  const res = await fetch(`${BASE_URL}/especialidades`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// Reemplaza las especialidades (etiquetas) de un docente. Las nuevas se crean en el catálogo.
+export async function actualizarEspecialidadesDocente(usuarioId, especialidades) {
+  const res = await fetch(`${BASE_URL}/usuarios/${usuarioId}`, {
+    method : 'PUT',
+    headers: authHeaders(),
+    body   : JSON.stringify({ Docente_Especialidades: especialidades }),
+  });
+  return handleResponse(res);
+}
+
+// ── CU107: disponibilidad laboral semanal del docente (solo administrador) ──
+export async function getOpcionesDisponibilidad() {
+  const res = await fetch(`${BASE_URL}/usuarios/disponibilidad/opciones`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+export async function getDisponibilidadDocente(usuarioId, periodo) {
+  const query = periodo ? `?periodo=${encodeURIComponent(periodo)}` : '';
+  const res = await fetch(`${BASE_URL}/usuarios/${usuarioId}/disponibilidad${query}`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
@@ -516,6 +546,40 @@ export async function getHistorialCitaciones(estudianteId) {
 }
 // ── MENSAJES (CU73) ──────────────────────────
 
+// RF54 / CU85: recepción general de mensajes de apoderados (docente)
+export async function getRecepcionMensajes() {
+  const res = await fetch(`${BASE_URL}/mensajes/recepcion`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+export async function actualizarRecepcionMensajes(habilitada) {
+  const res = await fetch(`${BASE_URL}/mensajes/recepcion`, {
+    method : 'PUT',
+    headers: authHeaders(),
+    body   : JSON.stringify({ habilitada }),
+  });
+  return handleResponse(res);
+}
+
+// RF54 / CU86: habilitar respuestas en una conversación hasta "YYYY-MM-DDTHH:MM" (null cierra)
+export async function habilitarRespuestasConversacion(conversacionId, hasta) {
+  const res = await fetch(`${BASE_URL}/mensajes/conversaciones/${conversacionId}/habilitacion`, {
+    method : 'PUT',
+    headers: authHeaders(),
+    body   : JSON.stringify({ hasta }),
+  });
+  return handleResponse(res);
+}
+
+// RF54 / CU86: desde una citación, hasta el término de la reunión
+export async function habilitarRespuestasCitacion(citacionId) {
+  const res = await fetch(`${BASE_URL}/citaciones/${citacionId}/habilitar-respuestas`, {
+    method : 'POST',
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
 // Conversaciones del usuario según su rol activo (Docente | Apoderado)
 export async function getConversaciones(rol) {
   const query = rol ? `?${new URLSearchParams({ rol })}` : '';
@@ -665,36 +729,23 @@ export async function getMiHorarioAtencion() {
   return handleResponse(res);
 }
 
-// CU87: registrar bloque { dia, horaInicio, horaFin }
-export async function crearBloqueAtencion(bloque) {
-  const res = await fetch(`${BASE_URL}/horario-atencion`, {
-    method : 'POST',
+// CU87 / CU88: semana completa de atención (tramos por día + vista por bloques)
+export async function getSemanaAtencion() {
+  const res = await fetch(`${BASE_URL}/horario-atencion/semana`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// Reemplaza la semana; si hay citaciones a futuro afectadas responde 409 con requiereConfirmacion
+export async function guardarSemanaAtencion(tramos, confirmar = false) {
+  const res = await fetch(`${BASE_URL}/horario-atencion/semana`, {
+    method : 'PUT',
     headers: authHeaders(),
-    body   : JSON.stringify(bloque),
+    body   : JSON.stringify({ tramos, confirmar }),
   });
   return handleResponse(res);
 }
 
 // CU88: modificar bloque. Si tiene citaciones a futuro el backend responde 409 con
-// requiereConfirmacion; se reintenta con confirmar = true.
-export async function actualizarBloqueAtencion(id, bloque, confirmar = false) {
-  const res = await fetch(`${BASE_URL}/horario-atencion/${id}`, {
-    method : 'PUT',
-    headers: authHeaders(),
-    body   : JSON.stringify({ ...bloque, confirmar }),
-  });
-  return handleResponse(res);
-}
-
-// CU88: eliminar bloque (misma confirmación que al modificar)
-export async function eliminarBloqueAtencion(id, confirmar = false) {
-  const res = await fetch(`${BASE_URL}/horario-atencion/${id}${confirmar ? '?confirmar=true' : ''}`, {
-    method : 'DELETE',
-    headers: authHeaders(),
-  });
-  return handleResponse(res);
-}
-
 // ── SOLICITUD DE CITACIÓN DEL APODERADO (RF56 / CU89) ────────
 
 // Estudiantes del apoderado (como titular o suplente)
@@ -811,4 +862,49 @@ export async function actualizarEvaluacion(id, datos, confirmar = false) {
 export async function eliminarEvaluacion(id) {
   const res = await fetch(`${BASE_URL}/evaluaciones/${id}`, { method: 'DELETE', headers: authHeaders() });
   return handleResponse(res);
+}
+
+// ── Electivos de 3° y 4° medio: plan del período (CU108) y programación (CU106) ──
+
+const jsonHeaders = { 'Content-Type': 'application/json' };
+const qsPeriodo = (periodo) => (periodo ? `?periodo=${encodeURIComponent(periodo)}` : '');
+
+export async function getPlanElectivos(periodo) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/plan${qsPeriodo(periodo)}`));
+}
+
+export async function crearPlanElectivos(periodo, asignaturas) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/plan`, {
+    method: 'POST', headers: jsonHeaders, body: JSON.stringify({ periodo, asignaturas }),
+  }));
+}
+
+export async function editarPlanElectivos(planId, asignaturas) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/plan/${planId}`, {
+    method: 'PUT', headers: jsonHeaders, body: JSON.stringify({ asignaturas }),
+  }));
+}
+
+export async function clonarPlanElectivos(hacia, desde) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/plan/clonar`, {
+    method: 'POST', headers: jsonHeaders, body: JSON.stringify({ hacia, desde }),
+  }));
+}
+
+export async function getProgramacionElectivos(periodo) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/programacion${qsPeriodo(periodo)}`));
+}
+
+export async function programarElectivo(datos) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/clases`, {
+    method: 'POST', headers: jsonHeaders, body: JSON.stringify(datos),
+  }));
+}
+
+export async function eliminarElectivo(id) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/clases/${id}`, { method: 'DELETE' }));
+}
+
+export async function getElectivosDeCurso(cursoId) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/curso/${cursoId}`));
 }

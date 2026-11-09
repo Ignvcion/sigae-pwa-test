@@ -13,6 +13,8 @@ function extraerLista(data, clave) {
   return { lista: data?.[clave] || [], mensaje: data?.mensaje || "" };
 }
 
+const DIAS_ATENCION = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+
 const FORM_INICIAL = { estudianteId: "", docenteId: "", fecha: "", tramo: "", motivo: "", modalidad: "" };
 
 /**
@@ -32,6 +34,7 @@ function SolicitarCitacionModal({ onClose, onSolicitada }) {
   const [msgDocentes, setMsgDocentes] = useState("");
   const [cargandoDocentes, setCargandoDocentes] = useState(false);
   const [dias, setDias] = useState([]);
+  const [horarioAtencion, setHorarioAtencion] = useState([]);
   const [msgDisponibilidad, setMsgDisponibilidad] = useState("");
   const [cargandoDisponibilidad, setCargandoDisponibilidad] = useState(false);
 
@@ -83,12 +86,14 @@ function SolicitarCitacionModal({ onClose, onSolicitada }) {
 
   const consultarDisponibilidad = async (estudianteId, docenteId) => {
     setDias([]);
+    setHorarioAtencion([]);
     setMsgDisponibilidad("");
     if (!docenteId) return;
     setCargandoDisponibilidad(true);
     try {
       const data = await getDisponibilidadSolicitud(estudianteId, docenteId);
       setDias(data?.dias || []);
+      setHorarioAtencion(data?.bloques || []);
       // Excepciones 1 y 2: sin horario de atención o sin bloques disponibles
       setMsgDisponibilidad(data?.dias?.length ? "" : data?.mensaje || "El docente no tiene bloques disponibles");
     } catch (error) {
@@ -219,6 +224,22 @@ function SolicitarCitacionModal({ onClose, onSolicitada }) {
                 {errores.docenteId && <span className="pwd-error">{errores.docenteId}</span>}
               </div>
             </div>
+
+            {/* RF55 / CU89: horario de atención semanal que configuró el docente */}
+            {form.docenteId && horarioAtencion.length > 0 && (
+              <div className="sol-horario-atencion">
+                <span className="sol-horario-atencion-titulo">Horario de atención</span>
+                {DIAS_ATENCION.filter((dia) => horarioAtencion.some((b) => b.Horario_Atencion_Dia_Semana === dia)).map((dia) => (
+                  <span key={dia} className="sol-horario-atencion-dia">
+                    <strong>{dia}</strong>{" "}
+                    {horarioAtencion
+                      .filter((b) => b.Horario_Atencion_Dia_Semana === dia)
+                      .map((b) => `${b.Horario_Atencion_Hora_Inicio}–${b.Horario_Atencion_Hora_Fin}`)
+                      .join(" · ")}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {form.docenteId && (
               <div className="campo-pwd">

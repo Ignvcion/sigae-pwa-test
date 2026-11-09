@@ -8,6 +8,9 @@ const conversacion = (extra = {}) => ({
   Docente_Usuario_Id: 5,
   Apoderado_Usuario_Id: 4,
   Conversacion_Estado: 1,
+  Recepcion_General: 1,
+  Habilitada_Hasta: null,
+  Apoderado_Puede_Responder: 1,
   ...extra,
 });
 

@@ -49,6 +49,7 @@ import BloquesHorarios from "../pages/academic/BloquesHorarios";
 import HorarioMaestro from "../pages/academic/HorarioMaestro";
 import ConsultaHorarios from "../pages/academic/ConsultaHorarios";
 import PlanEducativo from "../pages/academic/PlanEducativo";
+import Electivos from "../pages/academic/Electivos";
 import Asignaturas from "../pages/academic/Asignaturas";
 import SituacionFinal from "../pages/academic/SituacionFinal";
 import CierrePeriodo from "../pages/academic/CierrePeriodo";
@@ -379,6 +380,16 @@ function AppRouter() {
             element={
               <RoleRoute roles={["Administrador"]}>
                 <PlanEducativo />
+              </RoleRoute>
+            }
+          />
+
+          {/* CU106, CU108: electivos de 3° y 4° medio */}
+          <Route
+            path="/electivos"
+            element={
+              <RoleRoute roles={["Administrador"]}>
+                <Electivos />
               </RoleRoute>
             }
           />

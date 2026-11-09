@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { registrarDocente } from "../../services/api";
+import { registrarDocente, getEspecialidades, getOpcionesDisponibilidad } from "../../services/api";
+import EtiquetasInput from "../../components/EtiquetasInput";
+import DisponibilidadSemanal, { errorTramos } from "../../components/DisponibilidadSemanal";
 import {
   validarRut, normalizarRut, validarNombreCompleto, validarCorreoInstitucional, DOMINIO_INSTITUCIONAL,
   validarTelefonoChileno, validarFortalezaContrasena, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
@@ -24,8 +26,9 @@ function RegisterTeacher() {
     depto: "",
     comuna: "",
     password: "",
-    especialidad: "",
+    especialidades: [],
     cargaHoraria: "",
+    disponibilidad: [],
     estado: "Activo",
   });
 
@@ -33,6 +36,14 @@ function RegisterTeacher() {
   const [errores, setErrores] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [catalogo, setCatalogo] = useState([]);
+  const [opcionesDisp, setOpcionesDisp] = useState(null);
+
+  // RF04: etiquetas de especialidad existentes; CU107: bloques para la disponibilidad semanal
+  useEffect(() => {
+    getEspecialidades().then((d) => setCatalogo((d || []).map((e) => e.Especialidad_Nombre))).catch(() => {});
+    getOpcionesDisponibilidad().then(setOpcionesDisp).catch(() => setOpcionesDisp({ dias: [], bloques: [] }));
+  }, []);
 
 
   const validarCampo = (name, value, datos = formData) => {
@@ -56,8 +67,10 @@ function RegisterTeacher() {
         return value ? validarFortalezaContrasena(value) : "";
       case "cargaHoraria":
         return value && (isNaN(value) || Number(value) <= 0 || Number(value) > 44)
-          ? "La carga horaria debe ser un número entre 1 y 44 horas"
+          ? "La carga horaria semanal debe ser un número entre 1 y 44 horas"
           : "";
+      case "especialidades":
+        return value.length === 0 ? "Agrega al menos una especialidad" : "";
       default:
         return "";
     }
@@ -83,6 +96,8 @@ function RegisterTeacher() {
       telefono: validarCampo("telefono", formData.telefono),
       password: validarCampo("password", formData.password),
       cargaHoraria: validarCampo("cargaHoraria", formData.cargaHoraria),
+      especialidades: validarCampo("especialidades", formData.especialidades),
+      disponibilidad: opcionesDisp ? errorTramos(formData.disponibilidad, opcionesDisp.dias || []) : "",
       ...validarDireccion(formData),
     };
 
@@ -98,11 +113,13 @@ function RegisterTeacher() {
     try {
 
 
-      await registrarDocente(formData);
+      const creado = await registrarDocente(formData);
 
-
+      const advertencia = creado?.Disponibilidad_Laboral?.advertencia;
       alert(
-        "Docente registrado correctamente"
+        advertencia
+          ? `Docente registrado correctamente.\n\n⚠ ${advertencia}`
+          : "Docente registrado correctamente"
       );
 
 
@@ -255,22 +272,30 @@ function RegisterTeacher() {
 
 
 
-          <input
-            type="text"
-            name="especialidad"
-            placeholder="Especialidad"
-            value={formData.especialidad}
-            onChange={handleChange}
-            required
-          />
+          <div className="campo-pwd">
+            <label htmlFor="especialidades-docente">Especialidades</label>
+            <EtiquetasInput
+              id="especialidades-docente"
+              valores={formData.especialidades}
+              opciones={catalogo}
+              invalido={!!errores.especialidades}
+              onChange={(especialidades) => {
+                setFormData({ ...formData, especialidades });
+                setErrores({ ...errores, especialidades: validarCampo("especialidades", especialidades) });
+              }}
+            />
+            {errores.especialidades && <span className="input-error-msg">{errores.especialidades}</span>}
+          </div>
 
 
 
-          <div>
+          <div className="campo-pwd">
+            <label htmlFor="carga-horaria-semanal">Carga horaria semanal (hrs)</label>
             <input
+              id="carga-horaria-semanal"
               type="number"
               name="cargaHoraria"
-              placeholder="Carga horaria máxima (hrs)"
+              placeholder="Carga horaria semanal (hrs)"
               value={formData.cargaHoraria}
               onChange={handleChange}
               min="1"
@@ -279,6 +304,33 @@ function RegisterTeacher() {
               required
             />
             {errores.cargaHoraria && <span className="input-error-msg">{errores.cargaHoraria}</span>}
+          </div>
+
+
+
+          <div className="campo-pwd">
+            <label>Disponibilidad laboral semanal</label>
+            <span className="etiquetas-ayuda">
+              Tramos de cada día en que el docente está en el colegio, con recreos y horas sin clases.
+              Déjala vacía si no tiene restricción.
+            </span>
+            {opcionesDisp ? (
+              <DisponibilidadSemanal
+                dias={opcionesDisp.dias}
+                bloques={opcionesDisp.bloques}
+                jornada={opcionesDisp.jornada}
+                limites={opcionesDisp.limites}
+                periodo={opcionesDisp.periodos?.vigente}
+                tramos={formData.disponibilidad}
+                cargaSemanal={formData.cargaHoraria}
+                onChange={(disponibilidad) => {
+                  setFormData({ ...formData, disponibilidad });
+                  setErrores({ ...errores, disponibilidad: "" });
+                }}
+              />
+            ) : (
+              <span className="etiquetas-ayuda">Cargando bloques horarios…</span>
+            )}
           </div>
 
 

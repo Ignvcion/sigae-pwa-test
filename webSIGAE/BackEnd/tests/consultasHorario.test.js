@@ -28,7 +28,9 @@ describe('Pruebas Unitarias - CU67, CU68, CU69: Consultas y filtros de horario',
     expect(sql).toContain('ha.Usuario_Id = ?');
     expect(sql).toContain('bh.Bloque_Horario_Jornada = ?');
     expect(sql).toContain('ha.Horario_Asignatura_Dia_Semana = ?');
-    expect(params).toEqual(['Activo', '3', 'Mañana', 'Lunes']);
+    // Clases regulares y, con los mismos filtros, los electivos de 3° y 4° medio (CU106)
+    expect(sql).toContain('FROM clase_electivo ce');
+    expect(params).toEqual(['Activo', '3', 'Mañana', 'Lunes', '3', 'Mañana', 'Lunes']);
     expect(res.json).toHaveBeenCalledWith([{ Horario_Asignatura_Id: 222222 }]);
   });
 

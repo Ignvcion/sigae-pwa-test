@@ -10,6 +10,7 @@ const { obtenerPeriodos, periodoSiguienteDe } = require('../utils/periodos');
 const { registrarHistorial } = require('../utils/historial');
 const { ESTADOS } = require('../utils/situacionFinal');
 const { calcularLimpieza, conteo, datosRespaldo, ejecutarLimpieza } = require('../utils/limpiezaPeriodo');
+const { cursoConElectivosSQL, completitudElectivos } = require('../utils/electivos');
 
 /**
  * Avance por curso del período vigente (situaciones aplicadas) y completitud del
@@ -68,7 +69,8 @@ async function calcularEstado(conn) {
                                                              WHERE pe2.Nivel_Educativo_Id = c.Nivel_Educativo_Id)) AS horas_requeridas,
               (SELECT COALESCE(SUM(TIME_TO_SEC(TIMEDIFF(bh.Bloque_Horario_Hora_Fin, bh.Bloque_Horario_Hora_Inicio)) / 3600), 0)
                  FROM horario_asignatura ha JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
-                WHERE ha.Curso_Id = c.Curso_Id AND ha.Horario_Asignatura_Estado = 'Activo') AS horas_programadas
+                WHERE ha.Curso_Id = c.Curso_Id AND ha.Horario_Asignatura_Estado = 'Activo') AS horas_programadas,
+              ${cursoConElectivosSQL('c')} AS con_electivos
          FROM curso c
          JOIN nivel_educativo n ON n.Nivel_Educativo_Id = c.Nivel_Educativo_Id
          LEFT JOIN usuario pj ON pj.Usuario_Id = c.Curso_Profesor_Jefe_Usuario_Id
@@ -76,9 +78,12 @@ async function calcularEstado(conn) {
         ORDER BY n.Nivel_Educativo_Orden, c.Curso_Seccion`,
       [siguiente]
     );
+    // 3° y 4° medio: el horario incluye los electivos del período (CU106)
+    const electivos = filas.some((c) => Number(c.con_electivos) === 1) ? await completitudElectivos(conn, siguiente) : null;
     cursosSiguientes = filas.map((c) => {
-      const requeridas = Number(c.horas_requeridas);
-      const programadas = Number(c.horas_programadas);
+      const el = Number(c.con_electivos) === 1 ? electivos : null;
+      const requeridas = Number(c.horas_requeridas) + (el?.requeridas || 0);
+      const programadas = Number(c.horas_programadas) + (el?.programadas || 0);
       return {
         Curso_Id: c.Curso_Id,
         Curso_Nombre: c.Curso_Nombre,

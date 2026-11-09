@@ -1,4 +1,7 @@
 const pool = require('../config/db');
+
+const MSG_ELECTIVA_EN_PLAN = (nombre) =>
+  `${nombre} es una asignatura electiva: solo puede incluirse en el plan de electivos de 3° y 4° medio`;
 const { claseVigente } = require('../utils/clasesEliminadas');
 
 // ── GET /api/planes  ─────────────────────────────────────────────
@@ -124,12 +127,18 @@ const crearPlan = async (req, res) => {
     const idsAsig = asignaturas.map(a => a.asignatura_id);
     const placeholders = idsAsig.map(() => '?').join(',');
     const [asigExistentes] = await conn.execute(
-      `SELECT Asignatura_Id FROM asignatura WHERE Asignatura_Id IN (${placeholders})`,
+      `SELECT Asignatura_Id, Asignatura_Nombre, Asignatura_Es_Electiva FROM asignatura WHERE Asignatura_Id IN (${placeholders})`,
       idsAsig
     );
     if (asigExistentes.length !== idsAsig.length) {
       await conn.rollback();
       return res.status(400).json({ error: 'Una o más asignaturas seleccionadas no existen en el sistema' });
+    }
+    // RF27: una asignatura electiva solo va en el plan de electivos de 3° y 4° medio
+    const electiva = asigExistentes.find(a => Number(a.Asignatura_Es_Electiva) === 1);
+    if (electiva) {
+      await conn.rollback();
+      return res.status(422).json({ error: MSG_ELECTIVA_EN_PLAN(electiva.Asignatura_Nombre) });
     }
 
     const idSet = new Set(idsAsig);
@@ -225,8 +234,11 @@ const clonarPlan = async (req, res) => {
 
     let asignaturasFinales = asignaturas;
     if (!Array.isArray(asignaturasFinales) || asignaturasFinales.length === 0) {
+      // RF27: las asignaturas que hoy son electivas no se copian a un plan regular
       const [asigOrigen] = await conn.execute(
-        'SELECT Asignatura_Id, Tipo, Horas_Semanales_Requeridas FROM incluyeasig WHERE Plan_Educativo_Id = ?',
+        `SELECT ia.Asignatura_Id, ia.Tipo, ia.Horas_Semanales_Requeridas
+           FROM incluyeasig ia JOIN asignatura a ON a.Asignatura_Id = ia.Asignatura_Id
+          WHERE ia.Plan_Educativo_Id = ? AND a.Asignatura_Es_Electiva = 0`,
         [plan_origen_id]
       );
       asignaturasFinales = asigOrigen.map(a => ({
@@ -254,6 +266,17 @@ const clonarPlan = async (req, res) => {
       if (!['Obligatorio', 'Complementario'].includes(a.tipo)) {
         await conn.rollback();
         return res.status(400).json({ error: 'El tipo debe ser "Obligatorio" o "Complementario"' });
+      }
+    }
+
+    if (Array.isArray(asignaturas) && asignaturas.length > 0) {
+      const [electivas] = await conn.query(
+        'SELECT Asignatura_Nombre FROM asignatura WHERE Asignatura_Id IN (?) AND Asignatura_Es_Electiva = 1',
+        [asignaturasFinales.map(a => a.asignatura_id)]
+      );
+      if (electivas.length > 0) {
+        await conn.rollback();
+        return res.status(422).json({ error: MSG_ELECTIVA_EN_PLAN(electivas[0].Asignatura_Nombre) });
       }
     }
 
@@ -377,12 +400,18 @@ const editarPlan = async (req, res) => {
 
     const placeholders = idsAsig.map(() => '?').join(',');
     const [asigExistentes] = await conn.execute(
-      `SELECT Asignatura_Id FROM asignatura WHERE Asignatura_Id IN (${placeholders})`,
+      `SELECT Asignatura_Id, Asignatura_Nombre, Asignatura_Es_Electiva FROM asignatura WHERE Asignatura_Id IN (${placeholders})`,
       idsAsig
     );
     if (asigExistentes.length !== idsAsig.length) {
       await conn.rollback();
       return res.status(400).json({ error: 'Una o más asignaturas seleccionadas no existen en el sistema' });
+    }
+    // RF27: una asignatura electiva solo va en el plan de electivos de 3° y 4° medio
+    const electiva = asigExistentes.find(a => Number(a.Asignatura_Es_Electiva) === 1);
+    if (electiva) {
+      await conn.rollback();
+      return res.status(422).json({ error: MSG_ELECTIVA_EN_PLAN(electiva.Asignatura_Nombre) });
     }
 
     await conn.execute(
@@ -486,7 +515,7 @@ const getNivelesSinPlan = async (req, res) => {
 const getAsignaturas = async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      `SELECT Asignatura_Id, Asignatura_Nombre, Asignatura_Prioridad_Academica
+      `SELECT Asignatura_Id, Asignatura_Nombre, Asignatura_Prioridad_Academica, Asignatura_Es_Electiva
        FROM asignatura ORDER BY Asignatura_Nombre`
     );
     res.json(rows);
@@ -499,6 +528,8 @@ const getAsignaturas = async (req, res) => {
 // ── POST /api/planes/asignaturas  ── CU 47
 const crearAsignatura = async (req, res) => {
   const { nombre, prioridad } = req.body;
+  // CU47 / RF28: la asignatura puede marcarse como electiva de 3° y 4° medio
+  const electiva = req.body.electiva === true || req.body.electiva === 1 || req.body.electiva === '1';
 
   if (!nombre?.trim() || !prioridad) {
     return res.status(400).json({ error: 'El nombre y la prioridad académica son obligatorios' });
@@ -519,13 +550,13 @@ const crearAsignatura = async (req, res) => {
     }
 
     const [result] = await pool.execute(
-      `INSERT INTO asignatura (Asignatura_Nombre, Asignatura_Prioridad_Academica)
-       VALUES (?, ?)`,
-      [nombreTrim, prioridad]
+      `INSERT INTO asignatura (Asignatura_Nombre, Asignatura_Prioridad_Academica, Asignatura_Es_Electiva)
+       VALUES (?, ?, ?)`,
+      [nombreTrim, prioridad, electiva ? 1 : 0]
     );
 
     res.status(201).json({
-      mensaje: `Asignatura "${nombreTrim}" registrada correctamente`,
+      mensaje: `Asignatura${electiva ? ' electiva' : ''} "${nombreTrim}" registrada correctamente`,
       asignatura_id: result.insertId,
     });
   } catch (err) {
@@ -541,6 +572,9 @@ const crearAsignatura = async (req, res) => {
 const editarAsignatura = async (req, res) => {
   const { id } = req.params;
   const { nombre, prioridad } = req.body;
+  // CU47: la marca electiva es opcional al editar; si no llega, se mantiene
+  const cambiaElectiva = req.body.electiva !== undefined;
+  const electiva = req.body.electiva === true || req.body.electiva === 1 || req.body.electiva === '1';
 
   if (!nombre?.trim() || !prioridad) {
     return res.status(400).json({ error: 'El nombre y la prioridad académica son obligatorios' });
@@ -553,11 +587,31 @@ const editarAsignatura = async (req, res) => {
 
   try {
     const [asig] = await pool.execute(
-      'SELECT Asignatura_Id FROM asignatura WHERE Asignatura_Id = ?',
+      'SELECT Asignatura_Id, Asignatura_Es_Electiva FROM asignatura WHERE Asignatura_Id = ?',
       [id]
     );
     if (asig.length === 0) {
       return res.status(404).json({ error: 'Asignatura no encontrada' });
+    }
+
+    // CU47: no se cambia la marca mientras la asignatura se use con su tipo actual
+    const eraElectiva = Number(asig[0].Asignatura_Es_Electiva) === 1;
+    if (cambiaElectiva && electiva !== eraElectiva) {
+      const [[uso]] = await pool.query(
+        eraElectiva
+          ? `SELECT (SELECT COUNT(*) FROM plan_electivos_asignatura WHERE Asignatura_Id = ?)
+                  + (SELECT COUNT(*) FROM clase_electivo WHERE Asignatura_Id = ?) AS n`
+          : `SELECT (SELECT COUNT(*) FROM incluyeasig WHERE Asignatura_Id = ?)
+                  + (SELECT COUNT(*) FROM tieneasig WHERE Asignatura_Id = ? AND Estado_Asignacion = 'Activa') AS n`,
+        [id, id]
+      );
+      if (Number(uso?.n) > 0) {
+        return res.status(409).json({
+          error: eraElectiva
+            ? 'La asignatura está en un plan de electivos: quítala del plan antes de desmarcarla como electiva'
+            : 'La asignatura está en planes educativos o asociada a cursos: quítala de ellos antes de marcarla como electiva',
+        });
+      }
     }
 
     const [dup] = await pool.execute(
@@ -570,9 +624,9 @@ const editarAsignatura = async (req, res) => {
 
     await pool.execute(
       `UPDATE asignatura
-       SET Asignatura_Nombre = ?, Asignatura_Prioridad_Academica = ?
+       SET Asignatura_Nombre = ?, Asignatura_Prioridad_Academica = ?, Asignatura_Es_Electiva = ?
        WHERE Asignatura_Id = ?`,
-      [nombreTrim, prioridad, id]
+      [nombreTrim, prioridad, (cambiaElectiva ? electiva : eraElectiva) ? 1 : 0, id]
     );
 
     res.json({ mensaje: `Asignatura "${nombreTrim}" actualizada correctamente` });

@@ -5,6 +5,7 @@ const pool = require('../config/db');
 const { claseVigente } = require('../utils/clasesEliminadas');
 const { obtenerPeriodos } = require('../utils/periodos');
 const { registrarHistorial, refPersona } = require('../utils/historial');
+const { RUTAS, nivelConRutaSQL, normalizarRuta } = require('../utils/rutaFormacion');
 const { asignarJefatura, obtenerDocente, jefaturasDelDocente, mensajeTope, nombreCurso } = require('../utils/jefatura');
 
 const idValido = (v) => Number.isInteger(Number(v)) && Number(v) > 0;
@@ -212,11 +213,13 @@ const getEstudiantesDeCurso = async (req, res) => {
 
   try {
     const [cursos] = await pool.query(
-      `SELECT c.Curso_Id, c.Curso_Nombre, c.Curso_Periodo_Lectivo, c.Curso_Profesor_Jefe_Usuario_Id
+      `SELECT c.Curso_Id, c.Curso_Nombre, c.Curso_Periodo_Lectivo, c.Curso_Profesor_Jefe_Usuario_Id,
+              (SELECT ${nivelConRutaSQL('n')} FROM nivel_educativo n WHERE n.Nivel_Educativo_Id = c.Nivel_Educativo_Id) AS Permite_Ruta
          FROM curso c WHERE c.Curso_Id = ?`,
       [cursoId]
     );
     if (cursos.length === 0) return res.status(404).json({ mensaje: 'Curso no encontrado' });
+    cursos[0].Permite_Ruta = Number(cursos[0].Permite_Ruta) === 1; // CU105: 2°, 3° y 4° medio
 
     // CU97 Excepción 2: el docente no tiene relación con el curso
     if (!admin && !(await docenteTieneRelacion(pool, req.user.id, cursoId))) {
@@ -224,7 +227,8 @@ const getEstudiantesDeCurso = async (req, res) => {
     }
 
     const [estudiantes] = await pool.query(
-      `SELECT Estudiante_Id, Estudiante_Nombre_Completo, Estudiante_RUT, Estudiante_Estado_Academico
+      `SELECT Estudiante_Id, Estudiante_Nombre_Completo, Estudiante_RUT, Estudiante_Estado_Academico,
+              Estudiante_Ruta_Formacion
          FROM estudiante
         WHERE Curso_Id = ? AND Estudiante_Fecha_Eliminacion IS NULL
         ORDER BY Estudiante_Nombre_Completo`,
@@ -259,4 +263,80 @@ const getMisJefaturas = async (req, res) => {
   }
 };
 
-module.exports = { designarProfesorJefe, retirarProfesorJefe, getEstudiantesDeCurso, getMisJefaturas, docenteTieneRelacion };
+// ── CU105: asignar la ruta de formación a estudiantes desde la pestaña del curso ──
+// PUT /api/cursos/:id/ruta-formacion   Body: { estudianteIds: [..], ruta: 'Científica' }
+const asignarRutaFormacion = async (req, res) => {
+  const cursoId = Number(req.params.id);
+  const { estudianteIds } = req.body || {};
+  if (!idValido(cursoId)) return res.status(400).json({ mensaje: 'Curso no válido' });
+  // CU105 Excepción 2: la ruta debe ser Científica, Humanística o Técnica
+  const ruta = normalizarRuta(req.body?.ruta);
+  if (!ruta) return res.status(400).json({ mensaje: `La ruta debe ser ${RUTAS.join(', ')}` });
+  if (!Array.isArray(estudianteIds) || estudianteIds.length === 0 || estudianteIds.some((id) => !idValido(id))) {
+    return res.status(400).json({ mensaje: 'Selecciona uno o más estudiantes' });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [[curso]] = await conn.query(
+      `SELECT c.Curso_Id, c.Curso_Nombre, c.Curso_Periodo_Lectivo, ${nivelConRutaSQL('n')} AS Permite_Ruta
+         FROM curso c JOIN nivel_educativo n ON n.Nivel_Educativo_Id = c.Nivel_Educativo_Id
+        WHERE c.Curso_Id = ?`,
+      [cursoId]
+    );
+    if (!curso) {
+      await conn.rollback();
+      return res.status(404).json({ mensaje: 'Curso no encontrado' });
+    }
+    // CU105 Excepción 1: la ruta se decide desde 2° medio
+    if (Number(curso.Permite_Ruta) !== 1) {
+      await conn.rollback();
+      return res.status(409).json({ mensaje: 'La ruta de formación solo se asigna a estudiantes de 2°, 3° y 4° medio' });
+    }
+    const ids = [...new Set(estudianteIds.map(Number))];
+    const [estudiantes] = await conn.query(
+      `SELECT Estudiante_Id, Estudiante_Ruta_Formacion FROM estudiante
+        WHERE Estudiante_Id IN (?) AND Curso_Id = ? AND Estudiante_Fecha_Eliminacion IS NULL FOR UPDATE`,
+      [ids, cursoId]
+    );
+    if (estudiantes.length !== ids.length) {
+      await conn.rollback();
+      return res.status(400).json({ mensaje: 'Algunos estudiantes no pertenecen a este curso' });
+    }
+    let cambiados = 0;
+    for (const e of estudiantes) {
+      if (e.Estudiante_Ruta_Formacion === ruta) continue;
+      await conn.query('UPDATE estudiante SET Estudiante_Ruta_Formacion = ? WHERE Estudiante_Id = ?', [ruta, e.Estudiante_Id]);
+      await registrarHistorial(conn, {
+        atributo: 'Estudiante_Ruta_Formacion',
+        anterior: e.Estudiante_Ruta_Formacion,
+        nuevo: ruta,
+        descripcion: `CU105: ruta de formación (${nombreCurso(curso)})`,
+        estudianteId: e.Estudiante_Id,
+        responsableId: req.user.id,
+      });
+      cambiados += 1;
+    }
+    await conn.commit();
+    return res.json({
+      mensaje: cambiados > 0
+        ? `Ruta ${ruta} registrada para ${cambiados} estudiante(s)`
+        : `Los estudiantes seleccionados ya tenían la ruta ${ruta}`,
+      ruta,
+      cambiados,
+    });
+  } catch (error) {
+    if (conn) await conn.rollback().catch(() => {});
+    console.error('asignarRutaFormacion:', error);
+    return res.status(500).json({ mensaje: 'No fue posible registrar la ruta de formación' });
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
+module.exports = {
+  designarProfesorJefe, retirarProfesorJefe, getEstudiantesDeCurso, getMisJefaturas, docenteTieneRelacion,
+  asignarRutaFormacion,
+};

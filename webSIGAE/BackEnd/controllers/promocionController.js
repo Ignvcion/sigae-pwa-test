@@ -493,16 +493,17 @@ const promoverCurso = async (req, res) => {
       return res.status(400).json({ mensaje: 'Algunos estudiantes no tienen su situación final registrada en este curso' });
     }
 
-    // Promovido y Repitente van a un curso del período siguiente: requieren el cierre iniciado.
-    // Egresado, En práctica y Retirado no necesitan destino ("Retirado" puede aplicarse todo el año).
-    const conDestino = registradas.filter((s) => EFECTOS[s.Situacion_Final_Valor]?.destino);
-    if (conDestino.length > 0 && !periodos.cierreIniciado) {
+    // Punto abierto 2 (confirmado por el PO): sin el cierre iniciado solo se aplican retiros.
+    // Promovido, Repitente, Egresado y En práctica esperan el cierre (CU100, CU101).
+    const requierenCierre = registradas.filter((s) => !EFECTOS[s.Situacion_Final_Valor]?.sinCierre);
+    if (requierenCierre.length > 0 && !periodos.cierreIniciado) {
       await conn.rollback();
+      const valores = [...new Set(requierenCierre.map((s) => s.Situacion_Final_Valor))].join(', ');
       return res.status(409).json({
-        mensaje: 'Promovidos y repitentes se aplican con el cierre iniciado (los cursos de destino son del período siguiente). '
-          + 'Sin cierre solo se pueden aplicar retiros.',
+        mensaje: `Sin el cierre del período iniciado solo se pueden aplicar retiros (${valores} se aplica con el cierre iniciado).`,
       });
     }
+    const conDestino = registradas.filter((s) => EFECTOS[s.Situacion_Final_Valor]?.destino);
 
     // Cursos de destino: nivel siguiente (promovidos) o mismo nivel (repitentes), misma sección
     const destinos = new Map(); // 'siguiente' | 'mismo' -> curso

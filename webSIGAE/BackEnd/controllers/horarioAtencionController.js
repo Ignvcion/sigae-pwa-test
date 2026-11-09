@@ -1,9 +1,20 @@
 // Horario de atención de apoderados del docente (RF55 / CU87, CU88).
 //
-// Cada bloque es un día de la semana con hora de inicio y término, independiente del horario
-// de clases. Los bloques se definen en tramos de 30 minutos entre 08:00 y 18:00, igual que las
-// citaciones, para que el apoderado pueda solicitar exactamente esos tramos (RF56 / CU89).
+// Cada bloque (tramo) es un día de la semana con hora de inicio y término "desde–hasta",
+// independiente del horario de clases, entre 08:00 y 18:00. El apoderado solicita citaciones
+// de 30 minutos (en punto o y media) que caben completas en un tramo (RF56 / CU89), por eso
+// cada tramo debe incluir al menos una. Reglas que lo enlazan con el resto del horario:
+//   - no se superpone con sus clases del período vigente (CU87 Excepción 2) ni con otro tramo
+//     de atención (CU87 Excepción 3);
+//   - debe quedar dentro de su disponibilidad laboral (CU107) del período vigente, si la tiene;
+//   - si un cambio deja fuera citaciones a futuro, se pide confirmación (CU88 Excepción 1).
+// El docente lo edita por tramos o la semana completa (vista por bloques de 45 minutos).
 const pool = require('../config/db');
+const { obtenerPeriodos } = require('../utils/periodos');
+const { normalizarTramos, unirTramos, cabeEnTramos, aHora } = require('../utils/disponibilidadLaboral');
+const {
+  bloquesDeJornada, clasesDelDocente, tramosGuardados,
+} = require('./disponibilidadLaboralController');
 const {
   DIAS_SEMANA,
   aMinutos,
@@ -18,7 +29,10 @@ const {
 
 const INICIO_ATENCION = 8 * 60;   // 08:00
 const FIN_ATENCION = 18 * 60;     // 18:00
-const PASO_MINUTOS = 30;
+const PASO_MINUTOS = 30;          // duración de una citación (en punto o y media)
+
+/** ¿El tramo [inicio, fin) incluye al menos una citación de 30 minutos en punto o y media? */
+const alcanzaParaCitacion = (inicio, fin) => Math.ceil(inicio / PASO_MINUTOS) * PASO_MINUTOS + PASO_MINUTOS <= fin;
 
 const ESTADO_CANCELADA = 'Cancelada';
 
@@ -71,8 +85,8 @@ function validarBloque({ dia, horaInicio, horaFin } = {}) {
       errores.horaFin = 'La hora de inicio debe ser anterior a la hora de término';
     } else if (inicio < INICIO_ATENCION || fin > FIN_ATENCION) {
       errores.horaInicio = 'El horario de atención debe estar entre las 08:00 y las 18:00';
-    } else if (inicio % PASO_MINUTOS !== 0 || fin % PASO_MINUTOS !== 0) {
-      errores.horaInicio = 'Las horas deben ser en punto o y media (tramos de 30 minutos)';
+    } else if (!alcanzaParaCitacion(inicio, fin)) {
+      errores.horaFin = 'El bloque debe incluir al menos una citación de 30 minutos (en punto o y media)';
     }
   }
 
@@ -115,7 +129,31 @@ async function validarSuperposiciones(conn, docenteId, { dia, inicio, fin }, exc
       },
     };
   }
+
+  const fuera = await fueraDeDisponibilidadLaboral(conn, docenteId, [{ dia, inicio, fin }]);
+  if (fuera.mensajes.length > 0) return { status: 409, body: { mensaje: fuera.mensajes[0] } };
   return null;
+}
+
+/**
+ * CU107: los tramos de atención deben quedar dentro de la disponibilidad laboral del
+ * docente en el período vigente (si no tiene disponibilidad registrada, no hay restricción).
+ * Devuelve la disponibilidad (unida por día) y un mensaje por cada tramo que queda fuera.
+ */
+async function fueraDeDisponibilidadLaboral(conn, docenteId, tramos) {
+  const { vigente } = await obtenerPeriodos(conn);
+  const disponibilidad = await tramosGuardados(conn, docenteId, vigente);
+  if (disponibilidad.length === 0) return { disponibilidad, mensajes: [] };
+  const porDia = new Map(DIAS_SEMANA.map((d) => [d, unirTramos(disponibilidad.filter((t) => t.dia === d))]));
+  const mensajes = tramos
+    .filter((t) => !cabeEnTramos(porDia.get(t.dia) || [], t.inicio, t.fin))
+    .map((t) => {
+      const libres = (porDia.get(t.dia) || []).map((x) => `${aHora(x.inicio)}–${aHora(x.fin)}`).join(' y ');
+      return `El tramo ${t.dia} ${aHora(t.inicio)}–${aHora(t.fin)} queda fuera de tu disponibilidad laboral `
+        + `(${libres ? `ese día estás disponible ${libres}` : 'ese día no tienes disponibilidad'}). `
+        + 'Si necesitas otro horario, pide a un administrador que actualice tu disponibilidad.';
+    });
+  return { disponibilidad, mensajes };
 }
 
 /**
@@ -298,7 +336,133 @@ const eliminarBloqueAtencion = async (req, res) => {
   }
 };
 
+// ── CU87 / CU88: semana completa de atención, con la vista por bloques de 45 minutos ──
+// GET /api/horario-atencion/semana
+const getSemanaAtencion = async (req, res) => {
+  if (!esDocente(req.user)) return res.status(403).json(SOLO_DOCENTE);
+  const docenteId = req.user.id;
+  try {
+    const { vigente } = await obtenerPeriodos(pool);
+    const bloques = await obtenerBloques(pool, docenteId);
+    const disponibilidad = await tramosGuardados(pool, docenteId, vigente);
+    return res.json({
+      periodo: vigente,
+      dias: DIAS_SEMANA,
+      limites: { minimo: minutosAHora(INICIO_ATENCION), maximo: minutosAHora(FIN_ATENCION) },
+      duracionCitacion: PASO_MINUTOS,
+      tramos: bloques.map((b) => ({
+        dia: b.Horario_Atencion_Dia_Semana,
+        hora_inicio: b.Horario_Atencion_Hora_Inicio,
+        hora_fin: b.Horario_Atencion_Hora_Fin,
+      })),
+      disponibilidadLaboral: disponibilidad.map((t) => ({ dia: t.dia, hora_inicio: aHora(t.inicio), hora_fin: aHora(t.fin) })),
+      bloques: await bloquesDeJornada(pool),
+      clases: await clasesDelDocente(pool, docenteId, vigente),
+    });
+  } catch (error) {
+    console.error('getSemanaAtencion:', error);
+    return res.status(500).json({ mensaje: 'No fue posible cargar tu horario de atención' });
+  }
+};
+
+/** Citaciones a futuro (no canceladas) que están en algún tramo actual y no caben en los nuevos. */
+async function citacionesFueraDeLosTramos(conn, docenteId, actuales, nuevos) {
+  const afectadas = new Map();
+  for (const bloque of actuales) {
+    const nuevosDelDia = nuevos.filter((t) => t.dia === bloque.Horario_Atencion_Dia_Semana);
+    for (const c of await citacionesAfectadas(conn, docenteId, bloque)) {
+      const tramo = parsearTramo(c.Citacion_Tramo_Horario);
+      if (!nuevosDelDia.some((t) => t.inicio <= tramo.inicio && tramo.fin <= t.fin)) afectadas.set(c.Citacion_Id, c);
+    }
+  }
+  return [...afectadas.values()];
+}
+
+// PUT /api/horario-atencion/semana   Body: { tramos: [{ dia, hora_inicio, hora_fin }], confirmar? }
+// Reemplaza toda la semana con las mismas validaciones de CU87 y CU88.
+const guardarSemanaAtencion = async (req, res) => {
+  if (!esDocente(req.user)) return res.status(403).json(SOLO_DOCENTE);
+  const normalizados = normalizarTramos(req.body?.tramos, {
+    minimo: INICIO_ATENCION,
+    maximo: FIN_ATENCION,
+    minDuracion: PASO_MINUTOS,
+    nombre: 'El horario de atención',
+  });
+  // CU87 Excepciones 1 y 3: datos inválidos o tramos de atención que se superponen
+  if (!normalizados.ok) return res.status(400).json({ mensaje: normalizados.mensaje });
+  const tramos = normalizados.tramos;
+  const sinCitacion = tramos.find((t) => !alcanzaParaCitacion(t.inicio, t.fin));
+  if (sinCitacion) {
+    return res.status(400).json({
+      mensaje: `El tramo ${sinCitacion.dia} ${aHora(sinCitacion.inicio)}–${aHora(sinCitacion.fin)} no incluye `
+        + 'ninguna citación de 30 minutos (en punto o y media)',
+    });
+  }
+
+  const docenteId = req.user.id;
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    // CU87 Excepción 2: ningún tramo puede superponerse con una clase del período vigente
+    const conflictos = [];
+    for (const t of tramos) {
+      const clases = await buscarChoquesConClases(conn, { docenteId, dia: t.dia, inicio: t.inicio, fin: t.fin });
+      if (clases.length > 0) {
+        conflictos.push(`El tramo ${t.dia} ${aHora(t.inicio)}–${aHora(t.fin)} se superpone con una clase asignada: `
+          + `${clases.map(describirClase).join('; ')}`);
+      }
+    }
+    // CU107: dentro de la disponibilidad laboral
+    conflictos.push(...(await fueraDeDisponibilidadLaboral(conn, docenteId, tramos)).mensajes);
+    if (conflictos.length > 0) {
+      await conn.rollback();
+      return res.status(409).json({ mensaje: conflictos[0], conflictos });
+    }
+
+    // CU88 Excepción 1: citaciones a futuro que quedarían fuera del horario de atención
+    const actuales = await obtenerBloques(conn, docenteId);
+    const afectadas = await citacionesFueraDeLosTramos(conn, docenteId, actuales, tramos);
+    if (afectadas.length > 0 && !confirmado(req.body?.confirmar)) {
+      await conn.rollback();
+      return res.status(409).json({
+        mensaje: 'Hay citaciones agendadas a futuro que quedarían fuera del horario de atención. '
+          + 'Confirma para continuar; las citaciones se mantienen y puedes reprogramarlas desde Citaciones.',
+        requiereConfirmacion: true,
+        citaciones: afectadas,
+      });
+    }
+
+    await conn.query('DELETE FROM horario_atencion WHERE Docente_Usuario_Id = ?', [docenteId]);
+    if (tramos.length > 0) {
+      await conn.query(
+        `INSERT INTO horario_atencion
+           (Horario_Atencion_Dia_Semana, Horario_Atencion_Hora_Inicio, Horario_Atencion_Hora_Fin, Docente_Usuario_Id)
+         VALUES ?`,
+        [tramos.map((t) => [t.dia, aHora(t.inicio), aHora(t.fin), docenteId])]
+      );
+    }
+    await conn.commit();
+    return res.json({
+      mensaje: tramos.length > 0
+        ? 'Horario de atención guardado. Los apoderados ya pueden solicitar citaciones en estos tramos.'
+        : 'Se quitó tu horario de atención: los apoderados no podrán solicitar citaciones contigo.',
+      bloques: await obtenerBloques(pool, docenteId),
+    });
+  } catch (error) {
+    if (conn) await conn.rollback().catch(() => {});
+    console.error('guardarSemanaAtencion:', error);
+    return res.status(500).json({ mensaje: 'No fue posible guardar tu horario de atención' });
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
 module.exports = {
+  getSemanaAtencion,
+  guardarSemanaAtencion,
+  alcanzaParaCitacion,
   getMiHorarioAtencion,
   crearBloqueAtencion,
   actualizarBloqueAtencion,

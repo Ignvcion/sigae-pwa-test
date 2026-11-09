@@ -15,6 +15,33 @@ const {
   columnasDireccion,
   CAMPOS_DIRECCION,
 } = require('../middleware/validation');
+const { PERIODO_VIGENTE_SQL } = require('../utils/periodos');
+const {
+  normalizarEspecialidades,
+  especialidadesDelCuerpo,
+  guardarEspecialidadesDocente,
+} = require('../utils/especialidades');
+const {
+  leerDisponibilidad,
+  guardarDisponibilidadDocente,
+  ErrorDisponibilidad,
+} = require('./disponibilidadLaboralController');
+
+/** Ejecuta `fn(conn)` en una transacción y devuelve su resultado. */
+async function enTransaccion(fn) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const resultado = await fn(conn);
+    await conn.commit();
+    return resultado;
+  } catch (error) {
+    await conn.rollback().catch(() => {});
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
 
 const MENSAJE_TELEFONO_INVALIDO = 'El número telefónico debe tener 9 dígitos, opcionalmente con prefijo +56';
 
@@ -204,8 +231,7 @@ const createUsuario = async (req, res) => {
     Usuario_Contraseña,
     // Docente
     Es_Docente,
-    Docente_Carga_Horaria_Maxima,
-    Docente_Especialidad,
+    Docente_Carga_Horaria_Semanal,
     Docente_Correo_Institucional,
     // Administrador
     Es_Administrador,
@@ -232,6 +258,22 @@ const createUsuario = async (req, res) => {
     return res.status(400).json({ mensaje: 'El correo institucional del administrador debe pertenecer al dominio @jacquescousteau.edu' });
   if (Es_Apoderado && !Apoderado_Correo_Natural)
     return res.status(400).json({ mensaje: 'El correo del apoderado es obligatorio' });
+
+  // RF04: especialidades como etiquetas (arreglo o texto separado por comas)
+  let especialidades = null;
+  if (Es_Docente) {
+    const normalizadas = normalizarEspecialidades(especialidadesDelCuerpo(req.body));
+    if (!normalizadas.ok) return res.status(400).json({ mensaje: normalizadas.mensaje });
+    especialidades = normalizadas.nombres;
+  }
+
+  // CU107: disponibilidad laboral semanal (opcional; sin ella el docente no tiene restricción)
+  let disponibilidad = null;
+  if (Es_Docente && req.body.Docente_Disponibilidad !== undefined) {
+    const leida = leerDisponibilidad(req.body.Docente_Disponibilidad);
+    if (!leida.ok) return res.status(400).json({ mensaje: leida.mensaje });
+    disponibilidad = leida;
+  }
 
   try {
 
@@ -316,39 +358,52 @@ const createUsuario = async (req, res) => {
 
     const hash = await bcrypt.hash(Usuario_Contraseña, 10);
 
-    const [resultado] = await db.query(
-      `INSERT INTO usuario (
-        Usuario_RUT, Usuario_Telefono, Usuario_Nombre_Completo,
-        Usuario_Estado_Cuenta, Usuario_Contraseña, Usuario_Foto_Perfil,
-        Es_Docente, Docente_Carga_Horaria_Maxima, Docente_Especialidad, Docente_Correo_Institucional,
-        Es_Administrador, Administrador_Tipo, Administrador_Correo_Institucional,
-        Es_Apoderado, Usuario_Direccion_Calle, Usuario_Direccion_Numero,
-        Usuario_Direccion_Depto, Usuario_Direccion_Comuna, Apoderado_Correo_Natural
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        Usuario_RUT,
-        normalizarTelefono(Usuario_Telefono),
-        Usuario_Nombre_Completo.trim(),
-        Usuario_Estado_Cuenta !== undefined ? Usuario_Estado_Cuenta : 1,
-        hash,
-        null, // Glosario 6.1.2: la cuenta se crea sin fotografía; se carga luego desde el perfil
-        Es_Docente      ? 1 : 0,
-        Docente_Carga_Horaria_Maxima    || null,
-        Docente_Especialidad            || null,
-        Docente_Correo_Institucional    || null,
-        Es_Administrador ? 1 : 0,
-        Administrador_Tipo              || null,
-        Administrador_Correo_Institucional || null,
-        Es_Apoderado    ? 1 : 0,
-        ...columnasDireccion(direccionDesdeColumnas(req.body)).map(([, valor]) => valor),
-        Apoderado_Correo_Natural        || null,
-      ]
-    );
+    let guardadoDisponibilidad = null;
+    const nuevoId = await enTransaccion(async (conn) => {
+      const [resultado] = await conn.query(
+        `INSERT INTO usuario (
+          Usuario_RUT, Usuario_Telefono, Usuario_Nombre_Completo,
+          Usuario_Estado_Cuenta, Usuario_Contraseña, Usuario_Foto_Perfil,
+          Es_Docente, Docente_Carga_Horaria_Semanal, Docente_Especialidad, Docente_Correo_Institucional,
+          Es_Administrador, Administrador_Tipo, Administrador_Correo_Institucional,
+          Es_Apoderado, Usuario_Direccion_Calle, Usuario_Direccion_Numero,
+          Usuario_Direccion_Depto, Usuario_Direccion_Comuna, Apoderado_Correo_Natural
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          Usuario_RUT,
+          normalizarTelefono(Usuario_Telefono),
+          Usuario_Nombre_Completo.trim(),
+          Usuario_Estado_Cuenta !== undefined ? Usuario_Estado_Cuenta : 1,
+          hash,
+          null, // Glosario 6.1.2: la cuenta se crea sin fotografía; se carga luego desde el perfil
+          Es_Docente      ? 1 : 0,
+          Docente_Carga_Horaria_Semanal    || null,
+          especialidades ? especialidades.join(', ') : null,
+          Docente_Correo_Institucional    || null,
+          Es_Administrador ? 1 : 0,
+          Administrador_Tipo              || null,
+          Administrador_Correo_Institucional || null,
+          Es_Apoderado    ? 1 : 0,
+          ...columnasDireccion(direccionDesdeColumnas(req.body)).map(([, valor]) => valor),
+          Apoderado_Correo_Natural        || null,
+        ]
+      );
+      if (especialidades) await guardarEspecialidadesDocente(conn, resultado.insertId, especialidades);
+      if (disponibilidad && disponibilidad.tramos.length > 0) {
+        guardadoDisponibilidad = await guardarDisponibilidadDocente(conn, {
+          docenteId: resultado.insertId, disponibilidad, responsableId: req.user.id,
+        });
+      }
+      return resultado.insertId;
+    });
 
-    const [nuevo] = await db.query('SELECT * FROM usuario WHERE Usuario_Id = ?', [resultado.insertId]);
+    const [nuevo] = await db.query('SELECT * FROM usuario WHERE Usuario_Id = ?', [nuevoId]);
     const { Usuario_Contraseña: pwd, ...usuarioSinPwd } = nuevo[0];
-    res.status(201).json(usuarioSinPwd);
+    res.status(201).json(guardadoDisponibilidad
+      ? { ...usuarioSinPwd, Disponibilidad_Laboral: guardadoDisponibilidad }
+      : usuarioSinPwd);
   } catch (error) {
+    if (error instanceof ErrorDisponibilidad) return res.status(error.status).json({ mensaje: error.message });
     console.error(error);
     res.status(500).json({ mensaje: 'Error al crear el usuario' });
   }
@@ -361,7 +416,7 @@ const updateUsuario = async (req, res) => {
 
   try {
     const [existe] = await db.query(
-      'SELECT Es_Administrador, Administrador_Tipo, Es_Apoderado FROM usuario WHERE Usuario_Id = ?', [id]
+      'SELECT Es_Administrador, Administrador_Tipo, Es_Apoderado, Es_Docente FROM usuario WHERE Usuario_Id = ?', [id]
     );
     if (existe.length === 0) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
 
@@ -389,8 +444,7 @@ const updateUsuario = async (req, res) => {
       'Usuario_Nombre_Completo',
       'Usuario_Foto_Perfil',
       'Usuario_Estado_Cuenta',
-      'Docente_Carga_Horaria_Maxima',
-      'Docente_Especialidad',
+      'Docente_Carga_Horaria_Semanal',
       'Docente_Correo_Institucional',
       'Administrador_Correo_Institucional',
       ...Object.values(CAMPOS_DIRECCION),
@@ -404,6 +458,29 @@ const updateUsuario = async (req, res) => {
     const otrosDatos = Object.fromEntries(
       Object.entries(camposRaw).filter(([k]) => CAMPOS_EDITABLES_USUARIO.has(k))
     );
+
+    // RF04: las especialidades se guardan como etiquetas, aparte de las columnas de usuario
+    let especialidades = null;
+    const especialidadesEnviadas = especialidadesDelCuerpo(camposRaw);
+    if (especialidadesEnviadas !== undefined) {
+      if (!objetivo.Es_Docente) {
+        return res.status(400).json({ mensaje: 'Solo un docente puede tener especialidades' });
+      }
+      const normalizadas = normalizarEspecialidades(especialidadesEnviadas);
+      if (!normalizadas.ok) return res.status(400).json({ mensaje: normalizadas.mensaje });
+      especialidades = normalizadas.nombres;
+    }
+
+    // CU107: disponibilidad laboral semanal; solo la edita el administrador (esta ruta es de administración)
+    let disponibilidad = null;
+    if (camposRaw.Docente_Disponibilidad !== undefined) {
+      if (!objetivo.Es_Docente) {
+        return res.status(400).json({ mensaje: 'Solo un docente tiene disponibilidad laboral' });
+      }
+      const leida = leerDisponibilidad(camposRaw.Docente_Disponibilidad);
+      if (!leida.ok) return res.status(400).json({ mensaje: leida.mensaje });
+      disponibilidad = leida;
+    }
 
     // Validar dominio de correos institucionales si se están actualizando
     if (otrosDatos.Docente_Correo_Institucional && !validarCorreoInstitucional(otrosDatos.Docente_Correo_Institucional)) {
@@ -442,15 +519,32 @@ const updateUsuario = async (req, res) => {
     const valores = Object.values(otrosDatos);
 
     if (hash) { campos.push('Usuario_Contraseña = ?'); valores.push(hash); }
-    if (campos.length === 0) return res.status(400).json({ mensaje: 'No hay campos para actualizar' });
+    if (campos.length === 0 && !especialidades && !disponibilidad) return res.status(400).json({ mensaje: 'No hay campos para actualizar' });
 
     valores.push(id);
-    await db.query(`UPDATE usuario SET ${campos.join(', ')} WHERE Usuario_Id = ?`, valores);
+    let guardadoDisponibilidad = null;
+    if (especialidades || disponibilidad) {
+      await enTransaccion(async (conn) => {
+        if (campos.length > 0) await conn.query(`UPDATE usuario SET ${campos.join(', ')} WHERE Usuario_Id = ?`, valores);
+        if (especialidades) await guardarEspecialidadesDocente(conn, id, especialidades);
+        // Después de la carga horaria, para que las horas adeudadas usen la carga nueva
+        if (disponibilidad) {
+          guardadoDisponibilidad = await guardarDisponibilidadDocente(conn, {
+            docenteId: Number(id), disponibilidad, responsableId: solicitante.id,
+          });
+        }
+      });
+    } else {
+      await db.query(`UPDATE usuario SET ${campos.join(', ')} WHERE Usuario_Id = ?`, valores);
+    }
 
     const [actualizado] = await db.query('SELECT * FROM usuario WHERE Usuario_Id = ?', [id]);
     const { Usuario_Contraseña: pwd, ...usuarioSinPwd } = actualizado[0];
-    res.json(usuarioSinPwd);
+    res.json(guardadoDisponibilidad
+      ? { ...usuarioSinPwd, Disponibilidad_Laboral: guardadoDisponibilidad }
+      : usuarioSinPwd);
   } catch (error) {
+    if (error instanceof ErrorDisponibilidad) return res.status(error.status).json({ mensaje: error.message });
     console.error(error);
     res.status(500).json({ mensaje: 'Error al actualizar el usuario' });
   }
@@ -635,8 +729,10 @@ const asignarRol = async (req, res) => {
 
     // Resolver campos: valor enviado o, si se omite, el que ya existe en la BD
     const correoDocente  = datosFila.Docente_Correo_Institucional  || usuario.Docente_Correo_Institucional;
-    const especialidad   = datosFila.Docente_Especialidad          || usuario.Docente_Especialidad;
-    const carga          = datosFila.Docente_Carga_Horaria_Maxima  || usuario.Docente_Carga_Horaria_Maxima;
+    const especialidadesRol = normalizarEspecialidades(
+      especialidadesDelCuerpo(datosFila) ?? usuario.Docente_Especialidad
+    );
+    const carga          = datosFila.Docente_Carga_Horaria_Semanal  || usuario.Docente_Carga_Horaria_Semanal;
     const correoAdmin    = datosFila.Administrador_Correo_Institucional || usuario.Administrador_Correo_Institucional;
     const tipoAdmin      = datosFila.Administrador_Tipo            || usuario.Administrador_Tipo || 'Administrador Normal';
     const correoApo      = datosFila.Apoderado_Correo_Natural      || usuario.Apoderado_Correo_Natural;
@@ -650,10 +746,10 @@ const asignarRol = async (req, res) => {
         return res.status(400).json({ mensaje: 'El correo institucional del docente es obligatorio' });
       if (!validarCorreoInstitucional(correoDocente))
         return res.status(400).json({ mensaje: 'El correo institucional debe pertenecer al dominio @jacquescousteau.edu' });
-      if (!especialidad)
-        return res.status(400).json({ mensaje: 'La especialidad es obligatoria' });
+      if (!especialidadesRol.ok)
+        return res.status(400).json({ mensaje: especialidadesRol.mensaje });
       if (!carga)
-        return res.status(400).json({ mensaje: 'La carga horaria máxima es obligatoria' });
+        return res.status(400).json({ mensaje: 'La carga horaria semanal es obligatoria' });
       const [dup] = await db.query(
         'SELECT Usuario_Id FROM usuario WHERE Docente_Correo_Institucional = ? AND Usuario_Id != ?',
         [correoDocente, id]
@@ -698,10 +794,9 @@ const asignarRol = async (req, res) => {
     if (rol === 'Docente') {
       setCampos.push('Es_Docente = 1',
         'Docente_Correo_Institucional = ?',
-        'Docente_Especialidad = ?',
-        'Docente_Carga_Horaria_Maxima = ?'
+        'Docente_Carga_Horaria_Semanal = ?'
       );
-      setValores.push(correoDocente, especialidad, carga);
+      setValores.push(correoDocente, carga);
     }
 
     if (rol === 'Administrador') {
@@ -725,7 +820,10 @@ const asignarRol = async (req, res) => {
     }
 
     setValores.push(id);
-    await db.query(`UPDATE usuario SET ${setCampos.join(', ')} WHERE Usuario_Id = ?`, setValores);
+    await enTransaccion(async (conn) => {
+      await conn.query(`UPDATE usuario SET ${setCampos.join(', ')} WHERE Usuario_Id = ?`, setValores);
+      if (rol === 'Docente') await guardarEspecialidadesDocente(conn, id, especialidadesRol.nombres);
+    });
 
     const [actualizado] = await db.query('SELECT * FROM usuario WHERE Usuario_Id = ?', [id]);
     const { Usuario_Contraseña: pwd, ...usuarioSinPwd } = actualizado[0];
@@ -809,8 +907,9 @@ const buscarUsuario = async (req, res) => {
 // CU30 y CU31: Listar docentes y filtrar por especialidad o estado de cuenta
 // Endpoint: GET /api/usuarios/docentes?especialidad=...&estado=...
 const getDocentes = async (req, res) => {
-  const { especialidad, estado } = req.query;
-  const hayFiltros = (especialidad && especialidad.trim() !== '') || (estado !== undefined && estado !== '');
+  const { especialidad, especialidadId, estado } = req.query;
+  const hayFiltros = (especialidad && especialidad.trim() !== '') || (estado !== undefined && estado !== '')
+    || (especialidadId !== undefined && especialidadId !== '');
 
   try {
     let sql = `
@@ -821,7 +920,12 @@ const getDocentes = async (req, res) => {
         Usuario_Telefono,
         Docente_Correo_Institucional,
         Docente_Especialidad,
-        Docente_Carga_Horaria_Maxima,
+        Docente_Carga_Horaria_Semanal,
+        -- CU107: horas disponibles a la semana en el período vigente (NULL = sin restricción)
+        (SELECT SUM(TIME_TO_SEC(TIMEDIFF(dd.Disponibilidad_Docente_Hora_Fin, dd.Disponibilidad_Docente_Hora_Inicio))) / 3600
+           FROM disponibilidad_docente dd
+          WHERE dd.Docente_Usuario_Id = usuario.Usuario_Id
+            AND dd.Disponibilidad_Docente_Periodo_Lectivo = ${PERIODO_VIGENTE_SQL}) AS Horas_Disponibles,
         Usuario_Estado_Cuenta,
         Es_Docente,
         Es_Apoderado,
@@ -835,6 +939,13 @@ const getDocentes = async (req, res) => {
     if (especialidad && especialidad.trim() !== '') {
       sql += ' AND Docente_Especialidad LIKE ?';
       params.push(`%${especialidad.trim()}%`);
+    }
+
+    // Etiqueta exacta del catálogo de especialidades
+    if (especialidadId !== undefined && especialidadId !== '') {
+      sql += ` AND EXISTS (SELECT 1 FROM docente_especialidad de
+                            WHERE de.Docente_Usuario_Id = usuario.Usuario_Id AND de.Especialidad_Id = ?)`;
+      params.push(Number(especialidadId));
     }
 
     if (estado !== undefined && estado !== '') {
@@ -857,7 +968,16 @@ const getDocentes = async (req, res) => {
       });
     }
 
-    return res.json(docentes);
+    // CU107: indicador "debe horas" (carga horaria semanal − horas disponibles)
+    return res.json(docentes.map((d) => {
+      const disponibles = d.Horas_Disponibles == null ? null : Math.round(Number(d.Horas_Disponibles) * 100) / 100;
+      const carga = d.Docente_Carga_Horaria_Semanal;
+      return {
+        ...d,
+        Horas_Disponibles: disponibles,
+        Horas_Adeudadas: disponibles !== null && carga != null ? Math.max(0, Math.round((carga - disponibles) * 100) / 100) : 0,
+      };
+    }));
   } catch (error) {
     console.error(error);
     // CU30: "No fue posible obtener el listado, reintente posteriormente"

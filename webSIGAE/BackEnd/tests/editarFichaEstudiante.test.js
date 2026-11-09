@@ -55,7 +55,7 @@ describe('Pruebas Unitarias - CU38: Editando curso asociado y estado académico 
 
     expect(db.query).toHaveBeenCalledTimes(2);
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ mensaje: 'El curso seleccionado no existe o se encuentra inactivo' });
+    expect(res.json).toHaveBeenCalledWith({ mensaje: 'El curso seleccionado no existe o no está activo en el período vigente ni en el siguiente' });
   });
 
   test('Excepción "Sin modificaciones": los valores enviados son iguales a los actuales', async () => {

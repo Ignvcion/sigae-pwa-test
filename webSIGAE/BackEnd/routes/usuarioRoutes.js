@@ -1,4 +1,5 @@
 const express = require('express');
+const disponibilidadLaboral = require('../controllers/disponibilidadLaboralController');
 const router = express.Router();
 
 const usuarioController = require('../controllers/usuarioController');
@@ -45,6 +46,7 @@ router.get('/docentes', verifyToken, verifyAdmin, usuarioController.getDocentes)
 
 // CU32 y CU33: Listado y filtros de apoderados — Super Admin/Admin
 router.get('/apoderados', verifyToken, verifyAdmin, usuarioController.getApoderados);
+router.get('/disponibilidad/opciones', verifyToken, verifyAdmin, disponibilidadLaboral.getOpcionesDisponibilidad);
 router.get('/:id', verifyToken, usuarioController.getUsuarioById);
 
 // Solo Administrador puede crear, modificar estado o eliminar usuarios
@@ -54,6 +56,10 @@ router.put('/:id/estado', verifyToken, verifyAdmin, usuarioController.toggleEsta
 router.delete('/:id',    verifyToken, verifyAdmin, usuarioController.deleteUsuario);
 
 // Asignar un nuevo rol a usuario existente (Admin puede asignar Docente/Apoderado; solo SuperAdmin puede asignar Admin)
+// CU107: disponibilidad laboral semanal del docente. Solo el administrador la edita (POST / y
+// PUT /:id, campo Docente_Disponibilidad); la consultan el administrador y el propio docente.
+router.get('/:id/disponibilidad', verifyToken, disponibilidadLaboral.getDisponibilidad);
+
 router.post('/:id/asignar-rol', verifyToken, verifyAdmin, usuarioController.asignarRol);
 
 // Solo SuperAdmin puede cambiar/revocar roles libremente
