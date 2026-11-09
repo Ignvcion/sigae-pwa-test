@@ -7,6 +7,7 @@ const { UPLOAD_DIR } = require('../middleware/uploadFotoPerfil');
 const {
   validarCorreoInstitucional,
   TEXTO_DOMINIOS_INSTITUCIONALES,
+  normalizarCorreosCuerpo,
   validarTelefonoChileno,
   normalizarTelefono,
   validarNombreCompleto,
@@ -331,6 +332,7 @@ const actualizarFotografiaPerfil = async (req, res) => {
 
 // Crear usuario — acepta los 3 roles con sus correos específicos
 const createUsuario = async (req, res) => {
+  normalizarCorreosCuerpo(req.body);
   const {
     Usuario_RUT,
     Usuario_Telefono,
@@ -590,15 +592,28 @@ const updateUsuario = async (req, res) => {
       disponibilidad = leida;
     }
 
-    // Validar dominio de correos institucionales si se están actualizando
-    if (otrosDatos.Docente_Correo_Institucional && !validarCorreoInstitucional(otrosDatos.Docente_Correo_Institucional)) {
-      return res.status(400).json({ mensaje: `El correo institucional del docente debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}` });
+    // Correos que se están actualizando: obligatorios (no se pueden dejar vacíos) y, los
+    // institucionales, de un dominio del colegio. Antes un valor vacío se guardaba sin validar.
+    normalizarCorreosCuerpo(otrosDatos);
+    for (const [columna, rolCorreo] of [
+      ['Docente_Correo_Institucional', 'docente'],
+      ['Administrador_Correo_Institucional', 'administrador'],
+    ]) {
+      if (otrosDatos[columna] === undefined) continue;
+      if (!otrosDatos[columna]) {
+        return res.status(400).json({ mensaje: `El correo institucional del ${rolCorreo} es obligatorio` });
+      }
+      if (!validarCorreoInstitucional(otrosDatos[columna])) {
+        return res.status(400).json({ mensaje: `El correo institucional del ${rolCorreo} debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}` });
+      }
     }
-    if (otrosDatos.Administrador_Correo_Institucional && !validarCorreoInstitucional(otrosDatos.Administrador_Correo_Institucional)) {
-      return res.status(400).json({ mensaje: `El correo institucional del administrador debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}` });
-    }
-    if (otrosDatos.Apoderado_Correo_Natural && !validarCorreo(otrosDatos.Apoderado_Correo_Natural)) {
-      return res.status(400).json({ mensaje: 'El correo del apoderado debe tener el formato usuario@dominio' });
+    if (otrosDatos.Apoderado_Correo_Natural !== undefined) {
+      if (!otrosDatos.Apoderado_Correo_Natural) {
+        return res.status(400).json({ mensaje: 'El correo del apoderado es obligatorio' });
+      }
+      if (!validarCorreo(otrosDatos.Apoderado_Correo_Natural)) {
+        return res.status(400).json({ mensaje: 'El correo del apoderado debe tener el formato usuario@dominio' });
+      }
     }
     if (otrosDatos.Usuario_Nombre_Completo !== undefined) {
       if (!validarNombreCompleto(otrosDatos.Usuario_Nombre_Completo)) {
@@ -801,7 +816,7 @@ const toggleEstado = async (req, res) => {
 const asignarRol = async (req, res) => {
   const { id } = req.params;
   const solicitante = req.user;
-  const { rol, ...datosFila } = req.body;
+  const { rol, ...datosFila } = normalizarCorreosCuerpo(req.body);
 
   const rolesValidos = ['Administrador', 'Docente', 'Apoderado'];
   if (!rol || !rolesValidos.includes(rol)) {
@@ -1309,7 +1324,7 @@ const getAdministradores = async (req, res) => {
 // Endpoint: PUT /api/usuarios/administradores/:id
 const editarAdministrador = async (req, res) => {
   const { id } = req.params;
-  const { Administrador_Correo_Institucional, Usuario_Telefono, Usuario_Estado_Cuenta } = req.body;
+  const { Administrador_Correo_Institucional, Usuario_Telefono, Usuario_Estado_Cuenta } = normalizarCorreosCuerpo(req.body);
 
   try {
     const [existe] = await db.query(

@@ -31,6 +31,8 @@ const CAMPOS_DIRECCION = [
 const direccionDesdeForm = (f) =>
   Object.fromEntries(Object.entries(COLUMNAS_DIRECCION).map(([col, clave]) => [clave, f[col] || ""]));
 
+const CAMPOS_CORREO = ["Administrador_Correo_Institucional", "Docente_Correo_Institucional", "Apoderado_Correo_Natural"];
+
 function validarCampo(name, value, form) {
   if (name === "Docente_Especialidades") {
     return value.length === 0 ? "Agrega al menos una especialidad" : "";
@@ -48,6 +50,8 @@ function validarCampo(name, value, form) {
         ? "La carga horaria semanal debe ser un número entre 1 y 44 horas"
         : "";
   }
+  // Los correos de cada rol son obligatorios: el backend tampoco acepta dejarlos vacíos
+  if (CAMPOS_CORREO.includes(name) && !String(value ?? "").trim()) return "El correo es obligatorio";
   if (!value) return "";
   switch (name) {
     case "Administrador_Correo_Institucional":

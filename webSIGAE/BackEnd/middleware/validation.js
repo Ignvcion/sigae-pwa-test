@@ -24,6 +24,18 @@ function validarCorreoInstitucional(correo) {
     && DOMINIOS_INSTITUCIONALES.some((dominio) => normalizado.endsWith(dominio));
 }
 
+const COLUMNAS_CORREO_USUARIO = ['Docente_Correo_Institucional', 'Administrador_Correo_Institucional', 'Apoderado_Correo_Natural'];
+
+// Quita los espacios de los extremos de los correos del cuerpo (en el mismo
+// objeto), para que se guarde exactamente lo que se validó.
+function normalizarCorreosCuerpo(body) {
+  if (!body || typeof body !== 'object') return body;
+  for (const columna of COLUMNAS_CORREO_USUARIO) {
+    if (typeof body[columna] === 'string') body[columna] = body[columna].trim();
+  }
+  return body;
+}
+
 // Formato chileno: 9 dígitos, opcionalmente con prefijo internacional +56 (o 56).
 // Solo números: sin espacios, guiones ni letras.
 function validarTelefonoChileno(telefono) {
@@ -215,6 +227,7 @@ module.exports = {
   validarRut,
   validarCorreoInstitucional,
   TEXTO_DOMINIOS_INSTITUCIONALES,
+  normalizarCorreosCuerpo,
   validarTelefonoChileno,
   normalizarTelefono,
   validarNombreCompleto,
