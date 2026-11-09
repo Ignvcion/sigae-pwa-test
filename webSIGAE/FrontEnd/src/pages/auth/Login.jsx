@@ -79,7 +79,7 @@ function Login() {
         },
         "9343727-6:ilovemilf": {
           id: 2,
-          nombre: "Carlos Gonzales",
+          nombre: "Carlos Gonzales Farias",
           rut: "9343727-6",
           correo: "c.gonzales@jacquescousteau.edu",
           roles: ["Administrador"],

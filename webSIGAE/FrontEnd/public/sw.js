@@ -1,7 +1,5 @@
-const CACHE_NAME = 'sigae-pwa-v1';
+const CACHE_NAME = 'sigae-pwa-v6';
 const PRECACHE_ASSETS = [
-  './',
-  './index.html',
   './manifest.json',
   './favicon.svg',
   './logo-colegio.png',
@@ -19,7 +17,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activación: limpiar cachés obsoletas
+// Activación: limpiar inmediatamente todas las cachés anteriores
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -46,32 +44,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Si es navegación HTML, intentar red primero, si falla usar cache
+  // Si es navegación HTML, red primero siempre para obtener la versión más reciente
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req).catch(() => {
-        return caches.match('./index.html') || caches.match('./');
-      })
+      fetch(req).catch(() => caches.match('./index.html') || caches.match('./'))
     );
     return;
   }
 
-  // Para otros recursos (JS, CSS, imágenes): Stale-While-Revalidate
+  // Para otros recursos: Network first con fallback a caché para garantizar frescura
   event.respondWith(
-    caches.match(req).then((cachedResponse) => {
-      const fetchPromise = fetch(req)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(req, responseToCache);
-            });
-          }
-          return networkResponse;
-        })
-        .catch(() => cachedResponse);
-
-      return cachedResponse || fetchPromise;
-    })
+    fetch(req)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(req, responseToCache);
+          });
+        }
+        return networkResponse;
+      })
+      .catch(() => caches.match(req))
   );
 });

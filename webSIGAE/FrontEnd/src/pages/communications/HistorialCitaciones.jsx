@@ -333,11 +333,11 @@ function HistorialCitaciones() {
             </dl>
 
             <h3 className="cit-subtitulo">Historial de cambios</h3>
-            {seleccionada.historial.length === 0 ? (
+            {(!seleccionada.historial || seleccionada.historial.length === 0) ? (
               <p className="empty-state-text">La citación no registra cambios de estado.</p>
             ) : (
               <ol className="cit-timeline">
-                {[...seleccionada.historial]
+                {[...(seleccionada.historial || [])]
                   .sort((a, b) =>
                     `${a.Historial_Fecha_Registro || ""} ${a.Historial_Hora_Registro || ""}`.localeCompare(
                       `${b.Historial_Fecha_Registro || ""} ${b.Historial_Hora_Registro || ""}`

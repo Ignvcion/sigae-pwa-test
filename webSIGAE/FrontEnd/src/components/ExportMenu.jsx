@@ -92,7 +92,7 @@ export default function ExportMenu({ label, url, filenameBase, disabled }) {
           {[
             { key: "pdf", label: "📄 PDF" },
             { key: "excel", label: "📊 Excel" },
-            { key: "csv", label: "🧾 CSV" },
+            { key: "csv", label: "📋 CSV" },
             { key: "png", label: "🖼 Imagen (PNG)" },
           ].map((op) => (
             <button

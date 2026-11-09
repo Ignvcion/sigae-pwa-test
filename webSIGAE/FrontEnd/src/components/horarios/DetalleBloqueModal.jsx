@@ -9,7 +9,8 @@ function hhmm(t) {
 // Muestra curso, docente, asignatura, jornada, estado y observaciones
 // (incluye las suspensiones por eventos institucionales, RF42/RF45).
 function DetalleBloqueModal({ horarioId, onClose }) {
-  const [detalle, setDetalle] = useState(null);
+  const [rawDetalle, setDetalle] = useState(null);
+  const detalle = Array.isArray(rawDetalle) ? (rawDetalle[0] || {}) : rawDetalle;
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState("");
 
@@ -72,7 +73,7 @@ function DetalleBloqueModal({ horarioId, onClose }) {
 
             <dt>Observaciones</dt>
             <dd>
-              {detalle.observaciones?.length > 0 ? (
+              {Array.isArray(detalle.observaciones) && detalle.observaciones.length > 0 ? (
                 <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
                   {detalle.observaciones.map((obs) => <li key={obs}>{obs}</li>)}
                 </ul>

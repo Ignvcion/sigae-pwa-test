@@ -1442,17 +1442,24 @@ function DetalleEventoModal({ eventoId, onClose, onEditar }) {
     return () => { vigente = false; };
   }, [eventoId]);
 
-  const col = IMPACTO_COLORES[evento?.Evento_Institucional_Impacto_Clases] || IMPACTO_COLORES["Sin impacto"];
-  const esPasado = evento && evento.Evento_Institucional_Fecha < toISODate(new Date());
-  const fechaLarga = evento
-    ? formatearFechaEvento(evento.Evento_Institucional_Fecha, { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+  // Soporte robusto si la API devuelve un arreglo o un objeto único
+  const ev = Array.isArray(evento)
+    ? (evento.find((x) => String(x.Evento_Institucional_Id) === String(eventoId)) || evento[0] || {})
+    : (evento || {});
+
+  const col = IMPACTO_COLORES[ev?.Evento_Institucional_Impacto_Clases] || IMPACTO_COLORES["Sin impacto"];
+  const esPasado = ev?.Evento_Institucional_Fecha && ev.Evento_Institucional_Fecha < toISODate(new Date());
+  const fechaLarga = ev?.Evento_Institucional_Fecha
+    ? formatearFechaEvento(ev.Evento_Institucional_Fecha, { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     : "";
+  const bloques = Array.isArray(ev?.bloques) ? ev.bloques : [];
+  const clases = Array.isArray(ev?.clases) ? ev.clases : [];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" style={{ maxWidth: 620 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{evento ? evento.Evento_Institucional_Nombre : "Detalle del evento"}</h2>
+          <h2>{ev?.Evento_Institucional_Nombre || "Detalle del evento"}</h2>
           <button className="btn-cerrar" onClick={onClose} title="Cerrar">✕</button>
         </div>
 
@@ -1464,27 +1471,27 @@ function DetalleEventoModal({ eventoId, onClose, onEditar }) {
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
               <span style={{ fontWeight: 600, color: "#1e3a5f" }}>
-                📅 {fechaLarga.charAt(0).toUpperCase() + fechaLarga.slice(1)}
+                📅 {fechaLarga ? (fechaLarga.charAt(0).toUpperCase() + fechaLarga.slice(1)) : "Fecha por definir"}
               </span>
               {esPasado && <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>Pasado</span>}
-              <ImpactoChip impacto={evento.Evento_Institucional_Impacto_Clases} />
+              <ImpactoChip impacto={ev?.Evento_Institucional_Impacto_Clases} />
             </div>
 
             <div>
               <div style={s.label}>Descripción</div>
               <p style={{ margin: 0, color: "#374151", whiteSpace: "pre-wrap" }}>
-                {evento.Evento_Institucional_Descripcion}
+                {ev?.Evento_Institucional_Descripcion || "Sin descripción detallada."}
               </p>
             </div>
 
             <div>
-              <div style={s.label}>Bloques horarios afectados ({evento.bloques.length})</div>
-              {evento.bloques.length === 0 ? (
+              <div style={s.label}>Bloques horarios afectados ({bloques.length})</div>
+              {bloques.length === 0 ? (
                 <p style={{ margin: 0, fontSize: "0.85rem", color: "#9ca3af" }}>Este evento no afecta ningún bloque horario.</p>
               ) : (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                  {evento.bloques.map((b) => (
-                    <span key={b.Afecta_Id} style={{
+                  {bloques.map((b) => (
+                    <span key={b.Afecta_Id || b.Bloque_Horario_Id || Math.random()} style={{
                       fontSize: "0.75rem", padding: "2px 8px", borderRadius: 10,
                       background: col.bg, color: col.acento, border: `1px solid ${col.borde}`,
                     }}>
@@ -1495,12 +1502,12 @@ function DetalleEventoModal({ eventoId, onClose, onEditar }) {
               )}
             </div>
 
-            {evento.bloques.length > 0 && (
+            {bloques.length > 0 && (
               <div>
                 <div style={s.label}>
-                  Clases suspendidas el {evento.dia_semana?.toLowerCase()} ({evento.clases.length})
+                  Clases suspendidas el {ev?.dia_semana ? ev.dia_semana.toLowerCase() : "día seleccionado"} ({clases.length})
                 </div>
-                {evento.clases.length === 0 ? (
+                {clases.length === 0 ? (
                   <p style={{ margin: 0, fontSize: "0.85rem", color: "#9ca3af" }}>
                     No hay clases programadas en esos bloques ese día de la semana.
                   </p>
@@ -1516,15 +1523,15 @@ function DetalleEventoModal({ eventoId, onClose, onEditar }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {evento.clases.map((c) => (
-                          <tr key={c.Horario_Asignatura_Id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                        {clases.map((c) => (
+                          <tr key={c.Horario_Asignatura_Id || Math.random()} style={{ borderBottom: "1px solid #f3f4f6" }}>
                             <td style={{ ...s.td, whiteSpace: "nowrap" }}>
                               {hhmm(c.Bloque_Horario_Hora_Inicio)}–{hhmm(c.Bloque_Horario_Hora_Fin)}
                             </td>
-                            <td style={s.td}>{c.Curso_Nombre}</td>
-                            <td style={s.td}>{c.Asignatura_Nombre}</td>
-                            <td style={{ ...s.td, color: c.Docente_Nombre ? "#374151" : "#9ca3af" }}>
-                              {c.Docente_Nombre || "Sin docente"}
+                            <td style={s.td}>{c.Curso_Nombre || c.curso}</td>
+                            <td style={s.td}>{c.Asignatura_Nombre || c.asignatura}</td>
+                            <td style={{ ...s.td, color: (c.Docente_Nombre || c.docente) ? "#374151" : "#9ca3af" }}>
+                              {c.Docente_Nombre || c.docente || "Sin docente"}
                             </td>
                           </tr>
                         ))}
@@ -1537,7 +1544,7 @@ function DetalleEventoModal({ eventoId, onClose, onEditar }) {
 
             <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
               <button type="button" style={s.btnSecundario} onClick={onClose}>Cerrar</button>
-              <button type="button" className="btn-primary" onClick={() => onEditar(evento)}>✏ Editar evento</button>
+              <button type="button" className="btn-primary" onClick={() => onEditar(ev)}>✏ Editar evento</button>
             </div>
           </div>
         )}
