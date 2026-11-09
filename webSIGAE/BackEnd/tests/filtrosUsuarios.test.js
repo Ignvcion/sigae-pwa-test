@@ -121,7 +121,7 @@ describe('Pruebas Unitarias - CU29 a CU33: Listados y Filtros de Usuarios, Docen
           Usuario_Nombre_Completo: 'Pedro Morales',
           Total_Estudiantes_Asociados: 2,
           Es_Apoderado: 1,
-          Estudiantes_Asociados_Raw: 'Juan Perez::Regular||Ana Perez::Irregular',
+          Estudiantes_Asociados_Raw: 'Juan Perez::Regular::Titular||Ana Perez::Irregular::Suplente',
         },
       ];
 
@@ -129,6 +129,8 @@ describe('Pruebas Unitarias - CU29 a CU33: Listados y Filtros de Usuarios, Docen
 
       await usuarioController.getApoderados(req, res);
 
+      // RF57: cuenta y lista a los estudiantes donde es titular y donde es suplente
+      expect(db.query.mock.calls[0][0]).toContain('apoderado_suplente');
       expect(res.json).toHaveBeenCalledWith([
         {
           Usuario_Id: 10,
@@ -136,8 +138,8 @@ describe('Pruebas Unitarias - CU29 a CU33: Listados y Filtros de Usuarios, Docen
           Total_Estudiantes_Asociados: 2,
           Es_Apoderado: 1,
           Estudiantes: [
-            { Estudiante_Nombre_Completo: 'Juan Perez', Estudiante_Estado_Academico: 'Regular' },
-            { Estudiante_Nombre_Completo: 'Ana Perez', Estudiante_Estado_Academico: 'Irregular' },
+            { Estudiante_Nombre_Completo: 'Juan Perez', Estudiante_Estado_Academico: 'Regular', Rol_Apoderado: 'Titular' },
+            { Estudiante_Nombre_Completo: 'Ana Perez', Estudiante_Estado_Academico: 'Irregular', Rol_Apoderado: 'Suplente' },
           ],
         },
       ]);
