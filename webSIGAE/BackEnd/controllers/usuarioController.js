@@ -15,6 +15,7 @@ const {
   columnasDireccion,
   CAMPOS_DIRECCION,
 } = require('../middleware/validation');
+const { PERIODO_VIGENTE_SQL } = require('../utils/periodos');
 const {
   normalizarEspecialidades,
   especialidadesDelCuerpo,
@@ -920,6 +921,11 @@ const getDocentes = async (req, res) => {
         Docente_Correo_Institucional,
         Docente_Especialidad,
         Docente_Carga_Horaria_Semanal,
+        -- CU107: horas disponibles a la semana en el período vigente (NULL = sin restricción)
+        (SELECT SUM(TIME_TO_SEC(TIMEDIFF(dd.Disponibilidad_Docente_Hora_Fin, dd.Disponibilidad_Docente_Hora_Inicio))) / 3600
+           FROM disponibilidad_docente dd
+          WHERE dd.Docente_Usuario_Id = usuario.Usuario_Id
+            AND dd.Disponibilidad_Docente_Periodo_Lectivo = ${PERIODO_VIGENTE_SQL}) AS Horas_Disponibles,
         Usuario_Estado_Cuenta,
         Es_Docente,
         Es_Apoderado,
@@ -962,7 +968,16 @@ const getDocentes = async (req, res) => {
       });
     }
 
-    return res.json(docentes);
+    // CU107: indicador "debe horas" (carga horaria semanal − horas disponibles)
+    return res.json(docentes.map((d) => {
+      const disponibles = d.Horas_Disponibles == null ? null : Math.round(Number(d.Horas_Disponibles) * 100) / 100;
+      const carga = d.Docente_Carga_Horaria_Semanal;
+      return {
+        ...d,
+        Horas_Disponibles: disponibles,
+        Horas_Adeudadas: disponibles !== null && carga != null ? Math.max(0, Math.round((carga - disponibles) * 100) / 100) : 0,
+      };
+    }));
   } catch (error) {
     console.error(error);
     // CU30: "No fue posible obtener el listado, reintente posteriormente"

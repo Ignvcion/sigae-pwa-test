@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getHorarioMaestro } from "../../services/api";
+import { getHorarioMaestro, getDocentes } from "../../services/api";
 import ExportMenu from "../../components/ExportMenu";
 import { COLORES_ASIGNATURA, COLOR_PENDIENTE, DIAS_SEMANA, aMinutos, hhmm } from "../../utils/horarios";
 import EtiquetaPeriodo, { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
@@ -26,6 +26,17 @@ function HorarioMaestro() {
   const [dia, setDia] = useState(diaInicial);
   const [filtroCurso, setFiltroCurso] = useState("");
   const [filtroDocente, setFiltroDocente] = useState("");
+  // CU107: docentes que deben horas (disponibilidad laboral menor que su carga semanal)
+  const [debenHoras, setDebenHoras] = useState([]);
+
+  useEffect(() => {
+    getDocentes({})
+      .then((data) => {
+        const lista = Array.isArray(data) ? data : data?.docentes || [];
+        setDebenHoras(lista.filter((d) => d.Usuario_Estado_Cuenta && d.Horas_Adeudadas > 0));
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let vigente = true;
@@ -117,7 +128,15 @@ function HorarioMaestro() {
             <Stat valor={cursos.length} etiqueta="Cursos con horario" />
             <Stat valor={docentes.length} etiqueta="Docentes" />
             <Stat valor={totalSinDocente} etiqueta="Sin docente" alerta={totalSinDocente > 0} />
+            <Stat valor={debenHoras.length} etiqueta="Docentes que deben horas" alerta={debenHoras.length > 0} />
           </div>
+
+          {debenHoras.length > 0 && (
+            <div className="aviso-debe-horas" role="status">
+              ⚠ Deben horas según su disponibilidad laboral:{" "}
+              {debenHoras.map((d) => `${d.Usuario_Nombre_Completo} (${d.Horas_Adeudadas} h)`).join(" · ")}
+            </div>
+          )}
 
           <div style={s.toolbar}>
             <div style={s.segmento}>

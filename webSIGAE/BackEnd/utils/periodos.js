@@ -63,7 +63,7 @@ const periodoSiguienteDe = (periodo) => String(Number(periodo) + 1);
 async function obtenerPeriodos(conn, { bloquear = false } = {}) {
   const [filas] = await conn.query(
     `SELECT Parametro_Institucional_Id, Parametro_Institucional_Periodo_Vigente,
-            Parametro_Institucional_Periodo_Siguiente
+            Parametro_Institucional_Periodo_Siguiente, Parametro_Institucional_Estado_Cierre
        FROM parametro_institucional ORDER BY Parametro_Institucional_Id LIMIT 1${bloquear ? ' FOR UPDATE' : ''}`
   );
   const fila = Array.isArray(filas) ? filas[0] : undefined;
@@ -73,6 +73,8 @@ async function obtenerPeriodos(conn, { bloquear = false } = {}) {
     vigente,
     siguiente,
     cierreIniciado: Boolean(siguiente),
+    // Columna generada (cambios de esquema, punto 1); se deriva igual si no viene
+    estadoCierre: fila?.Parametro_Institucional_Estado_Cierre || (siguiente ? 'Cierre iniciado' : 'Sin cierre'),
     parametroId: fila?.Parametro_Institucional_Id ?? null,
   };
 }

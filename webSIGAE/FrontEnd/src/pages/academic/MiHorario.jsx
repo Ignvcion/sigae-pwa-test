@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getHorarioDocente, getListaDocentes, getMiHorarioAtencion } from "../../services/api";
+import { getHorarioDocente, getListaDocentes, getMiHorarioAtencion, getDisponibilidadDocente } from "../../services/api";
 import ExportMenu from "../../components/ExportMenu";
 import HorarioSemanal from "../../components/horarios/HorarioSemanal";
 import AvisoTopes from "../../components/horarios/AvisoTopes";
@@ -33,9 +33,14 @@ function MiHorario() {
     }
   };
 
+  // CU107: indicador "debe horas" del docente (disponibilidad laboral frente a su carga semanal)
+  const [resumenDisp, setResumenDisp] = useState(null);
+
   // CU43: horario semanal a partir de sus cursos asociados
   const cargarHorario = async (id) => {
     if (!id) return;
+    setResumenDisp(null);
+    getDisponibilidadDocente(id).then((d) => setResumenDisp(d?.resumen || null)).catch(() => {});
     setLoading(true);
     setErrorCarga("");
     setMensajeInfo("");
@@ -147,6 +152,14 @@ function MiHorario() {
 
       {!loading && !errorCarga && mensajeInfo && (
         <div className="usuarios-empty">{mensajeInfo}</div>
+      )}
+
+      {docenteId && resumenDisp?.horasAdeudadas > 0 && (
+        <div className="aviso-debe-horas" role="status">
+          ⚠ {esAdmin ? "El docente debe" : "Debes"} {resumenDisp.horasAdeudadas} h: {esAdmin ? "está disponible" : "estás disponible"}{" "}
+          {resumenDisp.horasDisponibles} h a la semana y su carga horaria semanal es de {resumenDisp.cargaSemanal} h
+          (período {resumenDisp.periodo}).
+        </div>
       )}
 
       {!loading && !errorCarga && (esAdmin ? docenteId && !mensajeInfo : true) && grilla.length > 0 && (

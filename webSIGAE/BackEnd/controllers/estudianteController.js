@@ -5,6 +5,7 @@
 const db = require('../config/db');
 const { registrarHistorial, refPersona, buscarPersonas } = require('../utils/historial');
 const { claseVigente } = require('../utils/clasesEliminadas');
+const { cursoNoArchivado } = require('../utils/periodos');
 const { condicionApoderadoAsociado, rolApoderadoSQL, puedeAsociarse, reactivarApoderados } = require('../utils/apoderadosEstudiante');
 const {
   validarRut,
@@ -250,10 +251,15 @@ const createEstudiante = async (req, res) => {
       return res.status(400).json({ mensaje: 'Ya existe un estudiante con ese RUT' });
     }
 
-    // Verificar que el curso existe
-    const [curso] = await db.query('SELECT Curso_Id FROM curso WHERE Curso_Id = ?', [Curso_Id]);
+    // RF06 / CU6: el curso debe existir y estar activo en el período vigente o, con el
+    // cierre iniciado, en el siguiente (no en un período anterior)
+    const [curso] = await db.query(
+      `SELECT c.Curso_Id FROM curso c WHERE c.Curso_Id = ? AND ${cursoNoArchivado('c')}`, [Curso_Id]
+    );
     if (curso.length === 0) {
-      return res.status(404).json({ mensaje: `No se encontró el curso con Id ${Curso_Id}` });
+      return res.status(404).json({
+        mensaje: `No se encontró el curso con Id ${Curso_Id} en el período vigente ni en el siguiente`,
+      });
     }
 
     const [resultado] = await db.query(
@@ -341,9 +347,12 @@ const updateEstudiante = async (req, res) => {
       Object.prototype.hasOwnProperty.call(datosFiltrados, 'Curso_Id') &&
       String(datosFiltrados.Curso_Id) !== String(actual.Curso_Id)
     ) {
-      const [curso] = await db.query('SELECT Curso_Id FROM curso WHERE Curso_Id = ?', [datosFiltrados.Curso_Id]);
+      // CU38: el curso debe existir y estar activo en el período vigente o siguiente
+      const [curso] = await db.query(
+        `SELECT c.Curso_Id FROM curso c WHERE c.Curso_Id = ? AND ${cursoNoArchivado('c')}`, [datosFiltrados.Curso_Id]
+      );
       if (curso.length === 0) {
-        return res.status(400).json({ mensaje: 'El curso seleccionado no existe o se encuentra inactivo' });
+        return res.status(400).json({ mensaje: 'El curso seleccionado no existe o no está activo en el período vigente ni en el siguiente' });
       }
     }
 

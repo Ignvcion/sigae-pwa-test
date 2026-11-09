@@ -18,6 +18,15 @@ describe('Pruebas Unitarias - CU29 a CU33: Listados y Filtros de Usuarios, Docen
 
   // CU30 y CU31: Listado y filtro de Docentes
   describe('CU30 y CU31 - getDocentes', () => {
+    test('CU107: calcula las horas adeudadas con la disponibilidad del período vigente', async () => {
+      db.query.mockResolvedValueOnce([[
+        { Usuario_Id: 5, Docente_Carga_Horaria_Semanal: 32, Horas_Disponibles: '12.0000' },
+        { Usuario_Id: 6, Docente_Carga_Horaria_Semanal: 30, Horas_Disponibles: '40.5' },
+      ]]);
+      await usuarioController.getDocentes(req, res);
+      expect(res.json.mock.calls[0][0].map((d) => [d.Horas_Disponibles, d.Horas_Adeudadas])).toEqual([[12, 20], [40.5, 0]]);
+    });
+
     test('CU30: Debe retornar el listado completo de docentes', async () => {
       const mockDocentes = [
         {
@@ -33,7 +42,8 @@ describe('Pruebas Unitarias - CU29 a CU33: Listados y Filtros de Usuarios, Docen
 
       await usuarioController.getDocentes(req, res);
 
-      expect(res.json).toHaveBeenCalledWith(mockDocentes);
+      // CU107: cada docente trae además sus horas disponibles y adeudadas
+      expect(res.json).toHaveBeenCalledWith(mockDocentes.map((d) => ({ ...d, Horas_Disponibles: null, Horas_Adeudadas: 0 })));
     });
 
     test('CU31: Debe filtrar docentes por especialidad y estado de cuenta', async () => {
@@ -56,7 +66,8 @@ describe('Pruebas Unitarias - CU29 a CU33: Listados y Filtros de Usuarios, Docen
         expect.stringContaining('AND Docente_Especialidad LIKE ?'),
         expect.arrayContaining(['%Historia%', 1])
       );
-      expect(res.json).toHaveBeenCalledWith(mockDocentesFiltrados);
+      // CU107: cada docente trae además sus horas disponibles y adeudadas
+      expect(res.json).toHaveBeenCalledWith(mockDocentesFiltrados.map((d) => ({ ...d, Horas_Disponibles: null, Horas_Adeudadas: 0 })));
     });
 
     test('CU31 - Excepción "Sin coincidencias": Retorna mensaje si no hay coincidencias con los filtros', async () => {

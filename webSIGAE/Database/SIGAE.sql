@@ -684,6 +684,8 @@ UNLOCK TABLES;
 -- Table structure for table `parametro_institucional`
 -- Incremento 4, RF61: Periodo_Vigente es el año escolar en curso; Periodo_Siguiente se llena
 -- con "Iniciar cierre" y vuelve a NULL con "Iniciar nuevo período"
+-- Incremento 4 (cambios de esquema, punto 1): Estado_Cierre es una columna generada a partir
+-- de Periodo_Siguiente: 'Cierre iniciado' mientras existe un período siguiente.
 --
 
 DROP TABLE IF EXISTS `parametro_institucional`;
@@ -698,6 +700,7 @@ CREATE TABLE `parametro_institucional` (
   `Parametro_Institucional_Duracion_Recreo` int NOT NULL,
   `Parametro_Institucional_Periodo_Vigente` varchar(10) DEFAULT NULL,
   `Parametro_Institucional_Periodo_Siguiente` varchar(10) DEFAULT NULL,
+  `Parametro_Institucional_Estado_Cierre` varchar(20) GENERATED ALWAYS AS (if(`Parametro_Institucional_Periodo_Siguiente` is null,'Sin cierre','Cierre iniciado')) VIRTUAL,
   PRIMARY KEY (`Parametro_Institucional_Id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=111114 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -708,7 +711,7 @@ CREATE TABLE `parametro_institucional` (
 
 LOCK TABLES `parametro_institucional` WRITE;
 /*!40000 ALTER TABLE `parametro_institucional` DISABLE KEYS */;
-INSERT INTO `parametro_institucional` VALUES (111111,45,'08:30:00','16:30:00',8,15,'2026',NULL);
+INSERT INTO `parametro_institucional` VALUES (111111,45,'08:30:00','16:30:00',8,15,'2026',NULL,DEFAULT);
 /*!40000 ALTER TABLE `parametro_institucional` ENABLE KEYS */;
 UNLOCK TABLES;
 

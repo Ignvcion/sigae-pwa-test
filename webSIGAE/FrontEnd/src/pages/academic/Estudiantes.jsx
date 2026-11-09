@@ -13,6 +13,7 @@ import {
   formatearDireccion,
   COLUMNAS_DIRECCION_ESTUDIANTE,
 } from "../../utils/validaciones";
+import { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
 
 // Campos de la dirección separada del estudiante (Incremento 3)
 const CAMPOS_DIRECCION_FICHA = [
@@ -376,7 +377,7 @@ function Estudiantes() {
                 >
                   <option value="">Selecciona un curso...</option>
                   {cursosOpciones.map((c) => (
-                    <option key={c.Curso_Id} value={c.Curso_Id}>{c.Curso_Nombre}</option>
+                    <option key={c.Curso_Id} value={c.Curso_Id}>{c.Curso_Nombre}{textoPeriodo(c.Curso_Periodo_Lectivo, c.Curso_Periodo_Estado)}</option>
                   ))}
                 </select>
               </div>

@@ -277,6 +277,15 @@ function Docentes() {
                         {d.Docente_Carga_Horaria_Semanal == null || d.Docente_Carga_Horaria_Semanal === ""
                           ? renderDato(null, "Sin carga horaria registrada")
                           : `${d.Docente_Carga_Horaria_Semanal} h`}
+                        {/* CU107: indicador "debe horas" frente a su disponibilidad laboral */}
+                        {d.Horas_Adeudadas > 0 && (
+                          <span
+                            className="indicador-debe-horas"
+                            title={`Disponible ${d.Horas_Disponibles} h a la semana en el período vigente`}
+                          >
+                            ⚠ Debe {d.Horas_Adeudadas} h
+                          </span>
+                        )}
                       </td>
                       <td>
                         {d.Usuario_Estado_Cuenta ? (
