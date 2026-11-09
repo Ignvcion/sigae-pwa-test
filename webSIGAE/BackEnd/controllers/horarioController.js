@@ -1,13 +1,16 @@
 const pool = require('../config/db');
 const { condicionDesajustado, motivoDesajuste } = require('../utils/bloquesDesajustados');
 const { ESTADO_ELIMINADO, claseVigente } = require('../utils/clasesEliminadas');
-const { mismoPeriodoQueCurso, enPeriodoVigente, cursoNoArchivado, obtenerPeriodos, estadoPeriodoCursoSQL } = require('../utils/periodos');
+const { mismoPeriodoQueCurso, enPeriodoVigente, cursoNoArchivado, obtenerPeriodos, estadoPeriodoCursoSQL, PERIODO_VIGENTE_SQL } = require('../utils/periodos');
 const { coincideEspecialidad, sugerenciaEspecialidad } = require('../utils/especialidades');
 const {
   periodoDelCurso, mapaDisponibilidad, estaDisponible, validarDisponibilidad,
   resumenSemanal, advertenciaHorasAdeudadas,
 } = require('../utils/disponibilidadLaboral');
 const { esApoderadoDelEstudiante } = require('../utils/apoderadosEstudiante');
+const {
+  conflictoRegularConElectivos, bloquesElectivoDelDia, horasElectivoDocente, completitudElectivos, cursoConElectivosSQL,
+} = require('../utils/electivos');
 
 // ── GET /api/horarios?curso_id=X  (admin ve todo, docente solo el suyo) ──
 // Las clases eliminadas solo se incluyen con ?incluir_eliminadas=1 y para
@@ -265,6 +268,14 @@ const getDocentesDisponibles = async (req, res) => {
 
     const [conflictos] = await pool.execute(conflictoQuery, conflictoParams);
     const conflictoSet = new Set(conflictos.map(c => c.Usuario_Id));
+    // Un electivo del docente ese día y bloque también es choque
+    const [conflictosElectivo] = await pool.query(
+      `SELECT DISTINCT Docente_Usuario_Id FROM clase_electivo
+        WHERE Docente_Usuario_Id IN (?) AND Bloque_Horario_Id = ? AND Clase_Electivo_Dia_Semana = ?
+          AND Clase_Electivo_Periodo_Lectivo = ?`,
+      [userIds, bloque_id, dia, periodo]
+    );
+    for (const c of conflictosElectivo || []) conflictoSet.add(c.Docente_Usuario_Id);
 
     // Carga horaria semanal actual de cada docente
     let cargaQuery =
@@ -284,6 +295,18 @@ const getDocentesDisponibles = async (req, res) => {
 
     const [cargas] = await pool.execute(cargaQuery, cargaParams);
     const cargaMap = Object.fromEntries(cargas.map(c => [c.Usuario_Id, Number(c.horas_actuales)]));
+    // La carga semanal incluye los electivos del período
+    const [cargasElectivo] = await pool.query(
+      `SELECT ce.Docente_Usuario_Id,
+              SUM(TIME_TO_SEC(TIMEDIFF(bh.Bloque_Horario_Hora_Fin, bh.Bloque_Horario_Hora_Inicio)) / 3600) AS horas
+         FROM clase_electivo ce JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ce.Bloque_Horario_Id
+        WHERE ce.Docente_Usuario_Id IN (?) AND ce.Clase_Electivo_Periodo_Lectivo = ?
+        GROUP BY ce.Docente_Usuario_Id`,
+      [userIds, periodo]
+    );
+    for (const c of cargasElectivo || []) {
+      cargaMap[c.Docente_Usuario_Id] = (cargaMap[c.Docente_Usuario_Id] || 0) + Number(c.horas);
+    }
 
     // CU107: disponibilidad laboral semanal (tramos y horas disponibles por docente en el período)
     const mapaDisp = await mapaDisponibilidad(pool, userIds, [periodo]);
@@ -447,6 +470,13 @@ const createHorario = async (req, res) => {
       return res.status(409).json({ error: 'Ya existe un bloque asignado en ese día y horario para este curso' });
     }
 
+    // CU54 / CU106 Excepción 4: un bloque con electivos de 3° y 4° medio no admite clases
+    // regulares de esos cursos, y el docente no puede tener un electivo ese día y bloque.
+    const conflictoElectivo = await conflictoRegularConElectivos(pool, {
+      cursoId: Curso_Id, docenteId: Usuario_Id, dia: Horario_Asignatura_Dia_Semana, bloqueId: Bloque_Horario_Id,
+    });
+    if (conflictoElectivo) return res.status(409).json({ error: conflictoElectivo });
+
     // Excepción 5 — restricciones institucionales (tipo de bloque y límite diario)
     const [[bloqueRestriccion]] = await pool.execute(
       `SELECT bh.Bloque_Horario_Tipo,
@@ -472,7 +502,9 @@ const createHorario = async (req, res) => {
        WHERE Curso_Id = ? AND Horario_Asignatura_Dia_Semana = ? AND Horario_Asignatura_Estado = 'Activo'`,
       [Curso_Id, Horario_Asignatura_Dia_Semana]
     );
-    if (total_dia >= bloqueRestriccion.Parametro_Institucional_Bloques_Maximos_Diarios) {
+    // Los bloques de electivos del día también ocupan la jornada del curso de 3° o 4° medio
+    if (Number(total_dia) + await bloquesElectivoDelDia(pool, Curso_Id, Horario_Asignatura_Dia_Semana)
+        >= bloqueRestriccion.Parametro_Institucional_Bloques_Maximos_Diarios) {
       return res.status(422).json({
         error: `El curso ya alcanzó el máximo de ${bloqueRestriccion.Parametro_Institucional_Bloques_Maximos_Diarios} bloque(s) diarios establecido por la institución`
       });
@@ -545,7 +577,9 @@ const createHorario = async (req, res) => {
              AND ${mismoPeriodoQueCurso('ha')}`,
           [Usuario_Id, Curso_Id]
         );
-        const horasActuales = Number(cargaRow.horas_actuales);
+        // La carga semanal incluye los electivos del docente en el período
+        const horasActuales = Number(cargaRow.horas_actuales)
+          + await horasElectivoDocente(pool, Usuario_Id, await periodoDelCurso(pool, Curso_Id));
         const duracion      = Number(bloqueDur?.duracion || 0);
         const maxHoras      = Number(docente.Docente_Carga_Horaria_Semanal);
         if ((horasActuales + duracion) > maxHoras) {
@@ -669,6 +703,12 @@ const updateHorario = async (req, res) => {
       return res.status(409).json({ error: 'Ya existe un bloque asignado en ese día y horario para este curso' });
     }
 
+    // CU54 / CU106 Excepción 4: choque con los electivos de 3° y 4° medio
+    const conflictoElectivoU = await conflictoRegularConElectivos(pool, {
+      cursoId: Curso_Id, docenteId: Usuario_Id, dia: Horario_Asignatura_Dia_Semana, bloqueId: Bloque_Horario_Id,
+    });
+    if (conflictoElectivoU) return res.status(409).json({ error: conflictoElectivoU });
+
     // ================================================================
     //  CU 53 — VERIFICAR ASOCIACIÓN ASIGNATURA-CURSO  (prerequisito)
     //  Misma validación que en POST: la asignatura debe existir en
@@ -743,7 +783,8 @@ const updateHorario = async (req, res) => {
          AND Horario_Asignatura_Estado = 'Activo' AND Horario_Asignatura_Id != ?`,
       [Curso_Id, Horario_Asignatura_Dia_Semana, id]
     );
-    if (total_dia_u >= bloqueRestriccionU.Parametro_Institucional_Bloques_Maximos_Diarios) {
+    if (Number(total_dia_u) + await bloquesElectivoDelDia(pool, Curso_Id, Horario_Asignatura_Dia_Semana)
+        >= bloqueRestriccionU.Parametro_Institucional_Bloques_Maximos_Diarios) {
       return res.status(422).json({
         error: `El curso ya alcanzó el máximo de ${bloqueRestriccionU.Parametro_Institucional_Bloques_Maximos_Diarios} bloque(s) diarios establecido por la institución`
       });
@@ -824,7 +865,8 @@ const updateHorario = async (req, res) => {
              AND ha.Horario_Asignatura_Id != ? AND ${mismoPeriodoQueCurso('ha')}`,
           [Usuario_Id, id, Curso_Id]
         );
-        const horasActuales = Number(cargaRow.horas_actuales);
+        const horasActuales = Number(cargaRow.horas_actuales)
+          + await horasElectivoDocente(pool, Usuario_Id, await periodoDelCurso(pool, Curso_Id));
         const duracion      = Number(bloqueDur?.duracion || 0);
         const maxHoras      = Number(docente.Docente_Carga_Horaria_Semanal);
         if ((horasActuales + duracion) > maxHoras) {
@@ -1046,7 +1088,8 @@ const getResumenCursos = async (req, res) => {
   try {
     const [cursosBase] = await pool.execute(`
       SELECT c.Curso_Id, c.Curso_Nombre, ne.Nivel_Educativo_Nombre, c.Curso_Periodo_Lectivo,
-             ${estadoPeriodoCursoSQL('c')} AS Curso_Periodo_Estado
+             ${estadoPeriodoCursoSQL('c')} AS Curso_Periodo_Estado,
+             ${cursoConElectivosSQL('c')} AS con_electivos
       FROM curso c
       JOIN nivel_educativo ne ON ne.Nivel_Educativo_Id = c.Nivel_Educativo_Id
       WHERE ${cursoNoArchivado('c')}
@@ -1088,15 +1131,26 @@ const getResumenCursos = async (req, res) => {
     const progMap = {};
     for (const r of programadas) progMap[r.Curso_Id] = Number(r.total_horas_programadas);
 
-    const result = cursosBase.map(c => ({
-      Curso_Id              : c.Curso_Id,
-      Curso_Nombre          : c.Curso_Nombre,
-      Nivel_Educativo_Nombre: c.Nivel_Educativo_Nombre,
-      Curso_Periodo_Lectivo : c.Curso_Periodo_Lectivo,
-      Curso_Periodo_Estado  : c.Curso_Periodo_Estado,
-      total_horas_requeridas : reqMap[c.Curso_Id]  ?? 0,
-      total_horas_programadas: progMap[c.Curso_Id] ?? 0,
-    }));
+    // Cursos de 3° y 4° medio: se suman las horas del plan de electivos (una ruta) y los
+    // bloques de electivos del período (cada bloque cuenta una vez)
+    const electivosPorPeriodo = {};
+    for (const periodo of new Set(cursosBase.filter(c => Number(c.con_electivos) === 1).map(c => c.Curso_Periodo_Lectivo))) {
+      electivosPorPeriodo[periodo] = await completitudElectivos(pool, periodo);
+    }
+
+    const result = cursosBase.map(c => {
+      const el = Number(c.con_electivos) === 1 ? electivosPorPeriodo[c.Curso_Periodo_Lectivo] : null;
+      return {
+        Curso_Id              : c.Curso_Id,
+        Curso_Nombre          : c.Curso_Nombre,
+        Nivel_Educativo_Nombre: c.Nivel_Educativo_Nombre,
+        Curso_Periodo_Lectivo : c.Curso_Periodo_Lectivo,
+        Curso_Periodo_Estado  : c.Curso_Periodo_Estado,
+        total_horas_requeridas : Math.round(((reqMap[c.Curso_Id] ?? 0) + (el?.requeridas ?? 0)) * 100) / 100,
+        total_horas_programadas: Math.round(((progMap[c.Curso_Id] ?? 0) + (el?.programadas ?? 0)) * 100) / 100,
+        ...(el ? { horas_electivos_requeridas: el.requeridas, horas_electivos_programadas: el.programadas } : {}),
+      };
+    });
 
     res.json(result);
   } catch (err) {
@@ -1223,8 +1277,8 @@ const getHorarioDocente = async (req, res) => {
 
     const [filas] = await pool.execute(
       `SELECT
-        ha.Horario_Asignatura_Id         AS id,
-        ha.Curso_Id                      AS cursoId,
+        CAST(ha.Horario_Asignatura_Id AS SIGNED) AS id,
+        CAST(ha.Curso_Id AS SIGNED)      AS cursoId,
         ha.Asignatura_Id                 AS asignaturaId,
         c.Curso_Nombre                   AS curso,
         a.Asignatura_Nombre              AS asignatura,
@@ -1232,15 +1286,25 @@ const getHorarioDocente = async (req, res) => {
         bh.Bloque_Horario_Hora_Inicio    AS horaInicio,
         bh.Bloque_Horario_Hora_Fin       AS horaFin,
         ha.Horario_Asignatura_Estado     AS estado,
-        ${condicionDesajustado('bh')}    AS pendiente
+        ${condicionDesajustado('bh')}    AS pendiente,
+        0                                AS electivo
       FROM horario_asignatura ha
       JOIN curso          c  ON c.Curso_Id          = ha.Curso_Id
       JOIN asignatura     a  ON a.Asignatura_Id      = ha.Asignatura_Id
       JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
       WHERE ha.Usuario_Id = ? AND ${claseVigente('ha')} AND ${enPeriodoVigente('ha')}
-      ORDER BY FIELD(ha.Horario_Asignatura_Dia_Semana, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'),
-               bh.Bloque_Horario_Hora_Inicio`,
-      [docenteId]
+      UNION ALL
+      -- Para el docente, un electivo de 3° y 4° medio es una clase más (CU106)
+      SELECT -CAST(ce.Clase_Electivo_Id AS SIGNED), NULL, ce.Asignatura_Id,
+             CONCAT('3° y 4° medio · Ruta ', ce.Clase_Electivo_Ruta), a.Asignatura_Nombre,
+             ce.Clase_Electivo_Dia_Semana, bh.Bloque_Horario_Hora_Inicio, bh.Bloque_Horario_Hora_Fin,
+             'Activo', ${condicionDesajustado('bh')}, 1
+        FROM clase_electivo ce
+        JOIN asignatura     a  ON a.Asignatura_Id      = ce.Asignatura_Id
+        JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ce.Bloque_Horario_Id
+       WHERE ce.Docente_Usuario_Id = ? AND ce.Clase_Electivo_Periodo_Lectivo = ${PERIODO_VIGENTE_SQL}
+      ORDER BY FIELD(dia, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'), horaInicio`,
+      [docenteId, docenteId]
     );
 
     // CU43/CU58 - Excepción "Horario sin planificar" / "Sin asignaciones horarias"
@@ -1278,7 +1342,7 @@ const getHorarioEstudiante = async (req, res) => {
 
     const [[estudiante]] = await pool.execute(
       `SELECT e.Estudiante_Id, e.Estudiante_Nombre_Completo, e.Curso_Id,
-              e.Apoderado_Usuario_Id, c.Curso_Nombre
+              e.Apoderado_Usuario_Id, c.Curso_Nombre, e.Estudiante_Ruta_Formacion
          FROM estudiante e
          JOIN curso c ON c.Curso_Id = e.Curso_Id
         WHERE e.Estudiante_Id = ? AND e.Estudiante_Fecha_Eliminacion IS NULL`,
@@ -1295,7 +1359,7 @@ const getHorarioEstudiante = async (req, res) => {
 
     const [horario] = await pool.execute(
       `SELECT
-        ha.Horario_Asignatura_Id         AS id,
+        CAST(ha.Horario_Asignatura_Id AS SIGNED) AS id,
         ha.Asignatura_Id                 AS asignaturaId,
         a.Asignatura_Nombre              AS asignatura,
         u.Usuario_Nombre_Completo        AS docente,
@@ -1303,15 +1367,29 @@ const getHorarioEstudiante = async (req, res) => {
         bh.Bloque_Horario_Hora_Inicio    AS horaInicio,
         bh.Bloque_Horario_Hora_Fin       AS horaFin,
         ha.Horario_Asignatura_Estado     AS estado,
-        ${condicionDesajustado('bh')}    AS pendiente
+        ${condicionDesajustado('bh')}    AS pendiente,
+        0                                AS electivo,
+        NULL                             AS ruta
       FROM horario_asignatura ha
       JOIN asignatura     a  ON a.Asignatura_Id      = ha.Asignatura_Id
       JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
       LEFT JOIN usuario   u  ON u.Usuario_Id         = ha.Usuario_Id
       WHERE ha.Curso_Id = ? AND ${claseVigente('ha')}
-      ORDER BY FIELD(ha.Horario_Asignatura_Dia_Semana, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'),
-               bh.Bloque_Horario_Hora_Inicio`,
-      [estudiante.Curso_Id]
+      UNION ALL
+      -- 3° y 4° medio: electivos del período; con la ruta definida, solo los de su ruta (CU105, CU106)
+      SELECT -CAST(ce.Clase_Electivo_Id AS SIGNED), ce.Asignatura_Id, a.Asignatura_Nombre, u.Usuario_Nombre_Completo,
+             ce.Clase_Electivo_Dia_Semana, bh.Bloque_Horario_Hora_Inicio, bh.Bloque_Horario_Hora_Fin,
+             'Activo', ${condicionDesajustado('bh')}, 1, ce.Clase_Electivo_Ruta
+        FROM curso c
+        JOIN clase_electivo ce ON ce.Clase_Electivo_Periodo_Lectivo = c.Curso_Periodo_Lectivo
+        JOIN asignatura     a  ON a.Asignatura_Id      = ce.Asignatura_Id
+        JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ce.Bloque_Horario_Id
+        JOIN usuario        u  ON u.Usuario_Id         = ce.Docente_Usuario_Id
+       WHERE c.Curso_Id = ? AND ${cursoConElectivosSQL('c')}
+         AND (? IS NULL OR ce.Clase_Electivo_Ruta = ?)
+      ORDER BY FIELD(dia, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'), horaInicio`,
+      [estudiante.Curso_Id, estudiante.Curso_Id, estudiante.Estudiante_Ruta_Formacion ?? null,
+        estudiante.Estudiante_Ruta_Formacion ?? null]
     );
 
     return res.json({
@@ -1319,6 +1397,7 @@ const getHorarioEstudiante = async (req, res) => {
         id: estudiante.Estudiante_Id,
         nombre: estudiante.Estudiante_Nombre_Completo,
         curso: estudiante.Curso_Nombre,
+        ruta: estudiante.Estudiante_Ruta_Formacion ?? null,
       },
       horario,
       ...(horario.length === 0 && { mensaje: 'El curso del estudiante aún no tiene horario planificado' }),
@@ -1334,7 +1413,7 @@ const getHorarioMaestro = async (req, res) => {
   try {
     const [rows] = await pool.execute(`
       SELECT
-        ha.Horario_Asignatura_Id,
+        CAST(ha.Horario_Asignatura_Id AS SIGNED) AS Horario_Asignatura_Id,
         ha.Horario_Asignatura_Dia_Semana  AS dia,
         ha.Curso_Id,
         c.Curso_Nombre                    AS curso,
@@ -1348,7 +1427,9 @@ const getHorarioMaestro = async (req, res) => {
         ha.Asignatura_Id,
         a.Asignatura_Nombre               AS asignatura,
         ha.Usuario_Id,
-        u.Usuario_Nombre_Completo         AS docente
+        u.Usuario_Nombre_Completo         AS docente,
+        0                                 AS electivo,
+        NULL                              AS Clase_Electivo_Id
       FROM horario_asignatura ha
       JOIN curso          c  ON c.Curso_Id          = ha.Curso_Id
       JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
@@ -1356,8 +1437,20 @@ const getHorarioMaestro = async (req, res) => {
       LEFT JOIN usuario   u  ON u.Usuario_Id         = ha.Usuario_Id
       WHERE ha.Horario_Asignatura_Estado = 'Activo'
         AND ${cursoNoArchivado('c')}  -- RF44: período vigente y siguiente, identificados
-      ORDER BY FIELD(ha.Horario_Asignatura_Dia_Semana, "Lunes","Martes","Miércoles","Jueves","Viernes"),
-               bh.Bloque_Horario_Hora_Inicio, c.Curso_Periodo_Lectivo, c.Curso_Nombre
+      UNION ALL
+      -- Electivos: el bloque compartido aparece en cada curso de 3° y 4° medio del período (CU106)
+      SELECT -CAST(ce.Clase_Electivo_Id * 1000000 + c.Curso_Id AS SIGNED), ce.Clase_Electivo_Dia_Semana, c.Curso_Id,
+             c.Curso_Nombre, c.Curso_Seccion, c.Curso_Periodo_Lectivo, ${estadoPeriodoCursoSQL('c')},
+             ce.Bloque_Horario_Id, bh.Bloque_Horario_Hora_Inicio, bh.Bloque_Horario_Hora_Fin, bh.Bloque_Horario_Jornada,
+             ce.Asignatura_Id, CONCAT(a.Asignatura_Nombre, ' · ', ce.Clase_Electivo_Ruta), ce.Docente_Usuario_Id,
+             u.Usuario_Nombre_Completo, 1, CAST(ce.Clase_Electivo_Id AS SIGNED)
+        FROM clase_electivo ce
+        JOIN curso          c  ON c.Curso_Periodo_Lectivo = ce.Clase_Electivo_Periodo_Lectivo
+        JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ce.Bloque_Horario_Id
+        JOIN asignatura     a  ON a.Asignatura_Id      = ce.Asignatura_Id
+        JOIN usuario        u  ON u.Usuario_Id         = ce.Docente_Usuario_Id
+       WHERE ${cursoConElectivosSQL('c')} AND ${cursoNoArchivado('c')}
+      ORDER BY FIELD(dia, "Lunes","Martes","Miércoles","Jueves","Viernes"), hora_inicio, periodo, curso
     `);
 
     // CU57 - Excepción "No existen datos suficientes"
@@ -1949,17 +2042,20 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
   }
 
   // Límite diario de bloques por curso (parámetro institucional)
+  let maxDiarios = null;
+  const totalesDia = new Map();
   if (cambiaDia) {
     const [param] = await db.query(
       `SELECT Parametro_Institucional_Bloques_Maximos_Diarios FROM parametro_institucional LIMIT 1`
     );
-    const maxDiarios = param[0]?.Parametro_Institucional_Bloques_Maximos_Diarios;
+    maxDiarios = param[0]?.Parametro_Institucional_Bloques_Maximos_Diarios ?? null;
     if (maxDiarios != null) {
       for (const cursoId of cursoIds) {
         const dia = cambios.Horario_Asignatura_Dia_Semana;
         const total =
           otros.filter((o) => o.Curso_Id === cursoId && o.dia === dia && o.estado === 'Activo').length +
           propuestas.filter((p) => p.Curso_Id === cursoId && p.dia === dia && p.estado === 'Activo').length;
+        totalesDia.set(cursoId, total);
         if (total > maxDiarios) {
           const curso = propuestas.find((p) => p.Curso_Id === cursoId).curso;
           conflictos.push(`${curso} superaría el máximo de ${maxDiarios} bloque(s) diarios el ${dia}`);
@@ -2025,12 +2121,28 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
         }
       }
     }
+    // La carga semanal incluye los electivos del docente en los períodos involucrados
+    const horasElectivo = new Map();
+    if ((cambiaDoc || cambiaBloque) && docentes.some((d) => d.Docente_Carga_Horaria_Semanal != null)) {
+      const filasCarga = await db.query(
+        `SELECT ce.Docente_Usuario_Id,
+                SUM(TIME_TO_SEC(TIMEDIFF(bh.Bloque_Horario_Hora_Fin, bh.Bloque_Horario_Hora_Inicio)) / 3600) AS horas
+           FROM clase_electivo ce JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ce.Bloque_Horario_Id
+          WHERE ce.Docente_Usuario_Id IN (?) AND ce.Clase_Electivo_Periodo_Lectivo IN (?)
+          GROUP BY ce.Docente_Usuario_Id`,
+        [docenteIds, [...new Set(propuestas.map((p) => p.periodo).filter(Boolean)), '']]
+      );
+      for (const f of Array.isArray(filasCarga?.[0]) ? filasCarga[0] : []) {
+        if (f && f.Docente_Usuario_Id != null) horasElectivo.set(Number(f.Docente_Usuario_Id), Number(f.horas) || 0);
+      }
+    }
     for (const d of docentes) {
       if (!(cambiaDoc || cambiaBloque)) break;
       if (d.Docente_Carga_Horaria_Semanal == null) continue;
       const max = Number(d.Docente_Carga_Horaria_Semanal);
       const delDocente = (r) => r.Usuario_Id === d.Usuario_Id && r.estado === 'Activo';
-      const cargaOtros   = otros.filter(delDocente).reduce((acc, r) => acc + Number(r.duracion), 0);
+      const cargaOtros   = otros.filter(delDocente).reduce((acc, r) => acc + Number(r.duracion), 0)
+        + (horasElectivo.get(Number(d.Usuario_Id)) || 0);
       const cargaNueva   = cargaOtros + propuestas.filter(delDocente).reduce((acc, r) => acc + r.duracion, 0);
       const cargaActual  = cargaOtros + seleccionados.filter(delDocente).reduce((acc, r) => acc + Number(r.duracion), 0);
       if (cargaNueva > max && cargaNueva > cargaActual) {
@@ -2038,6 +2150,58 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
           `${d.Usuario_Nombre_Completo} excedería su carga horaria semanal de ${max}h semanales ` +
           `(quedaría con ${cargaNueva.toFixed(1)}h)`
         );
+      }
+    }
+  }
+
+  // CU54 / CU106: electivos de 3° y 4° medio. Un bloque con electivos no admite clases
+  // regulares de esos cursos; el docente no puede tener un electivo a la misma hora; los
+  // bloques de electivos ocupan la jornada del curso (límite diario).
+  if (cambiaPosicion || cambiaDoc) {
+    const periodosInv = [...new Set(propuestas.map((p) => p.periodo).filter(Boolean))];
+    const filasEl = periodosInv.length > 0 ? await db.query(
+      `SELECT ce.Clase_Electivo_Periodo_Lectivo AS periodo, ce.Clase_Electivo_Dia_Semana AS dia,
+              ce.Bloque_Horario_Id, ce.Docente_Usuario_Id, a.Asignatura_Nombre AS asignatura,
+              ce.Clase_Electivo_Ruta AS ruta
+         FROM clase_electivo ce JOIN asignatura a ON a.Asignatura_Id = ce.Asignatura_Id
+        WHERE ce.Clase_Electivo_Periodo_Lectivo IN (?)`,
+      [periodosInv]
+    ) : null;
+    const electivos = Array.isArray(filasEl?.[0]) ? filasEl[0] : [];
+    if (electivos.length > 0) {
+      const filasCursos = await db.query(
+        `SELECT c.Curso_Id FROM curso c WHERE c.Curso_Id IN (?) AND ${cursoConElectivosSQL('c')}`,
+        [cursoIds]
+      );
+      const conElectivos = new Set((Array.isArray(filasCursos?.[0]) ? filasCursos[0] : []).map((c) => c.Curso_Id));
+      const avisados = new Set();
+      for (const p of propuestas) {
+        const enBloque = electivos.filter((e) => e.periodo === p.periodo && e.dia === p.dia
+          && Number(e.Bloque_Horario_Id) === Number(p.Bloque_Horario_Id));
+        if (enBloque.length === 0) continue;
+        if (conElectivos.has(p.Curso_Id) && cambiaPosicion && !avisados.has(`c${p.Curso_Id}|${p.dia}|${p.Bloque_Horario_Id}`)) {
+          avisados.add(`c${p.Curso_Id}|${p.dia}|${p.Bloque_Horario_Id}`);
+          conflictos.push(`${p.curso}: el ${etiqueta(p)} está ocupado por electivos de 3° y 4° medio`);
+        }
+        const delDocente = p.Usuario_Id && enBloque.find((e) => Number(e.Docente_Usuario_Id) === Number(p.Usuario_Id));
+        if (delDocente && !avisados.has(`d${p.Usuario_Id}|${p.dia}|${p.Bloque_Horario_Id}`)) {
+          avisados.add(`d${p.Usuario_Id}|${p.dia}|${p.Bloque_Horario_Id}`);
+          conflictos.push(`${p.docente} ya tiene el electivo ${delDocente.asignatura} (${delDocente.ruta}) el ${etiqueta(p)}`);
+        }
+      }
+      if (maxDiarios != null) {
+        const dia = cambios.Horario_Asignatura_Dia_Semana;
+        for (const cursoId of cursoIds) {
+          if (!conElectivos.has(cursoId)) continue;
+          const total = totalesDia.get(cursoId) ?? 0;
+          const periodoCurso = propuestas.find((p) => p.Curso_Id === cursoId).periodo;
+          const bloquesEl = new Set(electivos.filter((e) => e.periodo === periodoCurso && e.dia === dia)
+            .map((e) => Number(e.Bloque_Horario_Id))).size;
+          if (total <= maxDiarios && total + bloquesEl > maxDiarios) {
+            const curso = propuestas.find((p) => p.Curso_Id === cursoId).curso;
+            conflictos.push(`${curso} superaría el máximo de ${maxDiarios} bloque(s) diarios el ${dia} (contando ${bloquesEl} bloque(s) de electivos)`);
+          }
+        }
       }
     }
   }

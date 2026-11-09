@@ -124,7 +124,12 @@ function HorarioMaestro() {
       {!loading && !errorCarga && (
         <>
           <div style={s.stats}>
-            <Stat valor={horario.length} etiqueta="Clases programadas" />
+            {/* Un electivo aparece en cada curso de 3° y 4° medio, pero es una sola clase */}
+            <Stat
+              valor={horario.filter((h) => !Number(h.electivo)).length
+                + new Set(horario.filter((h) => Number(h.electivo)).map((h) => h.Clase_Electivo_Id)).size}
+              etiqueta="Clases programadas"
+            />
             <Stat valor={cursos.length} etiqueta="Cursos con horario" />
             <Stat valor={docentes.length} etiqueta="Docentes" />
             <Stat valor={totalSinDocente} etiqueta="Sin docente" alerta={totalSinDocente > 0} />
@@ -223,10 +228,17 @@ function HorarioMaestro() {
 
                       {vista === "dia"
                         ? columnasCurso.map((c) => {
-                            const clase = clasesBloque.find((h) => h.dia === dia && h.Curso_Id === c.id);
+                            // En 3° y 4° medio un bloque de electivos tiene varias clases a la vez (CU106)
+                            const delCurso = clasesBloque.filter((h) => h.dia === dia && h.Curso_Id === c.id);
                             return (
                               <td key={c.id} style={s.td}>
-                                {clase ? <TarjetaClase clase={clase} color={colorAsig[clase.Asignatura_Id]} /> : <Vacio />}
+                                {delCurso.length === 0 ? <Vacio /> : (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                    {delCurso.map((clase) => (
+                                      <TarjetaClase key={clase.Horario_Asignatura_Id} clase={clase} color={colorAsig[clase.Asignatura_Id]} />
+                                    ))}
+                                  </div>
+                                )}
                               </td>
                             );
                           })
@@ -239,7 +251,11 @@ function HorarioMaestro() {
                                 {delDia.length === 0 ? (
                                   <Vacio />
                                 ) : filtroCurso ? (
-                                  <TarjetaClase clase={delDia[0]} color={colorAsig[delDia[0].Asignatura_Id]} />
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                    {delDia.map((h) => (
+                                      <TarjetaClase key={h.Horario_Asignatura_Id} clase={h} color={colorAsig[h.Asignatura_Id]} />
+                                    ))}
+                                  </div>
                                 ) : (
                                   <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                                     {delDia.map((h) => (

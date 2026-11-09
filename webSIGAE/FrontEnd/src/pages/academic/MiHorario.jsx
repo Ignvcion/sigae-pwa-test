@@ -86,11 +86,12 @@ function MiHorario() {
     dia: h.dia,
     horaInicio: h.horaInicio,
     horaFin: h.horaFin,
-    titulo: h.asignatura,
+    titulo: Number(h.electivo) === 1 ? `Electivo · ${h.asignatura}` : h.asignatura,
     lineas: [h.curso],
     colorKey: h.asignaturaId ?? h.asignatura,
     estado: h.estado,
     pendiente: Boolean(Number(h.pendiente)),
+    electivo: Number(h.electivo) === 1,
   }));
   const topes = detectarTopes(clases);
 

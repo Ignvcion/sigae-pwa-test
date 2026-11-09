@@ -863,3 +863,48 @@ export async function eliminarEvaluacion(id) {
   const res = await fetch(`${BASE_URL}/evaluaciones/${id}`, { method: 'DELETE', headers: authHeaders() });
   return handleResponse(res);
 }
+
+// ── Electivos de 3° y 4° medio: plan del período (CU108) y programación (CU106) ──
+
+const jsonHeaders = { 'Content-Type': 'application/json' };
+const qsPeriodo = (periodo) => (periodo ? `?periodo=${encodeURIComponent(periodo)}` : '');
+
+export async function getPlanElectivos(periodo) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/plan${qsPeriodo(periodo)}`));
+}
+
+export async function crearPlanElectivos(periodo, asignaturas) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/plan`, {
+    method: 'POST', headers: jsonHeaders, body: JSON.stringify({ periodo, asignaturas }),
+  }));
+}
+
+export async function editarPlanElectivos(planId, asignaturas) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/plan/${planId}`, {
+    method: 'PUT', headers: jsonHeaders, body: JSON.stringify({ asignaturas }),
+  }));
+}
+
+export async function clonarPlanElectivos(hacia, desde) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/plan/clonar`, {
+    method: 'POST', headers: jsonHeaders, body: JSON.stringify({ hacia, desde }),
+  }));
+}
+
+export async function getProgramacionElectivos(periodo) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/programacion${qsPeriodo(periodo)}`));
+}
+
+export async function programarElectivo(datos) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/clases`, {
+    method: 'POST', headers: jsonHeaders, body: JSON.stringify(datos),
+  }));
+}
+
+export async function eliminarElectivo(id) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/clases/${id}`, { method: 'DELETE' }));
+}
+
+export async function getElectivosDeCurso(cursoId) {
+  return handleResponse(await apiFetch(`${BASE_URL}/electivos/curso/${cursoId}`));
+}

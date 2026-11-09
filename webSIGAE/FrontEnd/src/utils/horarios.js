@@ -50,6 +50,8 @@ export function detectarTopes(clases) {
     for (let j = i + 1; j < activas.length; j++) {
       const a = activas[i];
       const b = activas[j];
+      // RNF17: electivos simultáneos de 3° y 4° medio no son tope (cada estudiante cursa uno)
+      if (a.electivo && b.electivo) continue;
       if (a.dia === b.dia && seSolapan(a, b)) {
         topes.push({ dia: a.dia, clases: [a, b] });
       }

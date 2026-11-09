@@ -97,6 +97,7 @@ describe('Reubicación de clases tras redefinir la jornada o los bloques', () =>
       .mockResolvedValueOnce([[]])                  // choque docente
       .mockResolvedValueOnce([[{ Curso_Periodo_Lectivo: '2026' }]]) // período del curso (CU107)
       .mockResolvedValueOnce([[]])                  // disponibilidad laboral: sin restricción
+      .mockResolvedValueOnce([[]])                  // sin electivos que se crucen
       .mockResolvedValueOnce([{ affectedRows: 1 }]) // UPDATE
       .mockResolvedValueOnce([[{ Desajustado: 1, Clases: 0, Eventos: 0 }]]) // bloque viejo
       .mockResolvedValueOnce([{ affectedRows: 0 }]) // DELETE clases eliminadas del bloque viejo
@@ -104,9 +105,9 @@ describe('Reubicación de clases tras redefinir la jornada o los bloques', () =>
 
     await conflictos.migrarClase(req, res);
 
-    expect(conn.query.mock.calls[6][1]).toEqual([11111115, 222222]);
-    expect(conn.query.mock.calls[8][1]).toEqual([[11111111], 'Eliminado']);
-    expect(conn.query.mock.calls[9][1]).toEqual([11111111]);
+    expect(conn.query.mock.calls[7][1]).toEqual([11111115, 222222]);
+    expect(conn.query.mock.calls[9][1]).toEqual([[11111111], 'Eliminado']);
+    expect(conn.query.mock.calls[10][1]).toEqual([11111111]);
     expect(conn.commit).toHaveBeenCalled();
     expect(conn.release).toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith({ mensaje: 'Clase migrada al nuevo bloque', bloqueEliminado: true });
@@ -131,6 +132,7 @@ describe('Reubicación de clases tras redefinir la jornada o los bloques', () =>
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[{ Curso_Periodo_Lectivo: '2026' }]])
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
       .mockResolvedValueOnce([[{ Desajustado: 0, Clases: 0, Eventos: 0 }]]);
@@ -182,6 +184,23 @@ describe('Reubicación de clases tras redefinir la jornada o los bloques', () =>
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith({ error: 'El curso ya tiene Lenguaje y Comunicación en ese horario el Lunes' });
     expect(conn.rollback).toHaveBeenCalled();
+  });
+
+  test('CU106: rechaza migrar si el destino se cruza con un electivo del docente', async () => {
+    conn.query
+      .mockResolvedValueOnce([[CLASE_PENDIENTE]])
+      .mockResolvedValueOnce([[DESTINO_VIGENTE]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ Curso_Periodo_Lectivo: '2026' }]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ Asignatura_Nombre: 'Biología Celular', Ruta: 'Científica', DelDocente: 1 }]]);
+
+    await conflictos.migrarClase(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json.mock.calls[0][0].error).toContain('electivo Biología Celular (Científica)');
+    expect(conn.commit).not.toHaveBeenCalled();
   });
 
   test('Rechaza migrar si el docente ya tiene clase en ese horario', async () => {

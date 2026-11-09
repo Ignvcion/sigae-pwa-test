@@ -5,7 +5,8 @@
 //   1. Se eliminan los cursos de períodos < V (los de dos cambios atrás) con sus
 //      estudiantes (egresados, en práctica, retirados) y todo lo asociado:
 //      historial, citaciones, situaciones finales, evaluaciones, horarios y
-//      asignaturas del curso. Los suplentes se borran en cascada.
+//      asignaturas del curso. Los suplentes se borran en cascada. También el plan y
+//      las clases de electivos de esos períodos.
 //   2. Apoderados sin asociaciones (ni titular ni suplente de un estudiante vigente):
 //      - con otro rol (docente/administrador): se les quita el rol de apoderado;
 //      - solo apoderados, ya marcados en un cambio anterior: se eliminan, con sus
@@ -61,6 +62,8 @@ async function calcularLimpieza(conn, vigente) {
   );
 
   return {
+    // Los electivos (CU106, CU108) se eliminan con los cursos: los de períodos < V
+    periodoLimite: String(vigente),
     cursoIds,
     estudianteIds,
     horarioIds,
@@ -110,6 +113,15 @@ async function datosRespaldo(conn, l) {
     Evaluaciones: await q('SELECT * FROM evaluacion WHERE Curso_Id IN (?)', [lista(l.cursoIds)]),
     Horarios: await q('SELECT * FROM horario_asignatura WHERE Horario_Asignatura_Id IN (?)', [lista(l.horarioIds)]),
     'Asignaturas de curso': await q('SELECT * FROM tieneasig WHERE Curso_Id IN (?)', [lista(l.cursoIds)]),
+    'Plan de electivos': await q(
+      `SELECT pe.Plan_Electivos_Periodo_Lectivo, pea.*,
+              (SELECT GROUP_CONCAT(ped.Docente_Usuario_Id) FROM plan_electivos_docente ped
+                WHERE ped.Plan_Electivos_Asignatura_Id = pea.Plan_Electivos_Asignatura_Id) AS Docentes_Habilitados
+         FROM plan_electivos pe JOIN plan_electivos_asignatura pea ON pea.Plan_Electivos_Id = pe.Plan_Electivos_Id
+        WHERE pe.Plan_Electivos_Periodo_Lectivo < ?`,
+      [l.periodoLimite ?? '0']
+    ),
+    'Clases de electivos': await q('SELECT * FROM clase_electivo WHERE Clase_Electivo_Periodo_Lectivo < ?', [l.periodoLimite ?? '0']),
     Apoderados: (await q(
       `SELECT Usuario_Id, Usuario_RUT, Usuario_Nombre_Completo, Usuario_Telefono, Apoderado_Correo_Natural,
               Es_Docente, Es_Administrador, Usuario_Estado_Cuenta, Apoderado_Sin_Asociaciones_Desde
@@ -150,6 +162,11 @@ async function ejecutarLimpieza(conn, l, nuevoVigente) {
   await run('DELETE FROM situacion_final WHERE Estudiante_Id IN (?) OR Curso_Id IN (?)', [e, c]);
   await run('DELETE FROM evaluacion WHERE Curso_Id IN (?)', [c]);
   await run('DELETE FROM horario_asignatura WHERE Curso_Id IN (?)', [c]);
+  // Electivos de 3° y 4° medio de los mismos períodos (asignaturas y docentes del plan: CASCADE)
+  if (l.periodoLimite) {
+    await run('DELETE FROM clase_electivo WHERE Clase_Electivo_Periodo_Lectivo < ?', [l.periodoLimite]);
+    await run('DELETE FROM plan_electivos WHERE Plan_Electivos_Periodo_Lectivo < ?', [l.periodoLimite]);
+  }
   await run('DELETE FROM tieneasig WHERE Curso_Id IN (?)', [c]);
   await run('DELETE FROM estudiante WHERE Estudiante_Id IN (?)', [e]); // apoderado_suplente: CASCADE
   await run('DELETE FROM curso WHERE Curso_Id IN (?)', [c]);

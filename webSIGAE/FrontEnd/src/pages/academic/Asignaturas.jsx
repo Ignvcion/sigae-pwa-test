@@ -27,10 +27,11 @@ function BadgePrioridad({ valor }) {
 function FormAsignatura({ inicial, onGuardar, onCancelar, guardando, error }) {
   const [nombre, setNombre]       = useState(inicial?.nombre    || "");
   const [prioridad, setPrioridad] = useState(inicial?.prioridad || "");
+  const [electiva, setElectiva]   = useState(Boolean(inicial?.electiva));
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onGuardar({ nombre, prioridad });
+    onGuardar({ nombre, prioridad, electiva });
   };
 
   return (
@@ -58,6 +59,22 @@ function FormAsignatura({ inicial, onGuardar, onCancelar, guardando, error }) {
           <option key={p} value={p}>{p}</option>
         ))}
       </select>
+
+      {/* CU47 / RF28: las electivas solo van en el plan de electivos de 3° y 4° medio */}
+      <label style={{ marginTop: "0.9rem", display: "flex", alignItems: "flex-start", gap: "0.5rem", fontWeight: 400 }}>
+        <input
+          type="checkbox"
+          checked={electiva}
+          onChange={(e) => setElectiva(e.target.checked)}
+          style={{ width: "auto", marginTop: 3 }}
+        />
+        <span>
+          <strong>Asignatura electiva de 3° y 4° medio</strong>
+          <span style={{ display: "block", fontSize: "0.8rem", color: "#64748b" }}>
+            Solo se incluye en el plan de electivos; no entra en planes educativos ni se asocia a cursos.
+          </span>
+        </span>
+      </label>
 
       <div style={{ display: "flex", gap: "0.5rem", marginTop: "1.1rem" }}>
         <button type="submit" className="btn-primary" disabled={guardando}>
@@ -110,7 +127,7 @@ function Asignaturas() {
     setTimeout(() => setExito(""), 4000);
   };
 
-  const handleCrear = async ({ nombre, prioridad }) => {
+  const handleCrear = async ({ nombre, prioridad, electiva }) => {
     setGuardando(true);
     setError("");
     try {
@@ -120,7 +137,7 @@ function Asignaturas() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ nombre, prioridad }),
+        body: JSON.stringify({ nombre, prioridad, electiva }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
@@ -134,7 +151,7 @@ function Asignaturas() {
     }
   };
 
-  const handleEditar = async ({ nombre, prioridad }) => {
+  const handleEditar = async ({ nombre, prioridad, electiva }) => {
     setGuardando(true);
     setError("");
     try {
@@ -144,7 +161,7 @@ function Asignaturas() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ nombre, prioridad }),
+        body: JSON.stringify({ nombre, prioridad, electiva }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
@@ -163,6 +180,7 @@ function Asignaturas() {
       id: a.Asignatura_Id,
       nombre: a.Asignatura_Nombre,
       prioridad: a.Asignatura_Prioridad_Academica,
+      electiva: Number(a.Asignatura_Es_Electiva) === 1,
     });
     setMostrarForm(false);
     setError("");
@@ -260,7 +278,12 @@ function Asignaturas() {
             {filtradas.map((a, i) => (
               <tr key={a.Asignatura_Id} style={editando?.id === a.Asignatura_Id ? { background: "#eff6ff" } : {}}>
                 <td style={{ color: "#94a3b8", fontSize: "0.85rem" }}>{i + 1}</td>
-                <td style={{ fontWeight: 500 }}>{a.Asignatura_Nombre}</td>
+                <td style={{ fontWeight: 500 }}>
+                  {a.Asignatura_Nombre}
+                  {Number(a.Asignatura_Es_Electiva) === 1 && (
+                    <span className="badge-electiva" title="Electiva de 3° y 4° medio: va en el plan de electivos">Electiva</span>
+                  )}
+                </td>
                 <td><BadgePrioridad valor={a.Asignatura_Prioridad_Academica} /></td>
                 {esAdmin && (
                   <td>

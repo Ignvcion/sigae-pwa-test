@@ -3,6 +3,8 @@ import { useAuth } from "../context/AuthContext";
 
 const TOKEN = () => localStorage.getItem("token");
 const authH = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${TOKEN()}` });
+// RF27: las asignaturas electivas solo van en el plan de electivos de 3° y 4° medio
+const sinElectivas = (lista) => (Array.isArray(lista) ? lista.filter((a) => Number(a.Asignatura_Es_Electiva) !== 1) : []);
 
 function TablaAsignaturas({ asignaturas }) {
   if (!asignaturas || asignaturas.length === 0) {
@@ -169,7 +171,7 @@ function FormCrearPlan({ onExito, onCancelar, periodoPropuesto }) {
         ]);
         setNiveles(await rNiveles.json());
         const asig = await rAsig.json();
-        setTodasAsig(Array.isArray(asig) ? asig : []);
+        setTodasAsig(sinElectivas(asig));
       } catch {
         setError("Error al cargar datos");
       }
@@ -316,7 +318,7 @@ function FormEditarPlan({ planId, onExito, onCancelar }) {
         const niv = await rNiveles.json();
         const asig = await rAsig.json();
         setNiveles(Array.isArray(niv) ? niv : []);
-        setTodasAsig(Array.isArray(asig) ? asig : []);
+        setTodasAsig(sinElectivas(asig));
         setNivelId(String(plan.Nivel_Educativo_Id));
         setPeriodo(plan.Plan_Educativo_Periodo_Lectivo);
         setAsignaturas(
@@ -470,7 +472,7 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
         ]);
         setNiveles(await rNiveles.json());
         const asig = await rAsig.json();
-        setTodasAsig(Array.isArray(asig) ? asig : []);
+        setTodasAsig(sinElectivas(asig));
       } catch {
         setError("Error al cargar datos");
       }

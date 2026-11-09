@@ -5,6 +5,7 @@ import DetalleBloqueModal from "../../components/horarios/DetalleBloqueModal";
 import PanelConflictos from "../../components/horarios/PanelConflictos";
 import EtiquetaPeriodo, { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
 import { COLOR_PENDIENTE } from "../../utils/horarios";
+import { getElectivosDeCurso } from "../../services/api";
 
 const API = "/api";
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
@@ -248,6 +249,8 @@ export default function Horarios() {
   // Listado sidebar
   const [listadoAbierto, setListadoAbierto] = useState(false);
   const [resumenCursos, setResumenCursos] = useState([]);
+  // CU106: en 3° y 4° medio, los bloques de electivos (compartidos) no admiten clases regulares
+  const [electivosCurso, setElectivosCurso] = useState([]);
 
   // Sidebar collapse
   useEffect(() => {
@@ -324,6 +327,17 @@ export default function Horarios() {
   useEffect(() => {
     if (listadoAbierto) cargarResumenCursos();
   }, [listadoAbierto, cargarResumenCursos]);
+
+  useEffect(() => {
+    let vigente = true;
+    const pedir = esAdmin && cursoSeleccionado
+      ? getElectivosDeCurso(cursoSeleccionado).then((d) => d?.clases || [])
+      : Promise.resolve([]);
+    pedir
+      .then((clases) => { if (vigente) setElectivosCurso(clases); })
+      .catch(() => { if (vigente) setElectivosCurso([]); });
+    return () => { vigente = false; };
+  }, [esAdmin, cursoSeleccionado]);
 
   const alResolverConflicto = () => {
     recargarBloques();
@@ -823,9 +837,16 @@ export default function Horarios() {
               </div>
             )}
 
+            {electivosCurso.length > 0 && (
+              <p style={{ margin: "0 0 0.6rem", fontSize: "0.8rem", color: "#5b21b6" }}>
+                Los bloques morados son electivos de 3° y 4° medio, compartidos por todos esos cursos; se gestionan en{" "}
+                <a href="/electivos" style={{ color: "#5b21b6", fontWeight: 700 }}>Electivos</a>.
+              </p>
+            )}
             <VistaBloqueGrid
               bloques={bloques}
               horarios={horariosVigentes}
+              electivos={electivosCurso}
               esAdmin={esAdmin}
               asignaturaActiva={asignaturaActiva}
               colorMap={colorMap}
@@ -927,6 +948,7 @@ export default function Horarios() {
 function VistaBloqueGrid({
   bloques,
   horarios,
+  electivos = [],
   esAdmin,
   asignaturaActiva,
   colorMap,
@@ -958,6 +980,11 @@ function VistaBloqueGrid({
   const cellMap = {};
   horarios.forEach((h) => {
     cellMap[`${h.Bloque_Horario_Id}_${h.dia}`] = h;
+  });
+  // Electivos del bloque (varios a la vez: uno por asignatura y ruta)
+  const electivosMap = {};
+  electivos.forEach((e) => {
+    (electivosMap[`${e.Bloque_Horario_Id}_${e.dia}`] ||= []).push(e);
   });
 
   // Bloques reemplazados o fuera de la jornada: solo se muestran si este curso
@@ -1092,7 +1119,8 @@ function VistaBloqueGrid({
               const isHovered =
                 hoveredCell?.bloqueId === bloque.Bloque_Horario_Id &&
                 hoveredCell?.dia === dia;
-              const canClick = esAdmin && !esRecreo && !desajustado && !h && !!onCelda && !modoSeleccion;
+              const enElectivo = electivosMap[key] || [];
+              const canClick = esAdmin && !esRecreo && !desajustado && !h && enElectivo.length === 0 && !!onCelda && !modoSeleccion;
               const seleccionado = !!h && seleccionados.includes(h.Horario_Asignatura_Id);
               const asigColor = h ? colorMap[h.Asignatura_Id] || ASIG_COLORS[0] : null;
 
@@ -1315,6 +1343,31 @@ function VistaBloqueGrid({
                           )}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* CU106: bloque ocupado por electivos de 3° y 4° medio */}
+                  {!h && enElectivo.length > 0 && (
+                    <div
+                      title={enElectivo.map((e) => `${e.asignatura} (${e.ruta}) · ${e.docente}`).join("\n")}
+                      style={{
+                        background: "#f5f3ff",
+                        border: "1px solid #ddd6fe",
+                        borderRadius: 6,
+                        padding: "3px 6px",
+                        fontSize: "0.66rem",
+                        lineHeight: 1.3,
+                        color: "#5b21b6",
+                        height: "100%",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      <strong style={{ display: "block", fontSize: "0.7rem" }}>Electivos</strong>
+                      {enElectivo.map((e) => (
+                        <span key={e.Clase_Electivo_Id} style={{ display: "block", overflowWrap: "anywhere" }}>
+                          {e.asignatura} · {e.ruta === "Científica" ? "C" : "H"}
+                        </span>
+                      ))}
                     </div>
                   )}
 

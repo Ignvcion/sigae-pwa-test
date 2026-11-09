@@ -38,9 +38,10 @@ describe('Horario semanal de un estudiante visto por su apoderado', () => {
     await horarioController.getHorarioEstudiante(req, res);
 
     expect(pool.execute.mock.calls[0][1]).toEqual([222222222]);
-    expect(pool.execute.mock.calls[1][1]).toEqual([222]);
+    // Curso de las clases regulares, curso de los electivos y la ruta del estudiante (sin ruta: null)
+    expect(pool.execute.mock.calls[1][1]).toEqual([222, 222, null, null]);
     expect(res.json).toHaveBeenCalledWith({
-      estudiante: { id: 222222222, nombre: 'Diego Martin Perez Castro', curso: '1ero Básico A' },
+      estudiante: { id: 222222222, nombre: 'Diego Martin Perez Castro', curso: '1ero Básico A', ruta: null },
       horario,
     });
   });

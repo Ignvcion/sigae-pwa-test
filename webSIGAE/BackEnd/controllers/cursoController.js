@@ -148,6 +148,7 @@ const getAsignaturasDisponibles = async (req, res) => {
       FROM incluyeasig ia
       JOIN asignatura a ON ia.Asignatura_Id = a.Asignatura_Id
       WHERE ia.Plan_Educativo_Id = ?
+        AND a.Asignatura_Es_Electiva = 0  -- RF33: las electivas no se asocian a cursos
         AND a.Asignatura_Id NOT IN (
           SELECT Asignatura_Id FROM tieneasig
           WHERE Curso_Id = ? AND Estado_Asignacion = 'Activa'
@@ -188,8 +189,11 @@ const asignarAsignaturas = async (req, res) => {
     }
     const planId = planes[0].Plan_Educativo_Id;
 
+    // RF33: una asignatura electiva no se asocia a cursos (va en el plan de electivos)
     const [asignaturasDelPlan] = await pool.execute(
-      'SELECT Asignatura_Id FROM incluyeasig WHERE Plan_Educativo_Id = ?', [planId]
+      `SELECT ia.Asignatura_Id FROM incluyeasig ia
+         JOIN asignatura a ON a.Asignatura_Id = ia.Asignatura_Id
+        WHERE ia.Plan_Educativo_Id = ? AND a.Asignatura_Es_Electiva = 0`, [planId]
     );
     const idsValidos = new Set(asignaturasDelPlan.map(a => a.Asignatura_Id));
 

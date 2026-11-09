@@ -1,0 +1,86 @@
+/* Electivos de 3° y 4° medio (CU106, CU108) */
+.el-pagina { --el-c-bg: #e0f2fe; --el-c-text: #075985; --el-c-borde: #7dd3fc;
+             --el-h-bg: #fef3c7; --el-h-text: #92400e; --el-h-borde: #fcd34d; }
+
+.el-pestanas { display: flex; gap: 4px; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px; overflow-x: auto; }
+.el-pestanas button {
+  background: none; border: none; border-bottom: 2px solid transparent; padding: 10px 16px;
+  font-size: 0.95rem; font-weight: 600; color: #64748b; cursor: pointer; margin-bottom: -1px; white-space: nowrap;
+}
+.el-pestanas button.activo { color: #2563eb; border-bottom-color: #2563eb; }
+
+.el-seccion { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; }
+.el-barra { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.el-barra h2 { margin: 0 0 4px; font-size: 1.15rem; color: #0f172a; }
+.el-suave { color: #64748b; font-size: 0.85rem; }
+.el-periodo { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #475569; font-weight: 600; }
+.el-periodo select { padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; }
+
+.el-aviso { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; font-size: 0.9rem; }
+.el-vacio { text-align: center; padding: 28px 12px; border: 1px dashed #cbd5e1; border-radius: 12px; color: #475569; }
+.el-acciones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+.el-vacio .el-acciones { justify-content: center; }
+
+.el-rutas { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.el-ruta { border: 1px solid #e2e8f0; border-top: 4px solid var(--borde); border-radius: 12px; padding: 14px; background: #fcfcfd; }
+.el-ruta--c { --borde: var(--el-c-borde); }
+.el-ruta--h { --borde: var(--el-h-borde); }
+.el-ruta-titulo { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.el-ruta-titulo h3 { margin: 0; font-size: 1rem; color: #0f172a; }
+.el-total { font-weight: 700; font-size: 0.85rem; color: #334155; }
+
+.el-fila { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px; }
+.el-fila-principal { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.el-fila-principal select { flex: 1 1 180px; padding: 7px 9px; border-radius: 8px; border: 1px solid #cbd5e1; min-width: 0; }
+.el-horas { display: flex; align-items: center; gap: 4px; font-size: 0.8rem; color: #64748b; }
+.el-horas input { width: 60px; padding: 6px; border-radius: 8px; border: 1px solid #cbd5e1; }
+.el-progreso { font-size: 0.8rem; color: #475569; background: #f1f5f9; border-radius: 999px; padding: 2px 10px; }
+
+.el-btn-link { background: none; border: none; color: #2563eb; font-weight: 600; cursor: pointer; padding: 4px 0; font-size: 0.85rem; }
+.el-btn-quitar { background: none; border: 1px solid #fecaca; color: #b91c1c; border-radius: 8px; padding: 5px 10px; cursor: pointer; font-size: 0.8rem; }
+.el-btn-quitar:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.el-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.el-chip { display: inline-flex; align-items: center; gap: 4px; background: #eef2ff; color: #3730a3; border-radius: 999px; padding: 2px 4px 2px 10px; font-size: 0.78rem; font-weight: 600; }
+.el-chip--fijo { padding-right: 10px; }
+.el-chip button { background: none; border: none; color: inherit; cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 0 4px; }
+.el-lista-docentes { border: 1px solid #e2e8f0; border-radius: 8px; max-height: 180px; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.el-lista-docentes label { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; padding: 3px 4px; border-radius: 6px; cursor: pointer; }
+.el-lista-docentes label:hover { background: #f8fafc; }
+.el-lista-docentes input { width: auto; }
+
+.el-resumen { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; background: #f8fafc; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+.el-resumen > div { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.el-resumen-num { font-weight: 800; font-size: 1.05rem; color: #0f172a; }
+.el-ruta-pill { border-radius: 999px; padding: 2px 10px; font-size: 0.78rem; font-weight: 700; }
+.el-ruta-pill--c { background: var(--el-c-bg); color: var(--el-c-text); }
+.el-ruta-pill--h { background: var(--el-h-bg); color: var(--el-h-text); }
+
+.el-grilla-scroll { overflow-x: auto; }
+.el-grilla { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 760px; }
+.el-grilla th { background: #f1f5f9; color: #334155; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 8px; text-align: left; }
+.el-grilla td { border-top: 1px solid #e2e8f0; padding: 6px; vertical-align: top; }
+.el-bloque { white-space: nowrap; width: 110px; }
+.el-bloque strong { display: block; font-size: 0.85rem; color: #0f172a; }
+.el-recreo td { background: #f8fafc; }
+.el-celda { min-width: 130px; }
+.el-celda--recreo { background: repeating-linear-gradient(45deg, #f8fafc, #f8fafc 6px, #f1f5f9 6px, #f1f5f9 12px); }
+
+.el-clase { display: flex; justify-content: space-between; gap: 4px; border-radius: 8px; padding: 5px 6px 5px 8px; margin-bottom: 4px; font-size: 0.76rem; line-height: 1.3; border-left: 3px solid; }
+.el-clase strong { display: block; }
+.el-clase span { opacity: 0.85; }
+.el-clase--c { background: var(--el-c-bg); color: var(--el-c-text); border-color: var(--el-c-text); }
+.el-clase--h { background: var(--el-h-bg); color: var(--el-h-text); border-color: var(--el-h-text); }
+.el-clase button { background: none; border: none; color: inherit; cursor: pointer; font-size: 1rem; line-height: 1; align-self: flex-start; }
+.el-agregar { width: 100%; background: none; border: 1px dashed #cbd5e1; border-radius: 8px; color: #64748b; padding: 4px; cursor: pointer; font-size: 0.75rem; }
+.el-agregar:hover { border-color: #2563eb; color: #2563eb; }
+.el-ocupado { background: #f1f5f9; color: #475569; border-radius: 8px; padding: 6px 8px; font-size: 0.74rem; font-weight: 600; }
+.el-ocupado span { display: block; font-weight: 400; }
+
+.el-modal { background: #fff; border-radius: 14px; padding: 22px; width: min(440px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 6px; box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25); }
+.el-modal h3 { margin: 0; }
+.el-modal label { font-weight: 600; font-size: 0.85rem; color: #334155; margin-top: 8px; }
+.el-modal select { padding: 8px 10px; border-radius: 8px; border: 1px solid #cbd5e1; }
+.el-segmentos { display: flex; gap: 6px; }
+.el-segmentos button { flex: 1; padding: 7px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; font-weight: 600; color: #475569; }
+.el-segmentos button.activo { background: #2563eb; border-color: #2563eb; color: #fff; }
