@@ -147,7 +147,7 @@ function Administradores() {
             <tr>
               <th>#</th>
               <th>Nombre</th>
-              <th>Correo</th>
+              <th className="col-correo-th">Correo</th>
               <th>Teléfono</th>
               <th>Estado</th>
               <th>Acciones</th>

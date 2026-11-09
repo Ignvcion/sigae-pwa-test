@@ -123,7 +123,7 @@ function BuscarUsuarios() {
               <th>Nombre</th>
               <th>RUT</th>
               <th>Roles</th>
-              <th>Correo</th>
+              <th className="col-correo-th">Correo</th>
               <th>Estado</th>
               <th>Perfil</th>
             </tr>
@@ -139,7 +139,7 @@ function BuscarUsuarios() {
                     {getBadgesRoles(u)}
                   </div>
                 </td>
-                <td>{getCorreoPrincipal(u)}</td>
+                <td className="col-correo-td correo-celda" title={getCorreoPrincipal(u)}>{getCorreoPrincipal(u)}</td>
                 <td>
                   {u.Usuario_Estado_Cuenta
                     ? <span className="badge-activo">Activo</span>

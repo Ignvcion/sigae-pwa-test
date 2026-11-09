@@ -209,7 +209,7 @@ const cambiarEstadoCuenta = async (u) => {
               <th>Nombre</th>
               <th>RUT</th>
               <th>Roles</th>
-              <th style={{ minWidth: "240px" }}>Correo</th>
+              <th className="col-correo-th">Correo</th>
               <th>Estado</th>
               <th>Perfil</th>
               <th>Acciones</th>
@@ -230,7 +230,7 @@ const cambiarEstadoCuenta = async (u) => {
                       {getBadgesRoles(u)}
                     </div>
                   </td>
-                  <td style={{ minWidth: "240px", whiteSpace: "nowrap" }}>
+                  <td className="col-correo-td correo-celda" title={getCorreoPrincipal(u)}>
                     {getCorreoPrincipal(u)}
                   </td>
                   <td>

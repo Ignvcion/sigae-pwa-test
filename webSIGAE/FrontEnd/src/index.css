@@ -593,10 +593,13 @@ select {
     padding-top: 72px; /* deja espacio para la barra superior fija */
   }
 
+  .usuarios-container {
+    padding: 16px 8px;
+  }
+
   .tabla-usuarios {
-    display: block;
-    overflow-x: auto;
-    white-space: nowrap;
+    width: 100%;
+    min-width: 680px;
   }
 }
 
@@ -2798,4 +2801,28 @@ table {
   font-weight: 600;
   letter-spacing: 0.05em;
   line-height: 1.1;
+}
+
+
+/* ── CELDA DE CORREO TOTALMENTE VISIBLE Y RESPONSIVA EN MÓVIL ─────────────── */
+.correo-celda,
+th.col-correo-th,
+td.col-correo-td {
+  min-width: 150px !important;
+  max-width: 220px !important;
+  word-break: break-all !important;
+  overflow-wrap: anywhere !important;
+  white-space: normal !important;
+  font-size: 0.84rem !important;
+  line-height: 1.35 !important;
+}
+
+@media (max-width: 640px) {
+  .correo-celda,
+  th.col-correo-th,
+  td.col-correo-td {
+    min-width: 140px !important;
+    max-width: 190px !important;
+    font-size: 0.80rem !important;
+  }
 }

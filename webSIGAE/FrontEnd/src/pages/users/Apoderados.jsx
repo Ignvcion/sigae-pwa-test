@@ -335,7 +335,7 @@ function Apoderados() {
               <th>#</th>
               <th>Nombre</th>
               <th>RUT</th>
-              <th>Correo</th>
+              <th className="col-correo-th">Correo</th>
               <th>Teléfono</th>
               <th>Estado</th>
               <th>Roles</th>
