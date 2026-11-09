@@ -459,7 +459,7 @@ function Perfil() {
                 </div>
                 <div className="perfil-campo">
                   <label>Carga Horaria Semanal</label>
-                  <span>{datos.Docente_Carga_Horaria_Maxima || "Sin carga horaria registrada"} hrs</span>
+                  <span>{datos.Docente_Carga_Horaria_Semanal || "Sin carga horaria registrada"} hrs</span>
                 </div>
               </>
             ) : null}

@@ -176,6 +176,10 @@ UNLOCK TABLES;
 
 --
 -- Table structure for table `conversacion`
+-- Incremento 4, RF54 (CU85, CU86): usuario.Docente_Recepcion_Mensajes es la recepción general
+-- del docente; Conversacion_Habilitada_Hasta abre las respuestas del apoderado en esta conversación
+-- hasta esa fecha y hora, y Conversacion_Habilitada_Citacion_Id la citación desde la que se
+-- habilitó (si se cancela, el período se cierra).
 --
 
 DROP TABLE IF EXISTS `conversacion`;
@@ -188,9 +192,12 @@ CREATE TABLE `conversacion` (
   `Docente_Usuario_Id` int unsigned NOT NULL,
   `Apoderado_Usuario_Id` int unsigned NOT NULL,
   `Conversacion_Habilitada_Hasta` datetime DEFAULT NULL,
+  `Conversacion_Habilitada_Citacion_Id` int unsigned DEFAULT NULL,
   PRIMARY KEY (`Conversacion_Id`),
   KEY `fk Conversacion_Usuario_idx` (`Docente_Usuario_Id`),
   KEY `fk Conversacion_Apoderado_idx` (`Apoderado_Usuario_Id`),
+  KEY `fk_Conversacion_Habilitada_Citacion_idx` (`Conversacion_Habilitada_Citacion_Id`),
+  CONSTRAINT `fk_Conversacion_Habilitada_Citacion` FOREIGN KEY (`Conversacion_Habilitada_Citacion_Id`) REFERENCES `citacion` (`Citacion_Id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_Conversacion_Apoderado` FOREIGN KEY (`Apoderado_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_Conversacion_Docente` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=1115 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -202,7 +209,7 @@ CREATE TABLE `conversacion` (
 
 LOCK TABLES `conversacion` WRITE;
 /*!40000 ALTER TABLE `conversacion` DISABLE KEYS */;
-INSERT INTO `conversacion` VALUES (1111,'2026-04-11',0,3,4,NULL),(1112,'2026-04-15',1,5,4,NULL),(1113,'2026-05-01',1,3,8,NULL);
+INSERT INTO `conversacion` VALUES (1111,'2026-04-11',0,3,4,NULL,NULL),(1112,'2026-04-15',1,5,4,NULL,NULL),(1113,'2026-05-01',1,3,8,NULL,NULL);
 /*!40000 ALTER TABLE `conversacion` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -882,7 +889,7 @@ CREATE TABLE `usuario` (
   `Usuario_Contraseña` varchar(200) NOT NULL,
   `Usuario_Foto_Perfil` varchar(255) DEFAULT NULL,
   `Es_Docente` tinyint(1) NOT NULL,
-  `Docente_Carga_Horaria_Maxima` int DEFAULT NULL,
+  `Docente_Carga_Horaria_Semanal` int DEFAULT NULL,
   `Docente_Especialidad` varchar(255) DEFAULT NULL,
   `Docente_Correo_Institucional` varchar(100) DEFAULT NULL,
   `Es_Administrador` tinyint(1) NOT NULL,

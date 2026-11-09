@@ -4,6 +4,7 @@ import {
   cancelarCitacion,
   confirmarCitacion,
   getDetalleCitacion,
+  habilitarRespuestasCitacion,
   reprogramarCitacion,
 } from "../../services/api";
 import {
@@ -37,6 +38,22 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
   const [errorMotivo, setErrorMotivo] = useState("");
 
   const [reprog, setReprog] = useState({ fecha: "", tramo: "" });
+  const [msgRespuestas, setMsgRespuestas] = useState("");
+
+  // RF54 / CU86: el docente habilita que el apoderado le responda hasta el término de la reunión
+  const handleHabilitarRespuestas = async () => {
+    setProcesando(true);
+    setMsgError("");
+    setMsgRespuestas("");
+    try {
+      const data = await habilitarRespuestasCitacion(citacion.Citacion_Id);
+      setMsgRespuestas(data.mensaje);
+    } catch (error) {
+      setMsgError(error.message || "No fue posible habilitar las respuestas del apoderado");
+    } finally {
+      setProcesando(false);
+    }
+  };
   const [erroresReprog, setErroresReprog] = useState({});
 
   // CU76/CU77 pasos 4–10: getDetalleCitacion(Citacion_Id)
@@ -219,6 +236,7 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
             )}
 
             {msgError && <div className="msg-error-form">{msgError}</div>}
+            {msgRespuestas && <div className="msg-exito" role="status">{msgRespuestas}</div>}
 
             <div className="cit-acciones-detalle">
               <Link className="cit-link" to={`/citaciones/historial?estudiante=${citacion.Estudiante_Id}`}>
@@ -228,6 +246,17 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
                 {puedeConfirmar(citacion, rol) && fechaISO(citacion.Citacion_Fecha) >= hoyISO() && (
                   <button type="button" className="btn-reactivar" onClick={handleConfirmar} disabled={procesando}>
                     {procesando ? "Confirmando..." : "Confirmar citación"}
+                  </button>
+                )}
+                {rol === "Docente" && esEditable(citacion) && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={handleHabilitarRespuestas}
+                    disabled={procesando}
+                    title="Aunque tu recepción de mensajes esté deshabilitada, el apoderado podrá responderte hasta que termine la reunión"
+                  >
+                    Habilitar respuestas hasta la reunión
                   </button>
                 )}
                 {esEditable(citacion) && (

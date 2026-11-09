@@ -10,6 +10,7 @@ import {
   getNivelesEducativos,
 } from "../../services/api";
 import DetalleBloqueModal from "../../components/horarios/DetalleBloqueModal";
+import EtiquetaPeriodo, { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
 
@@ -197,7 +198,7 @@ function ConsultaHorarios() {
     <option key={d.Usuario_Id} value={d.Usuario_Id}>{d.Usuario_Nombre_Completo}</option>
   ));
   const opcionesCursos = opciones.cursos.map((c) => (
-    <option key={c.Curso_Id} value={c.Curso_Id}>{c.Curso_Nombre}</option>
+    <option key={c.Curso_Id} value={c.Curso_Id}>{c.Curso_Nombre}{textoPeriodo(c.Curso_Periodo_Lectivo, c.Curso_Periodo_Estado)}</option>
   ));
   const opcionesJornadas = opciones.jornadas.map((j) => <option key={j} value={j}>{j}</option>);
   const opcionesDias = DIAS.map((d) => <option key={d} value={d}>{d}</option>);
@@ -302,7 +303,10 @@ function ConsultaHorarios() {
                         <td>{h.dia}</td>
                         <td>{hhmm(h.horaInicio)} - {hhmm(h.horaFin)}</td>
                         <td>{h.jornada}</td>
-                        <td>{h.curso}</td>
+                        <td style={{ position: "relative", paddingTop: 22 }}>
+                          <EtiquetaPeriodo periodo={h.periodo} estado={h.periodoEstado} esquina />
+                          {h.curso}
+                        </td>
                         <td>{h.asignatura}</td>
                         <td>{h.docente}</td>
                         <td style={{ color: h.estado === "Suspendido" ? "#b91c1c" : undefined }}>{h.estado}</td>

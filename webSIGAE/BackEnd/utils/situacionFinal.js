@@ -15,12 +15,14 @@ const ESTADOS = { BORRADOR: 'Borrador', REGISTRADO: 'Registrado', APLICADO: 'Apl
 //   destino 'siguiente' -> curso del nivel siguiente, misma sección, período siguiente
 //   destino 'mismo'     -> curso del mismo nivel, misma sección, período siguiente
 //   destino null        -> se queda en su curso (período antiguo) y cambia el estado académico
+//   sinCierre true      -> se puede aplicar todo el año; el resto exige el cierre iniciado
+//                          (punto abierto 2, confirmado por el PO: solo Retirado se aplica sin cierre)
 const EFECTOS = {
-  Promovido: { destino: 'siguiente', estadoAcademico: null },
-  Repitente: { destino: 'mismo', estadoAcademico: null },
-  Egresado: { destino: null, estadoAcademico: 'Egresado' },
-  'En práctica': { destino: null, estadoAcademico: 'En práctica' },
-  Retirado: { destino: null, estadoAcademico: 'Retirado' },
+  Promovido: { destino: 'siguiente', estadoAcademico: null, sinCierre: false },
+  Repitente: { destino: 'mismo', estadoAcademico: null, sinCierre: false },
+  Egresado: { destino: null, estadoAcademico: 'Egresado', sinCierre: false },
+  'En práctica': { destino: null, estadoAcademico: 'En práctica', sinCierre: false },
+  Retirado: { destino: null, estadoAcademico: 'Retirado', sinCierre: true },
 };
 
 const valoresPermitidos = (nivelOrden, ordenMaximo) =>

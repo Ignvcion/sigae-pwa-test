@@ -123,10 +123,10 @@ Cada punto indica:
     Si el curso de destino no existe, el sistema ofrece crearlo (CU100,
     Excepción 2): el administrador confirma y se crea vacío, con el
     profesor jefe heredado (3.3).
-    [INTERPRETACIÓN] La promoción solo puede aplicarse con el cierre
-    iniciado (ver 5.3), porque los cursos de destino son del período
-    siguiente. Excepción: "Retirado" no necesita curso de destino y puede
-    aplicarse en cualquier momento del año.
+    [DECIDIDO, punto abierto 2 confirmado por el PO el 9-nov] La promoción
+    solo puede aplicarse con el cierre iniciado (ver 5.3). Solo "Retirado"
+    se aplica en cualquier momento del año; Promovido, Repitente, Egresado
+    y En práctica esperan el cierre.
 
 4.5 [DECIDIDO] Lo natural es que los del A sigan en el A. Los cambios de
     sección se hacen en el sistema, cambiando el curso del estudiante en

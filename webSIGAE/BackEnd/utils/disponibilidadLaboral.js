@@ -195,7 +195,7 @@ async function validarDisponibilidad(db, { docenteId, periodo, dia, bloqueId, ho
  */
 async function resumenSemanal(db, docenteId, periodo) {
   const [[docente]] = await db.query(
-    'SELECT Docente_Carga_Horaria_Maxima FROM usuario WHERE Usuario_Id = ?',
+    'SELECT Docente_Carga_Horaria_Semanal FROM usuario WHERE Usuario_Id = ?',
     [docenteId]
   );
   const [[disp]] = await db.query(
@@ -213,7 +213,7 @@ async function resumenSemanal(db, docenteId, periodo) {
       WHERE ha.Usuario_Id = ? AND ha.Horario_Asignatura_Estado = 'Activo' AND c.Curso_Periodo_Lectivo = ?`,
     [docenteId, periodo]
   );
-  const carga = docente?.Docente_Carga_Horaria_Maxima ?? null;
+  const carga = docente?.Docente_Carga_Horaria_Semanal ?? null;
   const configurada = Number(disp?.tramos || 0) > 0;
   const horasDisponibles = redondear(disp?.horas);
   const horasAdeudadas = configurada && carga != null ? redondear(Math.max(0, Number(carga) - horasDisponibles)) : 0;

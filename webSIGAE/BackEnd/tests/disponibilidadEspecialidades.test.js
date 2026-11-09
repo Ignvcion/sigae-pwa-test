@@ -4,6 +4,8 @@ const {
   normalizarEspecialidades,
   especialidadesDelCuerpo,
   guardarEspecialidadesDocente,
+  coincideEspecialidad,
+  sugerenciaEspecialidad,
 } = require('../utils/especialidades');
 const {
   normalizarTramos,
@@ -70,6 +72,18 @@ describe('RF04: especialidades del docente como etiquetas', () => {
       'UPDATE usuario SET Docente_Especialidad = ? WHERE Usuario_Id = ?', ['Matemáticas, Química', 7]
     );
     expect(sqls.some((s) => s.includes('DELETE FROM especialidad'))).toBe(true);
+  });
+
+  test('CU56: coincidencia de especialidad sin distinguir tildes ni plural (solo sugerencia)', () => {
+    expect(coincideEspecialidad('Matemáticas', 'Matemática')).toBe(true);
+    expect(coincideEspecialidad('Historia, Lenguaje', 'Lenguaje y Comunicación')).toBe(true);
+    expect(coincideEspecialidad('Ingles', 'Inglés')).toBe(true);
+    expect(coincideEspecialidad('Historia', 'Matemática')).toBe(false);
+    expect(coincideEspecialidad('', 'Matemática')).toBe(false);
+    expect(sugerenciaEspecialidad('Ana', 'Historia', 'Matemática'))
+      .toBe('Sugerencia: la especialidad de Ana (Historia) no coincide con Matemática. Se puede asignar igual.');
+    expect(sugerenciaEspecialidad('Ana', null, 'Matemática')).toContain('no tiene especialidad registrada');
+    expect(sugerenciaEspecialidad('Ana', 'Matemáticas', 'Matemática')).toBeNull();
   });
 
   test('crear un docente sin especialidades responde 400', async () => {
@@ -143,7 +157,7 @@ describe('CU107: disponibilidad laboral semanal del docente (tramos desde–hast
   test('horas adeudadas = carga semanal − horas de los tramos (incluyen recreos y horas sin clases)', async () => {
     const db = {
       query: jest.fn()
-        .mockResolvedValueOnce([[{ Docente_Carga_Horaria_Maxima: 32 }]])
+        .mockResolvedValueOnce([[{ Docente_Carga_Horaria_Semanal: 32 }]])
         .mockResolvedValueOnce([[{ tramos: 4, horas: '12.0000' }]])
         .mockResolvedValueOnce([[{ horas: '1.5' }]]),
     };
@@ -155,7 +169,7 @@ describe('CU107: disponibilidad laboral semanal del docente (tramos desde–hast
   test('sin disponibilidad registrada no hay horas adeudadas', async () => {
     const db = {
       query: jest.fn()
-        .mockResolvedValueOnce([[{ Docente_Carga_Horaria_Maxima: 32 }]])
+        .mockResolvedValueOnce([[{ Docente_Carga_Horaria_Semanal: 32 }]])
         .mockResolvedValueOnce([[{ tramos: 0, horas: 0 }]])
         .mockResolvedValueOnce([[{ horas: 0 }]]),
     };

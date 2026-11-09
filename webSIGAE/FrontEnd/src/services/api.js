@@ -132,7 +132,7 @@ export async function registrarDocente({ nombre, rut, correo, telefono, password
       Usuario_Estado_Cuenta        : estado === 'Activo' ? 1 : 0,
       Es_Docente                   : 1,
       Docente_Especialidades       : especialidades,
-      Docente_Carga_Horaria_Maxima : parseInt(cargaHoraria, 10), // carga horaria semanal
+      Docente_Carga_Horaria_Semanal : parseInt(cargaHoraria, 10), // carga horaria semanal
       Docente_Disponibilidad       : { tramos: disponibilidad || [] }, // CU107: tramos desde–hasta por día
       Docente_Correo_Institucional : correo,
       ...columnasDireccionUsuario({ calle, numero, depto, comuna }),
@@ -545,6 +545,40 @@ export async function getHistorialCitaciones(estudianteId) {
   return handleResponse(res);
 }
 // ── MENSAJES (CU73) ──────────────────────────
+
+// RF54 / CU85: recepción general de mensajes de apoderados (docente)
+export async function getRecepcionMensajes() {
+  const res = await fetch(`${BASE_URL}/mensajes/recepcion`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+export async function actualizarRecepcionMensajes(habilitada) {
+  const res = await fetch(`${BASE_URL}/mensajes/recepcion`, {
+    method : 'PUT',
+    headers: authHeaders(),
+    body   : JSON.stringify({ habilitada }),
+  });
+  return handleResponse(res);
+}
+
+// RF54 / CU86: habilitar respuestas en una conversación hasta "YYYY-MM-DDTHH:MM" (null cierra)
+export async function habilitarRespuestasConversacion(conversacionId, hasta) {
+  const res = await fetch(`${BASE_URL}/mensajes/conversaciones/${conversacionId}/habilitacion`, {
+    method : 'PUT',
+    headers: authHeaders(),
+    body   : JSON.stringify({ hasta }),
+  });
+  return handleResponse(res);
+}
+
+// RF54 / CU86: desde una citación, hasta el término de la reunión
+export async function habilitarRespuestasCitacion(citacionId) {
+  const res = await fetch(`${BASE_URL}/citaciones/${citacionId}/habilitar-respuestas`, {
+    method : 'POST',
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
 
 // Conversaciones del usuario según su rol activo (Docente | Apoderado)
 export async function getConversaciones(rol) {

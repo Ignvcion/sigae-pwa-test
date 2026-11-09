@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getHorarioMaestro } from "../../services/api";
 import ExportMenu from "../../components/ExportMenu";
 import { COLORES_ASIGNATURA, COLOR_PENDIENTE, DIAS_SEMANA, aMinutos, hhmm } from "../../utils/horarios";
+import EtiquetaPeriodo, { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
@@ -51,14 +52,17 @@ function HorarioMaestro() {
     const docentesMap = new Map();
     const asigMap = new Map();
     horario.forEach((h) => {
-      cursosMap.set(h.Curso_Id, h.curso);
+      cursosMap.set(h.Curso_Id, { nombre: h.curso, periodo: h.periodo, estado: h.periodo_estado });
       if (h.Usuario_Id) docentesMap.set(h.Usuario_Id, h.docente);
       asigMap.set(h.Asignatura_Id, h.asignatura);
     });
     const porNombre = (a, b) => a[1].localeCompare(b[1], "es");
     const asigOrdenadas = [...asigMap.entries()].sort(porNombre);
     return {
-      cursos: [...cursosMap.entries()].sort(porNombre).map(([id, nombre]) => ({ id, nombre })),
+      // Vigentes primero y luego los del período siguiente (RF44: identificados)
+      cursos: [...cursosMap.entries()]
+        .map(([id, c]) => ({ id, ...c }))
+        .sort((a, b) => String(a.periodo).localeCompare(String(b.periodo)) || a.nombre.localeCompare(b.nombre, "es")),
       docentes: [...docentesMap.entries()].sort(porNombre).map(([id, nombre]) => ({ id, nombre })),
       asignaturas: asigOrdenadas.map(([id, nombre]) => ({ id, nombre })),
       colorAsig: Object.fromEntries(
@@ -124,7 +128,7 @@ function HorarioMaestro() {
             <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
               <select value={filtroCurso} onChange={(e) => setFiltroCurso(e.target.value)} style={s.select}>
                 <option value="">Todos los cursos</option>
-                {cursos.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                {cursos.map((c) => <option key={c.id} value={c.id}>{c.nombre}{textoPeriodo(c.periodo, c.estado)}</option>)}
               </select>
               <select value={filtroDocente} onChange={(e) => setFiltroDocente(e.target.value)} style={s.select}>
                 <option value="">Todos los docentes</option>
@@ -159,9 +163,16 @@ function HorarioMaestro() {
               <thead>
                 <tr>
                   <th style={{ ...s.th, ...s.thBloque, ...(vista === "semana" ? { width: 120 } : {}) }}>Bloque</th>
-                  {(vista === "dia" ? columnasCurso.map((c) => c.nombre) : DIAS_SEMANA).map((col) => (
-                    <th key={col} style={vista === "semana" ? { ...s.th, minWidth: 0 } : s.th}>{col}</th>
-                  ))}
+                  {vista === "dia"
+                    ? columnasCurso.map((c) => (
+                        <th key={c.id} style={{ ...s.th, position: "relative", paddingTop: 24 }}>
+                          <EtiquetaPeriodo periodo={c.periodo} estado={c.estado} esquina />
+                          {c.nombre}
+                        </th>
+                      ))
+                    : DIAS_SEMANA.map((col) => (
+                        <th key={col} style={{ ...s.th, minWidth: 0 }}>{col}</th>
+                      ))}
                 </tr>
               </thead>
               <tbody>
@@ -253,8 +264,9 @@ function HorarioMaestro() {
 function TarjetaClase({ clase, color }) {
   return (
     <div
-      title={`${clase.curso} · ${clase.asignatura} · ${clase.docente || "Sin docente"} (${clase.dia} ${hhmm(clase.hora_inicio)}–${hhmm(clase.hora_fin)})`}
+      title={`${clase.curso} (${clase.periodo}) · ${clase.asignatura} · ${clase.docente || "Sin docente"} (${clase.dia} ${hhmm(clase.hora_inicio)}–${hhmm(clase.hora_fin)})`}
       style={{
+        position: "relative",
         background: color.bg,
         border: `1px solid ${color.border}`,
         borderLeft: `3px solid ${color.text}`,
@@ -264,7 +276,8 @@ function TarjetaClase({ clase, color }) {
         boxSizing: "border-box",
       }}
     >
-      <div style={{ fontSize: "0.74rem", fontWeight: 700, color: color.text, lineHeight: 1.25 }}>{clase.asignatura}</div>
+      <EtiquetaPeriodo periodo={clase.periodo} estado={clase.periodo_estado} esquina compacta />
+      <div style={{ fontSize: "0.74rem", fontWeight: 700, color: color.text, lineHeight: 1.25, paddingRight: 54 }}>{clase.asignatura}</div>
       <div style={{ fontSize: "0.66rem", color: clase.docente ? "#475569" : "#b91c1c", marginTop: 2, lineHeight: 1.2 }}>
         {clase.docente || "Sin docente"}
       </div>
@@ -275,18 +288,20 @@ function TarjetaClase({ clase, color }) {
 function ChipClase({ clase, color }) {
   return (
     <div
-      title={`${clase.curso} · ${clase.asignatura} · ${clase.docente || "Sin docente"}`}
+      title={`${clase.curso} (${clase.periodo}) · ${clase.asignatura} · ${clase.docente || "Sin docente"}`}
       style={{
+        position: "relative",
         background: color.bg,
         borderLeft: `3px solid ${color.text}`,
         borderRadius: 4,
-        padding: "2px 6px",
+        padding: "2px 56px 2px 6px",
         fontSize: "0.68rem",
         lineHeight: 1.3,
         color: color.text,
         overflowWrap: "anywhere",
       }}
     >
+      <EtiquetaPeriodo periodo={clase.periodo} estado={clase.periodo_estado} esquina compacta />
       <strong>{clase.curso}</strong> · {clase.asignatura}
     </div>
   );

@@ -9,6 +9,7 @@ const {
   cancelarCitacion,
   reprogramarCitacion,
   getHistorialCitaciones,
+  habilitarRespuestasCitacion,
 } = require('../controllers/citacionController');
 const {
   getEstudiantesSolicitud,
@@ -46,6 +47,8 @@ router.post('/', crearCitacion);
 router.patch('/:id/confirmar', confirmarCitacion);
 // CU76: cancelar citación con motivo obligatorio
 router.patch('/:id/cancelar', cancelarCitacion);
+// RF54 / CU86: el docente habilita las respuestas del apoderado hasta el término de la reunión
+router.post('/:id/habilitar-respuestas', habilitarRespuestasCitacion);
 // CU77: reprogramar fecha y/o tramo
 router.patch('/:id/reprogramar', reprogramarCitacion);
 

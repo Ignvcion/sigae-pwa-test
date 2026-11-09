@@ -75,8 +75,8 @@ function CamposDocente({ datos, errores, onChange }) {
         <label>Carga horaria semanal (hrs)</label>
         <input
           type="number"
-          name="Docente_Carga_Horaria_Maxima"
-          value={datos.Docente_Carga_Horaria_Maxima || ""}
+          name="Docente_Carga_Horaria_Semanal"
+          value={datos.Docente_Carga_Horaria_Semanal || ""}
           onChange={onChange}
           min="1"
           max="44"
@@ -358,7 +358,7 @@ function GestionRoles() {
       setDatosRol({
         Docente_Correo_Institucional: seleccionado.Docente_Correo_Institucional || "",
         Docente_Especialidades:       separarEtiquetas(seleccionado.Docente_Especialidad),
-        Docente_Carga_Horaria_Maxima: seleccionado.Docente_Carga_Horaria_Maxima || "",
+        Docente_Carga_Horaria_Semanal: seleccionado.Docente_Carga_Horaria_Semanal || "",
       });
     } else if (nuevoRol === "Administrador") {
       setDatosRol({

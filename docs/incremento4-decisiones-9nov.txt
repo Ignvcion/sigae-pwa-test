@@ -1,0 +1,124 @@
+SIGAE - Incremento 4
+Decisiones y ajustes del 9 de noviembre (contraste con "SIGAE Incremento 4. Ajustes a
+Documento 0 y nuevos RF y CU", 6-nov)
+
+======================================================================
+1. RF54 / CU85, CU86: RECEPCIÓN DE MENSAJES DE APODERADOS (implementado)
+======================================================================
+
+1.1 CU85: en Mensajes, el docente ve el estado de su recepción general
+    (usuario.Docente_Recepcion_Mensajes) y lo cambia con confirmación.
+    Deshabilitada, sus apoderados pueden leer los mensajes pero no responder.
+    Excepción 1: si falla al guardar, se informa y se mantiene el estado.
+    Excepción 2: si un apoderado intenta enviar, el servidor responde 403
+    ("El docente no está recibiendo mensajes...") y la pantalla del
+    apoderado reemplaza el campo de respuesta por ese aviso.
+
+1.2 CU86: con la recepción general deshabilitada, el docente habilita que
+    un apoderado responda en una conversación hasta una fecha y hora
+    (conversacion.Conversacion_Habilitada_Hasta), desde la conversación o
+    desde el detalle de una citación ("Habilitar respuestas hasta la
+    reunión": hasta el término del tramo de la citación).
+    - Excepción 1: un término anterior a la fecha y hora actual se rechaza
+      (máximo un año).
+    - Al vencer el período, la recepción se cierra sola (se compara con
+      la hora del servidor de base de datos).
+    - Excepción 2: si la citación se cancela, el período se cierra. Nueva
+      columna conversacion.Conversacion_Habilitada_Citacion_Id. Si la
+      citación se reprograma, el término se mueve al nuevo tramo.
+
+1.3 El docente siempre puede escribir. Un apoderado no puede abrir una
+    conversación nueva con un docente que no recibe mensajes; si ya existe
+    una, la abre para leer. En "+ Nueva", el apoderado ve "No está
+    recibiendo mensajes" junto al docente.
+
+1.4 API: GET/PUT /api/mensajes/recepcion,
+    PUT /api/mensajes/conversaciones/:id/habilitacion { hasta | null },
+    POST /api/citaciones/:id/habilitar-respuestas.
+    Reglas en BackEnd/utils/recepcionMensajes.js.
+
+======================================================================
+2. AJUSTES PEDIDOS AL CONTRASTAR CON EL DOCUMENTO
+======================================================================
+
+2.1 Carga horaria semanal (RF04, glosario): la columna
+    usuario.Docente_Carga_Horaria_Maxima se renombró a
+    Docente_Carga_Horaria_Semanal y todos los textos dicen "Carga horaria
+    semanal". Exceder la carga sigue bloqueando la asignación.
+
+2.2 RF35 / CU56, especialidad: DECIDIDO que es una SUGERENCIA, no un
+    bloqueo. El servidor calcula si alguna especialidad (etiqueta) del
+    docente coincide con la asignatura (sin mayúsculas ni tildes, y
+    aceptando que una contenga a la otra). El creador de horarios ordena y
+    marca a los "Sugeridos"; al guardar una clase o validar una edición
+    masiva (CU63, CU64) se informa la sugerencia y se puede seguir.
+    Texto propuesto para CU56: "El sistema valida el choque de horario
+    dentro del mismo período, la carga horaria semanal y la disponibilidad
+    laboral del docente; si alguna no se cumple, bloquea la asignación. La
+    especialidad se muestra como sugerencia: si no coincide con la
+    asignatura, el sistema lo informa y permite continuar."
+
+2.3 CU35, CU37, CU38: el filtro por estado de registro académico ofrece
+    siempre Regular, Irregular, En práctica, Egresado y Retirado (antes solo
+    mostraba los estados presentes en los datos), y la edición de la ficha
+    permite En práctica.
+
+2.4 RF36, RF38, RF43, RF44: en Gestión de horarios, Consulta de horarios y
+    Horario maestro cada curso lleva una etiqueta en una esquina:
+    "Vigente 2026" o "Futuro 2027" (período siguiente durante el cierre);
+    en los selectores, el texto " · Vigente 2026". La consulta y el horario
+    maestro ya no incluyen cursos de períodos archivados.
+
+2.5 Punto abierto 2: CONFIRMADO por el PO que solo Retirado se aplica sin el
+    cierre iniciado. Promovido, Repitente, Egresado y En práctica esperan el
+    cierre (CU100, CU101). Corregido en el código.
+
+2.6 Punto abierto 13: CONFIRMADO. Un administrador (o super administrador)
+    no puede ser además docente ni apoderado; el código ya lo impedía y se
+    mantiene. Documento 0 debe quitar el supuesto contrario de RF17 y CU103
+    ("se quita el rol de apoderado a usuarios que también son docentes o
+    administradores" → "...que también son docentes").
+
+2.7 Autenticación (sección 1.3, punto 3): el sistema autentica con RUT y
+    contraseña. Documento 0 debe unificar UR 1.9 y el glosario de
+    autenticación con RF09: "El usuario se autentica con su RUT y su
+    contraseña". El correo se usa solo para recuperar la contraseña.
+
+======================================================================
+3. ESTADO DEL CIERRE (punto 1 de cambios de esquema): PROPUESTA
+======================================================================
+
+Hoy el cierre se deduce de que parametro_institucional.Periodo_Siguiente
+tenga valor: "Iniciar cierre" lo llena y "Iniciar nuevo período" lo vacía.
+Funciona y no puede quedar inconsistente, pero el documento pide un "estado
+del cierre" explícito en los parámetros institucionales.
+
+Propuesta: agregar una columna GENERADA (calculada por la base, no editable):
+
+    ALTER TABLE parametro_institucional
+      ADD COLUMN Parametro_Institucional_Estado_Cierre varchar(20)
+        AS (IF(Parametro_Institucional_Periodo_Siguiente IS NULL,
+               'Sin cierre', 'Cierre iniciado')) VIRTUAL;
+
+- Cumple el punto 1 al pie de la letra y queda visible en la tabla y en los
+  respaldos, sin una segunda fuente de verdad que pueda desincronizarse.
+- No cambia el código: la API ya expone cierreIniciado.
+- Alternativa descartada: una columna normal, que habría que mantener a
+  mano y podría quedar en "Cierre iniciado" sin período siguiente.
+Pendiente de aprobación: no está aplicada.
+
+======================================================================
+4. ESQUEMA (SIGAE.sql y schema_base.sql regenerado)
+======================================================================
+
+Si la base de la RDS ya está cargada, aplicar además de los ALTER de
+docs/disponibilidad-y-especialidades-docente.txt (MariaDB):
+
+    -- (El renombre de la carga horaria, RF04, ya está en ese archivo.)
+
+    -- RF54 / CU86 Excepción 2
+    ALTER TABLE conversacion
+      ADD COLUMN Conversacion_Habilitada_Citacion_Id int unsigned DEFAULT NULL,
+      ADD KEY fk_Conversacion_Habilitada_Citacion_idx (Conversacion_Habilitada_Citacion_Id),
+      ADD CONSTRAINT fk_Conversacion_Habilitada_Citacion FOREIGN KEY (Conversacion_Habilitada_Citacion_Id)
+        REFERENCES citacion (Citacion_Id) ON DELETE SET NULL ON UPDATE CASCADE;

@@ -34,7 +34,7 @@ function MiDisponibilidadLaboral({ usuarioId }) {
           tramos={disp.tramos}
           clases={disp.clases}
           atencion={disp.atencion}
-          cargaSemanal={disp.docente?.Docente_Carga_Horaria_Maxima}
+          cargaSemanal={disp.docente?.Docente_Carga_Horaria_Semanal}
           periodo={disp.periodo}
           periodos={disp.periodos}
           onCambiarPeriodo={(p) => { setDisp(null); setError(""); setPeriodoPedido(p); }}

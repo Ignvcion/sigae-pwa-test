@@ -41,6 +41,16 @@ const enPeriodoVigente = (alias = 'ha') =>
 /** Condición sobre la tabla curso `alias`: no es de un período antiguo. Sin parámetros. */
 const cursoNoArchivado = (alias = 'c') => `${alias}.Curso_Periodo_Lectivo >= ${PERIODO_VIGENTE_SQL}`;
 
+/**
+ * 'Vigente', 'Futuro' (período siguiente, durante el cierre) o 'Anterior', para
+ * identificar el período de cada curso en las vistas de gestión (RF36, RF38, RF43, RF44).
+ */
+const estadoPeriodoCursoSQL = (alias = 'c') => `CASE
+    WHEN ${alias}.Curso_Periodo_Lectivo = ${PERIODO_VIGENTE_SQL} THEN 'Vigente'
+    WHEN ${alias}.Curso_Periodo_Lectivo > ${PERIODO_VIGENTE_SQL} THEN 'Futuro'
+    ELSE 'Anterior'
+  END`;
+
 const anioActual = () => String(new Date().getFullYear());
 
 /** "2026" -> "2027". */
@@ -72,6 +82,7 @@ module.exports = {
   mismoPeriodoQueCurso,
   enPeriodoVigente,
   cursoNoArchivado,
+  estadoPeriodoCursoSQL,
   periodoSiguienteDe,
   obtenerPeriodos,
   anioActual,

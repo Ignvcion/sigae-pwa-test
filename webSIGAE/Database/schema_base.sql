@@ -148,6 +148,10 @@ CREATE TABLE `citacion` (
 
 --
 -- Table structure for table `conversacion`
+-- Incremento 4, RF54 (CU85, CU86): usuario.Docente_Recepcion_Mensajes es la recepción general
+-- del docente; Conversacion_Habilitada_Hasta abre las respuestas del apoderado en esta conversación
+-- hasta esa fecha y hora, y Conversacion_Habilitada_Citacion_Id la citación desde la que se
+-- habilitó (si se cancela, el período se cierra).
 --
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -159,9 +163,12 @@ CREATE TABLE `conversacion` (
   `Docente_Usuario_Id` int unsigned NOT NULL,
   `Apoderado_Usuario_Id` int unsigned NOT NULL,
   `Conversacion_Habilitada_Hasta` datetime DEFAULT NULL,
+  `Conversacion_Habilitada_Citacion_Id` int unsigned DEFAULT NULL,
   PRIMARY KEY (`Conversacion_Id`),
   KEY `fk Conversacion_Usuario_idx` (`Docente_Usuario_Id`),
   KEY `fk Conversacion_Apoderado_idx` (`Apoderado_Usuario_Id`),
+  KEY `fk_Conversacion_Habilitada_Citacion_idx` (`Conversacion_Habilitada_Citacion_Id`),
+  CONSTRAINT `fk_Conversacion_Habilitada_Citacion` FOREIGN KEY (`Conversacion_Habilitada_Citacion_Id`) REFERENCES `citacion` (`Citacion_Id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_Conversacion_Apoderado` FOREIGN KEY (`Apoderado_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_Conversacion_Docente` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -706,7 +713,7 @@ CREATE TABLE `usuario` (
   `Usuario_Contraseña` varchar(200) NOT NULL,
   `Usuario_Foto_Perfil` varchar(255) DEFAULT NULL,
   `Es_Docente` tinyint(1) NOT NULL,
-  `Docente_Carga_Horaria_Maxima` int DEFAULT NULL,
+  `Docente_Carga_Horaria_Semanal` int DEFAULT NULL,
   `Docente_Especialidad` varchar(255) DEFAULT NULL,
   `Docente_Correo_Institucional` varchar(100) DEFAULT NULL,
   `Es_Administrador` tinyint(1) NOT NULL,

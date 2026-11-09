@@ -97,6 +97,35 @@ async function guardarEspecialidadesDocente(conn, usuarioId, nombres) {
   return resumen;
 }
 
+/** Etiquetas del resumen guardado en el docente: "A, B" → ["A", "B"]. */
+const etiquetasDe = (resumen) => String(resumen ?? '').split(',').map(limpiar).filter(Boolean);
+
+/**
+ * RF35 / CU56: ¿alguna especialidad del docente corresponde a la asignatura? Compara sin
+ * mayúsculas ni tildes y acepta que una contenga a la otra ("Matemáticas" ~ "Matemática",
+ * "Lenguaje" ~ "Lenguaje y Comunicación").
+ */
+function coincideEspecialidad(resumen, asignatura) {
+  const a = clave(asignatura);
+  if (!a) return false;
+  return etiquetasDe(resumen).some((e) => {
+    const k = clave(e);
+    return k.length > 0 && (a.includes(k) || k.includes(a));
+  });
+}
+
+/**
+ * La especialidad es solo una SUGERENCIA al asignar (no bloquea). Devuelve el texto a
+ * mostrar cuando no coincide, o null si coincide.
+ */
+function sugerenciaEspecialidad(nombreDocente, resumen, asignatura) {
+  if (!asignatura || coincideEspecialidad(resumen, asignatura)) return null;
+  const nombre = nombreDocente || 'El docente';
+  return etiquetasDe(resumen).length === 0
+    ? `Sugerencia: ${nombre} no tiene especialidad registrada para ${asignatura}. Se puede asignar igual.`
+    : `Sugerencia: la especialidad de ${nombre} (${etiquetasDe(resumen).join(', ')}) no coincide con ${asignatura}. Se puede asignar igual.`;
+}
+
 async function eliminarEspecialidadesSinDocentes(conn) {
   await conn.query(
     `DELETE FROM especialidad
@@ -112,4 +141,6 @@ module.exports = {
   especialidadesDelCuerpo,
   guardarEspecialidadesDocente,
   eliminarEspecialidadesSinDocentes,
+  coincideEspecialidad,
+  sugerenciaEspecialidad,
 };

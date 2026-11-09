@@ -62,7 +62,7 @@ describe('Pruebas Unitarias - CU63: Reasignando docente en múltiples bloques', 
       .mockResolvedValueOnce([[SELECCIONADO, SELECCIONADO_2]]) // bloques seleccionados
       .mockResolvedValueOnce([[DOCENTE_NUEVO]])                // nuevo docente activo
       .mockResolvedValueOnce([[]])                              // resto de la programación
-      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Maxima: 30 }]]); // carga
+      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Semanal: 30 }]]); // carga
     const req = { body: { horario_ids: [1, 2], Usuario_Id: 8 } };
     const res = mockRes();
 
@@ -130,7 +130,7 @@ describe('Pruebas Unitarias - CU63: Reasignando docente en múltiples bloques', 
         Horario_Asignatura_Id: 50, dia: 'Lunes', estado: 'Activo', Curso_Id: 11, curso: '2° Básico A',
         Bloque_Horario_Id: 5, Asignatura_Id: 4, Usuario_Id: 8, duracion: '0.75',
       }]])
-      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Maxima: null }]]);
+      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Semanal: null }]]);
     const req = { body: { horario_ids: [1], Usuario_Id: 8 } };
     const res = mockRes();
 
@@ -148,7 +148,7 @@ describe('Pruebas Unitarias - CU63: Reasignando docente en múltiples bloques', 
       .mockResolvedValueOnce([[SELECCIONADO, otroCursoMismoBloque]])
       .mockResolvedValueOnce([[DOCENTE_NUEVO]])
       .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Maxima: null }]]);
+      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Semanal: null }]]);
     const req = { body: { horario_ids: [1, 3], Usuario_Id: 8 } };
     const res = mockRes();
 
@@ -166,7 +166,7 @@ describe('Pruebas Unitarias - CU63: Reasignando docente en múltiples bloques', 
         Horario_Asignatura_Id: 60, dia: 'Viernes', estado: 'Activo', Curso_Id: 11, curso: '2° Básico A',
         Bloque_Horario_Id: 9, Asignatura_Id: 4, Usuario_Id: 8, duracion: '1.0',
       }]])
-      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Maxima: 2 }]]);
+      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Semanal: 2 }]]);
     const req = { body: { horario_ids: [1, 2], Usuario_Id: 8 } };
     const res = mockRes();
 
@@ -176,13 +176,32 @@ describe('Pruebas Unitarias - CU63: Reasignando docente en múltiples bloques', 
     expect(res.json.mock.calls[0][0].conflictos[0]).toContain('carga horaria semanal');
   });
 
+  test('CU56: la especialidad que no coincide es una sugerencia y no bloquea la validación', async () => {
+    pool.query
+      .mockResolvedValueOnce([[SELECCIONADO]])
+      .mockResolvedValueOnce([[DOCENTE_NUEVO]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Semanal: null, Docente_Especialidad: 'Historia, Geografía' }]]);
+    const req = { body: { horario_ids: [1], Usuario_Id: 8 } };
+    const res = mockRes();
+
+    await horarioController.validarReasignacion(req, res);
+
+    expect(res.status).not.toHaveBeenCalled();
+    const respuesta = res.json.mock.calls[0][0];
+    expect(respuesta.mensaje).toBe('Sin conflictos');
+    expect(respuesta.sugerencias).toEqual([
+      'Sugerencia: la especialidad de Ana Docente (Historia, Geografía) no coincide con Matemáticas. Se puede asignar igual.',
+    ]);
+  });
+
   test('Flujo correcto: confirma y actualiza los bloques con el nuevo docente', async () => {
     const conn = mockConn();
     conn.query
       .mockResolvedValueOnce([[SELECCIONADO, SELECCIONADO_2]])
       .mockResolvedValueOnce([[DOCENTE_NUEVO]])
       .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Maxima: null }]])
+      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Semanal: null }]])
       .mockResolvedValueOnce([{ affectedRows: 2 }]); // UPDATE
     const req = { body: { horario_ids: [1, 2], Usuario_Id: 8 } };
     const res = mockRes();
@@ -212,7 +231,7 @@ describe('Pruebas Unitarias - CU63: Reasignando docente en múltiples bloques', 
         Horario_Asignatura_Id: 50, dia: 'Lunes', estado: 'Activo', Curso_Id: 11, curso: '2° Básico A',
         Bloque_Horario_Id: 5, Asignatura_Id: 4, Usuario_Id: 8, duracion: '0.75',
       }]])
-      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Maxima: null }]]);
+      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Semanal: null }]]);
     const req = { body: { horario_ids: [1], Usuario_Id: 8 } };
     const res = mockRes();
 
@@ -332,7 +351,7 @@ describe('Pruebas Unitarias - CU64: Modificando múltiples bloques horarios', ()
       }]])
       .mockResolvedValueOnce([[]]) // resto de la programación
       .mockResolvedValueOnce([[{ Horas_Semanales_Requeridas: 6 }]]) // plan
-      .mockResolvedValueOnce([[{ Usuario_Id: 7, Usuario_Nombre_Completo: 'Carlos Docente', Docente_Carga_Horaria_Maxima: null }]]);
+      .mockResolvedValueOnce([[{ Usuario_Id: 7, Usuario_Nombre_Completo: 'Carlos Docente', Docente_Carga_Horaria_Semanal: null }]]);
     const req = { body: { horario_ids: [1], cambios: { Bloque_Horario_Id: 6 } } };
     const res = mockRes();
 
@@ -347,7 +366,8 @@ describe('Pruebas Unitarias - CU64: Modificando múltiples bloques horarios', ()
       .mockResolvedValueOnce([[SELECCIONADO]])
       .mockResolvedValueOnce([[{ Asignatura_Id: 4, Asignatura_Nombre: 'Historia' }]])
       .mockResolvedValueOnce([[]]) // resto de la programación
-      .mockResolvedValueOnce([[]]); // sin tieneasig/plan
+      .mockResolvedValueOnce([[]]) // sin tieneasig/plan
+      .mockResolvedValueOnce([[{ Usuario_Id: 7, Usuario_Nombre_Completo: 'Carlos Docente', Docente_Especialidad: 'Historia' }]]);
     const req = { body: { horario_ids: [1], cambios: { Asignatura_Id: 4 } } };
     const res = mockRes();
 
@@ -364,7 +384,7 @@ describe('Pruebas Unitarias - CU64: Modificando múltiples bloques horarios', ()
       .mockResolvedValueOnce([[DOCENTE_NUEVO]])            // docente nuevo
       .mockResolvedValueOnce([[]])                         // resto de la programación
       .mockResolvedValueOnce([[{ Parametro_Institucional_Bloques_Maximos_Diarios: 8 }]])
-      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Maxima: null }]])
+      .mockResolvedValueOnce([[{ ...DOCENTE_NUEVO, Docente_Carga_Horaria_Semanal: null }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);       // UPDATE
     const req = {
       body: { horario_ids: [1], cambios: { Horario_Asignatura_Dia_Semana: 'Jueves', Usuario_Id: 8 } },

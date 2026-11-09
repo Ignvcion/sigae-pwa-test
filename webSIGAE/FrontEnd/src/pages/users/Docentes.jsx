@@ -274,9 +274,9 @@ function Docentes() {
                       <td>{renderDato(d.Docente_Correo_Institucional, "Sin correo institucional registrado")}</td>
                       <td>{renderDato(d.Usuario_Telefono, "Sin teléfono registrado")}</td>
                       <td>
-                        {d.Docente_Carga_Horaria_Maxima == null || d.Docente_Carga_Horaria_Maxima === ""
+                        {d.Docente_Carga_Horaria_Semanal == null || d.Docente_Carga_Horaria_Semanal === ""
                           ? renderDato(null, "Sin carga horaria registrada")
-                          : `${d.Docente_Carga_Horaria_Maxima} h`}
+                          : `${d.Docente_Carga_Horaria_Semanal} h`}
                       </td>
                       <td>
                         {d.Usuario_Estado_Cuenta ? (

@@ -22,7 +22,9 @@ const CAMPOS_DIRECCION_FICHA = [
   { clave: "comuna", label: "Comuna",                 maxLength: 60 },
 ];
 
-const ESTADOS_ACADEMICOS = ["Regular", "Irregular", "Retirado", "Egresado"];
+// CU35, CU37 y CU38: estados de registro académico. Egresado, En práctica y Retirado
+// resultan de aplicar la situación final (RF61); CU38 permite pasar de En práctica a Egresado.
+const ESTADOS_ACADEMICOS = ["Regular", "Irregular", "En práctica", "Egresado", "Retirado"];
 
 function Estudiantes() {
   const { usuario } = useAuth();
@@ -78,7 +80,9 @@ function Estudiantes() {
         // para que no se reduzcan a medida que se aplican filtros posteriores.
         if (esInicial) {
           setCursosDisponibles([...new Set(data.map((e) => e.Curso_Nombre).filter(Boolean))].sort());
-          setEstadosDisponibles([...new Set(data.map((e) => e.Estudiante_Estado_Academico).filter(Boolean))].sort());
+          // El filtro ofrece siempre todos los estados (CU35, CU37) y además cualquier otro presente
+          const presentes = data.map((e) => e.Estudiante_Estado_Academico).filter(Boolean);
+          setEstadosDisponibles([...new Set([...ESTADOS_ACADEMICOS, ...presentes])]);
         }
       } else {
         // Excepciones: sin estudiantes registrados / sin coincidencias / docente sin cursos asignados

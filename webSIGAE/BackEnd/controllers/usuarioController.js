@@ -230,7 +230,7 @@ const createUsuario = async (req, res) => {
     Usuario_Contraseña,
     // Docente
     Es_Docente,
-    Docente_Carga_Horaria_Maxima,
+    Docente_Carga_Horaria_Semanal,
     Docente_Correo_Institucional,
     // Administrador
     Es_Administrador,
@@ -363,7 +363,7 @@ const createUsuario = async (req, res) => {
         `INSERT INTO usuario (
           Usuario_RUT, Usuario_Telefono, Usuario_Nombre_Completo,
           Usuario_Estado_Cuenta, Usuario_Contraseña, Usuario_Foto_Perfil,
-          Es_Docente, Docente_Carga_Horaria_Maxima, Docente_Especialidad, Docente_Correo_Institucional,
+          Es_Docente, Docente_Carga_Horaria_Semanal, Docente_Especialidad, Docente_Correo_Institucional,
           Es_Administrador, Administrador_Tipo, Administrador_Correo_Institucional,
           Es_Apoderado, Usuario_Direccion_Calle, Usuario_Direccion_Numero,
           Usuario_Direccion_Depto, Usuario_Direccion_Comuna, Apoderado_Correo_Natural
@@ -376,7 +376,7 @@ const createUsuario = async (req, res) => {
           hash,
           null, // Glosario 6.1.2: la cuenta se crea sin fotografía; se carga luego desde el perfil
           Es_Docente      ? 1 : 0,
-          Docente_Carga_Horaria_Maxima    || null,
+          Docente_Carga_Horaria_Semanal    || null,
           especialidades ? especialidades.join(', ') : null,
           Docente_Correo_Institucional    || null,
           Es_Administrador ? 1 : 0,
@@ -443,7 +443,7 @@ const updateUsuario = async (req, res) => {
       'Usuario_Nombre_Completo',
       'Usuario_Foto_Perfil',
       'Usuario_Estado_Cuenta',
-      'Docente_Carga_Horaria_Maxima',
+      'Docente_Carga_Horaria_Semanal',
       'Docente_Correo_Institucional',
       'Administrador_Correo_Institucional',
       ...Object.values(CAMPOS_DIRECCION),
@@ -731,7 +731,7 @@ const asignarRol = async (req, res) => {
     const especialidadesRol = normalizarEspecialidades(
       especialidadesDelCuerpo(datosFila) ?? usuario.Docente_Especialidad
     );
-    const carga          = datosFila.Docente_Carga_Horaria_Maxima  || usuario.Docente_Carga_Horaria_Maxima;
+    const carga          = datosFila.Docente_Carga_Horaria_Semanal  || usuario.Docente_Carga_Horaria_Semanal;
     const correoAdmin    = datosFila.Administrador_Correo_Institucional || usuario.Administrador_Correo_Institucional;
     const tipoAdmin      = datosFila.Administrador_Tipo            || usuario.Administrador_Tipo || 'Administrador Normal';
     const correoApo      = datosFila.Apoderado_Correo_Natural      || usuario.Apoderado_Correo_Natural;
@@ -793,7 +793,7 @@ const asignarRol = async (req, res) => {
     if (rol === 'Docente') {
       setCampos.push('Es_Docente = 1',
         'Docente_Correo_Institucional = ?',
-        'Docente_Carga_Horaria_Maxima = ?'
+        'Docente_Carga_Horaria_Semanal = ?'
       );
       setValores.push(correoDocente, carga);
     }
@@ -919,7 +919,7 @@ const getDocentes = async (req, res) => {
         Usuario_Telefono,
         Docente_Correo_Institucional,
         Docente_Especialidad,
-        Docente_Carga_Horaria_Maxima,
+        Docente_Carga_Horaria_Semanal,
         Usuario_Estado_Cuenta,
         Es_Docente,
         Es_Apoderado,

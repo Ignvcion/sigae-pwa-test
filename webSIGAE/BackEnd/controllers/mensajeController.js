@@ -2,6 +2,12 @@
 const pool = require('../config/db');
 const { claseVigente } = require('../utils/clasesEliminadas');
 const { enPeriodoVigente } = require('../utils/periodos');
+const {
+  MENSAJE_SIN_RECEPCION,
+  habilitadaHastaSQL,
+  apoderadoPuedeResponderSQL,
+  camposRecepcion,
+} = require('../utils/recepcionMensajes');
 
 const ROLES_MENSAJERIA = ['Docente', 'Apoderado'];
 
@@ -47,15 +53,20 @@ async function buscarConversacionDelUsuario(conversacionId, user) {
   const [conversaciones] = await pool.query(
     `
     SELECT
-      Conversacion_Id,
-      Docente_Usuario_Id,
-      Apoderado_Usuario_Id,
-      Conversacion_Estado
-    FROM conversacion
-    WHERE Conversacion_Id = ?
+      c.Conversacion_Id,
+      c.Docente_Usuario_Id,
+      c.Apoderado_Usuario_Id,
+      c.Conversacion_Estado,
+      docente.Docente_Recepcion_Mensajes AS Recepcion_General,
+      ${habilitadaHastaSQL('c')} AS Habilitada_Hasta,
+      c.Conversacion_Habilitada_Citacion_Id AS Habilitada_Citacion_Id,
+      ${apoderadoPuedeResponderSQL('c', 'docente')} AS Apoderado_Puede_Responder
+    FROM conversacion c
+    INNER JOIN usuario docente ON docente.Usuario_Id = c.Docente_Usuario_Id
+    WHERE c.Conversacion_Id = ?
       AND (
-        Docente_Usuario_Id = ?
-        OR Apoderado_Usuario_Id = ?
+        c.Docente_Usuario_Id = ?
+        OR c.Apoderado_Usuario_Id = ?
       )
     LIMIT 1
     `,
@@ -67,8 +78,9 @@ async function buscarConversacionDelUsuario(conversacionId, user) {
   }
 
   const rol = rolEnConversacion(conversaciones[0], user);
+  const { Habilitada_Citacion_Id: _cit, ...fila } = conversaciones[0];
 
-  return rol ? { conversacion: conversaciones[0], rol } : null;
+  return rol ? { conversacion: { ...fila, ...camposRecepcion(conversaciones[0]) }, rol } : null;
 }
 
 /**
@@ -112,6 +124,7 @@ async function buscarContactos(usuarioId, rol, contactoId = null) {
       SELECT DISTINCT
         u.Usuario_Id              AS Contacto_Id,
         u.Usuario_Nombre_Completo AS Contacto_Nombre,
+        u.Docente_Recepcion_Mensajes AS Recibe_Mensajes,
         e.Estudiante_Nombre_Completo,
         cu.Curso_Nombre
       FROM estudiante e
@@ -142,6 +155,8 @@ async function buscarContactos(usuarioId, rol, contactoId = null) {
         Contacto_Id: fila.Contacto_Id,
         Contacto_Nombre: fila.Contacto_Nombre,
         Contacto_Rol: rol === 'Docente' ? 'Apoderado' : 'Docente',
+        // RF54: el apoderado ve si el docente recibe mensajes (el docente siempre puede escribir)
+        ...(rol === 'Apoderado' ? { Recibe_Mensajes: Number(fila.Recibe_Mensajes) === 1 } : {}),
         Estudiantes: []
       });
     }
@@ -194,6 +209,12 @@ const obtenerConversaciones = async (req, res) => {
         apoderado.Usuario_Nombre_Completo AS Apoderado_Nombre,
 
         ? AS Mi_Rol,
+
+        -- RF54: recepción general del docente y período habilitado en la conversación
+        docente.Docente_Recepcion_Mensajes AS Recepcion_General,
+        ${habilitadaHastaSQL('c')} AS Habilitada_Hasta,
+        c.Conversacion_Habilitada_Citacion_Id AS Habilitada_Citacion_Id,
+        ${apoderadoPuedeResponderSQL('c', 'docente')} AS Apoderado_Puede_Responder,
 
         (
           SELECT m.Mensaje_Contenido
@@ -248,8 +269,9 @@ const obtenerConversaciones = async (req, res) => {
     );
 
     // La contraparte es quien se muestra como título de la conversación
-    const conversaciones = rows.map((fila) => ({
+    const conversaciones = rows.map(({ Habilitada_Citacion_Id: _cit, ...fila }) => ({
       ...fila,
+      ...camposRecepcion({ ...fila, Habilitada_Citacion_Id: _cit }),
       No_Leidos: Number(fila.No_Leidos) || 0,
       Contacto_Nombre: rol === 'Docente'
         ? fila.Apoderado_Nombre
@@ -383,6 +405,11 @@ const enviarMensaje = async (req, res) => {
       return res.status(409).json({
         mensaje: 'La conversación está cerrada'
       });
+    }
+
+    // RF54 / CU85 Excepción 2: con la recepción deshabilitada el apoderado no puede responder
+    if (acceso.rol === 'Apoderado' && !acceso.conversacion.Apoderado_Puede_Responder) {
+      return res.status(403).json({ mensaje: MENSAJE_SIN_RECEPCION, sinRecepcion: true });
     }
 
     // Fecha y hora las asigna MySQL: evita mezclar fecha UTC con hora local
@@ -700,6 +727,20 @@ const iniciarConversacion = async (req, res) => {
       });
     }
 
+    // RF54: un apoderado no puede abrir una conversación nueva si el docente no recibe mensajes
+    if (rol === 'Apoderado') {
+      const [[docente]] = await pool.query(
+        'SELECT Docente_Recepcion_Mensajes FROM usuario WHERE Usuario_Id = ?',
+        [docenteId]
+      );
+      if (docente && Number(docente.Docente_Recepcion_Mensajes) !== 1) {
+        return res.status(403).json({
+          mensaje: 'El docente no está recibiendo mensajes de apoderados en este momento.',
+          sinRecepcion: true
+        });
+      }
+    }
+
     const [resultado] = await pool.query(
       `
       INSERT INTO conversacion (
@@ -729,7 +770,100 @@ const iniciarConversacion = async (req, res) => {
 };
 
 
+// ── RF54 / CU85: recepción general de mensajes de apoderados (docente) ──
+// GET /api/mensajes/recepcion
+const obtenerRecepcion = async (req, res) => {
+  if (!(req.user?.roles || []).includes('Docente')) {
+    return res.status(403).json({ mensaje: 'Solo un docente configura la recepción de mensajes' });
+  }
+  try {
+    const [[fila]] = await pool.query(
+      `SELECT u.Docente_Recepcion_Mensajes AS recepcion,
+              (SELECT COUNT(*) FROM conversacion c
+                WHERE c.Docente_Usuario_Id = u.Usuario_Id AND c.Conversacion_Habilitada_Hasta > NOW()) AS habilitadas
+         FROM usuario u WHERE u.Usuario_Id = ?`,
+      [req.user.id]
+    );
+    return res.json({ recepcion: Number(fila?.recepcion) === 1, conversacionesHabilitadas: Number(fila?.habilitadas) || 0 });
+  } catch (error) {
+    console.error('Error al obtener la recepción de mensajes:', error);
+    return res.status(500).json({ mensaje: 'No fue posible obtener la configuración de recepción' });
+  }
+};
+
+// PUT /api/mensajes/recepcion   Body: { habilitada: true|false }
+const actualizarRecepcion = async (req, res) => {
+  if (!(req.user?.roles || []).includes('Docente')) {
+    return res.status(403).json({ mensaje: 'Solo un docente configura la recepción de mensajes' });
+  }
+  const habilitada = req.body?.habilitada;
+  if (typeof habilitada !== 'boolean') {
+    return res.status(400).json({ mensaje: 'Indica si la recepción queda habilitada (true) o deshabilitada (false)' });
+  }
+  try {
+    await pool.query('UPDATE usuario SET Docente_Recepcion_Mensajes = ? WHERE Usuario_Id = ? AND Es_Docente = 1', [habilitada ? 1 : 0, req.user.id]);
+    return res.json({
+      recepcion: habilitada,
+      mensaje: habilitada
+        ? 'Recepción de mensajes habilitada: tus apoderados pueden responderte.'
+        : 'Recepción de mensajes deshabilitada: tus apoderados pueden leer, pero no responder, salvo en conversaciones que habilites por un período.',
+    });
+  } catch (error) {
+    // CU85 Excepción 1: error al guardar; se mantiene el estado anterior
+    console.error('Error al actualizar la recepción de mensajes:', error);
+    return res.status(500).json({ mensaje: 'No fue posible guardar la configuración. Se mantiene el estado anterior.' });
+  }
+};
+
+// ── RF54 / CU86: habilitar respuestas en una conversación hasta una fecha y hora ──
+// PUT /api/mensajes/conversaciones/:id/habilitacion   Body: { hasta: "YYYY-MM-DDTHH:MM" | null }
+const habilitarConversacion = async (req, res) => {
+  const conversacionId = Number(req.params.id);
+  if (!Number.isInteger(conversacionId) || conversacionId <= 0) {
+    return res.status(400).json({ mensaje: 'ID de conversación inválido' });
+  }
+  const hasta = req.body?.hasta ?? null;
+  if (hasta !== null && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(hasta))) {
+    return res.status(400).json({ mensaje: 'La fecha de término debe tener el formato AAAA-MM-DDTHH:MM' });
+  }
+  try {
+    const acceso = await buscarConversacionDelUsuario(conversacionId, req.user);
+    if (!acceso) return res.status(404).json({ mensaje: 'Conversación no encontrada o no tienes acceso' });
+    if (acceso.rol !== 'Docente') {
+      return res.status(403).json({ mensaje: 'Solo el docente de la conversación puede habilitar las respuestas' });
+    }
+    if (hasta === null) {
+      await pool.query(
+        `UPDATE conversacion SET Conversacion_Habilitada_Hasta = NULL, Conversacion_Habilitada_Citacion_Id = NULL
+          WHERE Conversacion_Id = ?`,
+        [conversacionId]
+      );
+      return res.json({ mensaje: 'Se cerró la recepción de respuestas en esta conversación', Habilitada_Hasta: null });
+    }
+    const valor = `${String(hasta).replace('T', ' ')}:00`;
+    // CU86 Excepción 1: la fecha de término es anterior a la actual
+    const [[{ futuro, limite }]] = await pool.query(
+      'SELECT ? > NOW() AS futuro, ? <= DATE_ADD(NOW(), INTERVAL 1 YEAR) AS limite',
+      [valor, valor]
+    );
+    if (!Number(futuro)) return res.status(400).json({ mensaje: 'La fecha de término debe ser posterior a la fecha y hora actual' });
+    if (!Number(limite)) return res.status(400).json({ mensaje: 'El período puede durar como máximo un año' });
+    await pool.query(
+      `UPDATE conversacion SET Conversacion_Habilitada_Hasta = ?, Conversacion_Habilitada_Citacion_Id = NULL
+        WHERE Conversacion_Id = ?`,
+      [valor, conversacionId]
+    );
+    return res.json({ mensaje: 'Respuestas del apoderado habilitadas hasta la fecha indicada', Habilitada_Hasta: hasta });
+  } catch (error) {
+    console.error('Error al habilitar la conversación:', error);
+    return res.status(500).json({ mensaje: 'No fue posible habilitar las respuestas en la conversación' });
+  }
+};
+
 module.exports = {
+  obtenerRecepcion,
+  actualizarRecepcion,
+  habilitarConversacion,
   obtenerConversaciones,
   obtenerMensajes,
   enviarMensaje,

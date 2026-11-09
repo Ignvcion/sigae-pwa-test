@@ -12,8 +12,9 @@ Fecha: 2026-11-06
     (por ejemplo, lunes 08:00–13:00 y 14:00–17:30). Los tramos incluyen
     recreos y horas sin clases (corregir pruebas, reuniones), no solo los
     bloques de clase. Se repite todas las semanas del período, igual que la
-    carga horaria, que también es semanal (usuario.Docente_Carga_Horaria_Maxima
-    se muestra como "Carga horaria semanal"; la columna conserva su nombre).
+    carga horaria, que también es semanal (RF04, glosario: la columna
+    usuario.Docente_Carga_Horaria_Maxima pasó a llamarse
+    Docente_Carga_Horaria_Semanal, "carga horaria semanal contratada").
 
 1.2 Las clases se siguen asignando por bloques de 45 minutos: un bloque está
     disponible si cae COMPLETO dentro de un tramo (los tramos contiguos se
@@ -144,10 +145,14 @@ Fecha: 2026-11-06
     término del tramo), con CASCADE al borrar el docente.
   - especialidad (catálogo) y docente_especialidad (docente ↔ etiqueta).
   - usuario.Docente_Especialidad pasa de varchar(100) a varchar(255).
+  - usuario.Docente_Carga_Horaria_Maxima se renombra a Docente_Carga_Horaria_Semanal.
 
   Si la base de la RDS ya está cargada, aplicar a mano (MariaDB):
 
     ALTER TABLE usuario MODIFY Docente_Especialidad varchar(255) DEFAULT NULL;
+
+    -- RF04 y glosario: "Carga horaria máxima" pasa a "Carga horaria semanal"
+    ALTER TABLE usuario CHANGE Docente_Carga_Horaria_Maxima Docente_Carga_Horaria_Semanal int DEFAULT NULL;
 
     CREATE TABLE especialidad (
       Especialidad_Id int unsigned NOT NULL AUTO_INCREMENT,

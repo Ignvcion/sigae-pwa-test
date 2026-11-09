@@ -24,7 +24,7 @@ const claveTramo = (t) => `${t.dia}|${t.inicio}|${t.fin}`;
 
 async function obtenerDocente(db, id) {
   const [filas] = await db.query(
-    `SELECT Usuario_Id, Usuario_Nombre_Completo, Docente_Carga_Horaria_Maxima, Es_Docente
+    `SELECT Usuario_Id, Usuario_Nombre_Completo, Docente_Carga_Horaria_Semanal, Es_Docente
        FROM usuario WHERE Usuario_Id = ?`,
     [id]
   );
@@ -165,7 +165,7 @@ const getDisponibilidad = async (req, res) => {
       docente: {
         Usuario_Id: docente.Usuario_Id,
         Usuario_Nombre_Completo: docente.Usuario_Nombre_Completo,
-        Docente_Carga_Horaria_Maxima: docente.Docente_Carga_Horaria_Maxima,
+        Docente_Carga_Horaria_Semanal: docente.Docente_Carga_Horaria_Semanal,
       },
       periodo,
       periodos: { vigente: periodos.vigente, siguiente: periodos.siguiente },

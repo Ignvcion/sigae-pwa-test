@@ -43,7 +43,7 @@ function validarCampo(name, value, form) {
       return !validarNombreCompleto(value) ? "Ingrese nombre y apellido, solo letras y espacios (ej: Juan Pérez)" : "";
     case "Usuario_Telefono":
       return !validarTelefonoChileno(value) ? MENSAJE_TELEFONO : "";
-    case "Docente_Carga_Horaria_Maxima":
+    case "Docente_Carga_Horaria_Semanal":
       return value === "" || Number.isNaN(Number(value)) || Number(value) <= 0 || Number(value) > 44
         ? "La carga horaria semanal debe ser un número entre 1 y 44 horas"
         : "";
@@ -210,12 +210,12 @@ function BloqueDocente({ datos, onGuardado }) {
   const [form, setForm] = useState({
     Docente_Correo_Institucional: datos.Docente_Correo_Institucional || "",
     Docente_Especialidades: separarEtiquetas(datos.Docente_Especialidad),
-    Docente_Carga_Horaria_Maxima: datos.Docente_Carga_Horaria_Maxima ?? "",
+    Docente_Carga_Horaria_Semanal: datos.Docente_Carga_Horaria_Semanal ?? "",
   });
   const [errores, setErrores] = useState({});
   const [catalogo, setCatalogo] = useState([]);
   const [estado, guardar] = useGuardarBloque(datos.Usuario_Id, onGuardado);
-  const campos = ["Docente_Correo_Institucional", "Docente_Especialidades", "Docente_Carga_Horaria_Maxima"];
+  const campos = ["Docente_Correo_Institucional", "Docente_Especialidades", "Docente_Carga_Horaria_Semanal"];
 
   useEffect(() => {
     getEspecialidades().then((d) => setCatalogo((d || []).map((e) => e.Especialidad_Nombre))).catch(() => {});
@@ -251,7 +251,7 @@ function BloqueDocente({ datos, onGuardado }) {
           />
           {errores.Docente_Especialidades && <span className="input-error-msg">{errores.Docente_Especialidades}</span>}
         </div>
-        <Campo name="Docente_Carga_Horaria_Maxima" label="Carga horaria semanal (hrs)" type="number" min="1" max="44"
+        <Campo name="Docente_Carga_Horaria_Semanal" label="Carga horaria semanal (hrs)" type="number" min="1" max="44"
           form={form} errores={errores} onChange={(e) => cambiar(e.target.name, e.target.value)} />
         <PieBloque estado={estado} />
       </form>
@@ -304,7 +304,7 @@ function BloqueDisponibilidad({ datos, onGuardado }) {
             tramos={disp.tramos}
             clases={disp.clases}
             atencion={disp.atencion}
-            cargaSemanal={datos.Docente_Carga_Horaria_Maxima}
+            cargaSemanal={datos.Docente_Carga_Horaria_Semanal}
             periodo={disp.periodo}
             periodos={disp.periodos}
             onCambiarPeriodo={(p) => { setDisp(null); setErrorCarga(""); setPeriodoPedido(p); }}

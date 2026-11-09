@@ -8,8 +8,36 @@ import {
   marcarMensajesLeidos,
   getContactosMensajeria,
   iniciarConversacion,
-  getDetalleContactoConversacion
+  getDetalleContactoConversacion,
+  getRecepcionMensajes,
+  actualizarRecepcionMensajes,
+  habilitarRespuestasConversacion
 } from '../../services/api';
+import './Mensajes.css';
+
+// RF54: "2026-11-12T16:00" → "12/11 16:00"
+function fechaHoraCorta(valor) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/.exec(String(valor || ''));
+  return m ? `${m[3]}/${m[2]} ${m[4]}` : '';
+}
+
+// Valor por defecto del selector de término: mañana a esta hora
+function mananaLocal() {
+  const d = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** RF54: texto del estado de respuesta del apoderado en una conversación. */
+function estadoRespuesta(conversacion, miRol) {
+  if (!conversacion || conversacion.Recepcion_General) return null;
+  if (conversacion.Apoderado_Puede_Responder && conversacion.Habilitada_Hasta) {
+    return miRol === 'Docente'
+      ? `Puede responder hasta ${fechaHoraCorta(conversacion.Habilitada_Hasta)}`
+      : `Puedes responder hasta ${fechaHoraCorta(conversacion.Habilitada_Hasta)}`;
+  }
+  return miRol === 'Docente' ? 'Sin respuestas del apoderado' : 'Solo lectura';
+}
 
 // Iniciales para el avatar cuando el contacto no tiene fotografía
 function iniciales(nombre = '') {
@@ -202,6 +230,13 @@ function Mensajes() {
   const [detalleContacto, setDetalleContacto] = useState(null);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
   const [errorDetalle, setErrorDetalle] = useState('');
+  // RF54 / CU85, CU86: recepción de mensajes (solo docente)
+  const [recepcion, setRecepcion] = useState(null); // { recepcion, conversacionesHabilitadas }
+  const [confirmandoRecepcion, setConfirmandoRecepcion] = useState(false);
+  const [guardandoRecepcion, setGuardandoRecepcion] = useState(false);
+  const [msgRecepcion, setMsgRecepcion] = useState({ tipo: '', texto: '' });
+  const [habilitacion, setHabilitacion] = useState(null); // { hasta, guardando, error }
+
   // Evita que una respuesta lenta pise la ficha de otra conversación
   const conversacionActivaRef = useRef(null);
 
@@ -405,9 +440,55 @@ function Mensajes() {
   // ─────────────────────────────────────────
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarConversaciones();
   }, [cargarConversaciones]);
+
+  useEffect(() => {
+    if (rol !== 'Docente') return;
+    getRecepcionMensajes().then(setRecepcion).catch(() => {});
+  }, [rol]);
+
+  // CU85: el docente cambia la recepción general y confirma
+  const cambiarRecepcion = async () => {
+    setGuardandoRecepcion(true);
+    setMsgRecepcion({ tipo: '', texto: '' });
+    try {
+      const data = await actualizarRecepcionMensajes(!recepcion.recepcion);
+      setRecepcion((r) => ({ ...r, recepcion: data.recepcion }));
+      setMsgRecepcion({ tipo: 'exito', texto: data.mensaje });
+      const lista = await cargarConversaciones();
+      if (conversacionSeleccionada) {
+        const actual = lista.find((c) => c.Conversacion_Id === conversacionSeleccionada.Conversacion_Id);
+        if (actual) setConversacionSeleccionada(actual);
+      }
+    } catch (err) {
+      // CU85 Excepción 1: se mantiene el estado anterior
+      setMsgRecepcion({ tipo: 'error', texto: err.message || 'No fue posible guardar la configuración' });
+    } finally {
+      setGuardandoRecepcion(false);
+      setConfirmandoRecepcion(false);
+    }
+  };
+
+  // CU86: habilitar (o cerrar con null) las respuestas del apoderado en la conversación abierta
+  const guardarHabilitacion = async (hasta) => {
+    const id = conversacionSeleccionada.Conversacion_Id;
+    setHabilitacion((h) => ({ ...(h || {}), guardando: true, error: '' }));
+    try {
+      await habilitarRespuestasConversacion(id, hasta);
+      const cambios = {
+        Habilitada_Hasta: hasta,
+        Apoderado_Puede_Responder: Boolean(hasta) || conversacionSeleccionada.Recepcion_General,
+        Habilitada_Por_Citacion: null,
+      };
+      setConversacionSeleccionada((c) => ({ ...c, ...cambios }));
+      setConversaciones((prev) => prev.map((c) => (c.Conversacion_Id === id ? { ...c, ...cambios } : c)));
+      setHabilitacion(null);
+      getRecepcionMensajes().then(setRecepcion).catch(() => {});
+    } catch (err) {
+      setHabilitacion((h) => ({ ...(h || {}), guardando: false, error: err.message || 'No fue posible guardar' }));
+    }
+  };
 
   // Enter envía; Shift + Enter inserta un salto de línea
   const handleTeclaMensaje = (e) => {
@@ -440,6 +521,44 @@ function Mensajes() {
       <h1 style={{ marginBottom: '20px' }}>
         Mensajes
       </h1>
+
+      {/* RF54 / CU85: recepción general de mensajes de apoderados */}
+      {rol === 'Docente' && recepcion && (
+        <div className={`msj-recepcion ${recepcion.recepcion ? 'msj-recepcion--on' : 'msj-recepcion--off'}`}>
+          <div className="msj-recepcion-estado">
+            <strong>Recepción de mensajes de apoderados: {recepcion.recepcion ? 'habilitada' : 'deshabilitada'}</strong>
+            <span>
+              {recepcion.recepcion
+                ? 'Tus apoderados pueden responderte.'
+                : `Tus apoderados pueden leer tus mensajes, pero no responder${recepcion.conversacionesHabilitadas > 0 ? `, salvo en ${recepcion.conversacionesHabilitadas} conversación(es) habilitada(s) por un período` : ''}.`}
+            </span>
+          </div>
+          {!confirmandoRecepcion ? (
+            <button type="button" className="btn-secondary" onClick={() => { setConfirmandoRecepcion(true); setMsgRecepcion({ tipo: '', texto: '' }); }}>
+              {recepcion.recepcion ? 'Deshabilitar recepción' : 'Habilitar recepción'}
+            </button>
+          ) : (
+            <div className="msj-recepcion-confirmar">
+              <span>
+                {recepcion.recepcion
+                  ? '¿Deshabilitar? Los apoderados no podrán responderte hasta que la habilites de nuevo.'
+                  : '¿Habilitar? Todos tus apoderados podrán responderte.'}
+              </span>
+              <button type="button" className="btn-primary" onClick={cambiarRecepcion} disabled={guardandoRecepcion}>
+                {guardandoRecepcion ? 'Guardando...' : 'Confirmar'}
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => setConfirmandoRecepcion(false)} disabled={guardandoRecepcion}>
+                Cancelar
+              </button>
+            </div>
+          )}
+          {msgRecepcion.texto && (
+            <div className={msgRecepcion.tipo === 'error' ? 'msj-recepcion-error' : 'msj-recepcion-exito'} role="status">
+              {msgRecepcion.texto}
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <div
@@ -591,6 +710,11 @@ function Mensajes() {
                         ? 'Apoderado'
                         : 'Docente'}
                       {!conversacion.Conversacion_Estado && ' · Cerrada'}
+                      {conversacion.Conversacion_Estado && estadoRespuesta(conversacion, conversacion.Mi_Rol) && (
+                        <span className={`msj-chip ${conversacion.Apoderado_Puede_Responder ? 'msj-chip--on' : 'msj-chip--off'}`}>
+                          {estadoRespuesta(conversacion, conversacion.Mi_Rol)}
+                        </span>
+                      )}
                     </div>
 
                     <div
@@ -706,6 +830,9 @@ function Mensajes() {
                         <div style={{ fontSize: '13px', color: '#666' }}>
                           {contacto.Contacto_Rol} · {contacto.Estudiantes.join(', ')}
                         </div>
+                        {contacto.Recibe_Mensajes === false && (
+                          <span className="msj-chip msj-chip--off">No está recibiendo mensajes</span>
+                        )}
                       </div>
 
                       <button
@@ -784,6 +911,45 @@ function Mensajes() {
                 )}
 
               </div>
+
+              {/* RF54 / CU86: el docente habilita respuestas en esta conversación por un período */}
+              {miRol === 'Docente' && !conversacionCerrada && !conversacionSeleccionada.Recepcion_General && (
+                <div className="msj-habilitacion">
+                  <span>
+                    {conversacionSeleccionada.Apoderado_Puede_Responder && conversacionSeleccionada.Habilitada_Hasta
+                      ? `El apoderado puede responder hasta ${fechaHoraCorta(conversacionSeleccionada.Habilitada_Hasta)}${conversacionSeleccionada.Habilitada_Por_Citacion ? ' (habilitado desde una citación)' : ''}.`
+                      : 'Tu recepción está deshabilitada: el apoderado no puede responder en esta conversación.'}
+                  </span>
+                  {!habilitacion ? (
+                    <span className="msj-habilitacion-acciones">
+                      <button type="button" className="btn-secondary" onClick={() => setHabilitacion({ hasta: conversacionSeleccionada.Habilitada_Hasta || mananaLocal(), guardando: false, error: '' })}>
+                        {conversacionSeleccionada.Habilitada_Hasta ? 'Cambiar término' : 'Habilitar respuestas'}
+                      </button>
+                      {conversacionSeleccionada.Habilitada_Hasta && (
+                        <button type="button" className="btn-secondary" onClick={() => guardarHabilitacion(null)}>
+                          Cerrar ahora
+                        </button>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="msj-habilitacion-acciones">
+                      <label>
+                        Hasta{' '}
+                        <input
+                          type="datetime-local"
+                          value={habilitacion.hasta}
+                          onChange={(e) => setHabilitacion((h) => ({ ...h, hasta: e.target.value, error: '' }))}
+                        />
+                      </label>
+                      <button type="button" className="btn-primary" disabled={habilitacion.guardando || !habilitacion.hasta} onClick={() => guardarHabilitacion(habilitacion.hasta)}>
+                        {habilitacion.guardando ? 'Guardando...' : 'Guardar'}
+                      </button>
+                      <button type="button" className="btn-secondary" onClick={() => setHabilitacion(null)}>Cancelar</button>
+                      {habilitacion.error && <span className="msj-recepcion-error">{habilitacion.error}</span>}
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* MENSAJES */}
 
@@ -895,7 +1061,12 @@ function Mensajes() {
 
               {/* FORMULARIO */}
 
-              {conversacionCerrada ? (
+              {miRol === 'Apoderado' && !conversacionCerrada && !conversacionSeleccionada.Apoderado_Puede_Responder ? (
+                <div className="msj-solo-lectura" role="status">
+                  El docente no está recibiendo mensajes de apoderados en este momento.
+                  Puedes leer los mensajes, pero no responder.
+                </div>
+              ) : conversacionCerrada ? (
                 <div
                   style={{
                     padding: '15px',
@@ -959,6 +1130,9 @@ function Mensajes() {
 
                   </div>
 
+                  {miRol === 'Apoderado' && !conversacionSeleccionada.Recepcion_General && conversacionSeleccionada.Habilitada_Hasta && (
+                    <div className="msj-plazo">Puedes responder hasta {fechaHoraCorta(conversacionSeleccionada.Habilitada_Hasta)}.</div>
+                  )}
                   <div
                     style={{
                       marginTop: '6px',
