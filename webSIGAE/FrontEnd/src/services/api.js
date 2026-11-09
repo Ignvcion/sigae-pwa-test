@@ -811,3 +811,55 @@ export async function getContactosApoderados(estudianteId) {
   const res = await fetch(`${BASE_URL}/citaciones/estudiante/${estudianteId}/contactos`, { headers: authHeaders() });
   return handleResponse(res);
 }
+
+// ── CALENDARIO DE EVALUACIONES (RF58, RF59 / CU92, CU93, CU94) ────────
+
+// CU94: evaluaciones del mes según el rol activo
+export async function getEvaluaciones({ mes, rol, estudianteId, cursoId, asignaturaId }) {
+  const params = new URLSearchParams({ mes });
+  if (rol) params.set('rol', rol);
+  if (estudianteId) params.set('estudianteId', estudianteId);
+  if (cursoId) params.set('cursoId', cursoId);
+  if (asignaturaId) params.set('asignaturaId', asignaturaId);
+  const res = await fetch(`${BASE_URL}/evaluaciones?${params}`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// CU92: cursos y asignaturas del docente en el período vigente
+export async function getMisAsignacionesEvaluacion() {
+  const res = await fetch(`${BASE_URL}/evaluaciones/mis-asignaciones`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+function cuerpoEvaluacion({ cursoId, asignaturaId, fecha, tipo, contenidos }, confirmar) {
+  return JSON.stringify({
+    Curso_Id             : Number(cursoId),
+    Asignatura_Id        : Number(asignaturaId),
+    Evaluacion_Fecha     : fecha,
+    Evaluacion_Tipo      : tipo,
+    Evaluacion_Contenidos: contenidos.trim(),
+    confirmar,
+  });
+}
+
+// CU92: registrar. Si la fecha tiene un evento que suspende clases, el backend responde 409
+// con requiereConfirmacion y se reintenta con confirmar = true.
+export async function crearEvaluacion(datos, confirmar = false) {
+  const res = await fetch(`${BASE_URL}/evaluaciones`, {
+    method: 'POST', headers: authHeaders(), body: cuerpoEvaluacion(datos, confirmar),
+  });
+  return handleResponse(res);
+}
+
+// CU93: modificar o eliminar una evaluación propia
+export async function actualizarEvaluacion(id, datos, confirmar = false) {
+  const res = await fetch(`${BASE_URL}/evaluaciones/${id}`, {
+    method: 'PUT', headers: authHeaders(), body: cuerpoEvaluacion(datos, confirmar),
+  });
+  return handleResponse(res);
+}
+
+export async function eliminarEvaluacion(id) {
+  const res = await fetch(`${BASE_URL}/evaluaciones/${id}`, { method: 'DELETE', headers: authHeaders() });
+  return handleResponse(res);
+}

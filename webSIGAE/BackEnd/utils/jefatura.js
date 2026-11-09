@@ -6,6 +6,7 @@
 //   el cierre puede tener 2 en el vigente y 2 en el siguiente.
 // - Lo usan la designación manual (CU95/CU96) y la herencia al promover (RF61).
 const { registrarHistorial, refPersona } = require('./historial');
+const { claseVigente } = require('./clasesEliminadas');
 
 const MAX_JEFATURAS = 2;
 
@@ -72,4 +73,23 @@ const mensajeTope = (docente, cursos) =>
   `${docente.Usuario_Nombre_Completo} ya es profesor jefe de ${MAX_JEFATURAS} cursos en este período `
   + `(${cursos.join(', ')}). Un docente puede tener como máximo ${MAX_JEFATURAS} jefaturas.`;
 
-module.exports = { MAX_JEFATURAS, jefaturasDelDocente, obtenerDocente, asignarJefatura, mensajeTope, nombreCurso };
+/**
+ * RNF04: el docente está vinculado al curso si le hace clases (clase no eliminada) o es su
+ * profesor jefe. Lo usan las consultas de datos de estudiantes, como los contactos (CU91).
+ */
+async function esDocenteVinculadoAlCurso(conn, docenteId, cursoId) {
+  const [filas] = await conn.query(
+    `SELECT 1 FROM curso c
+      WHERE c.Curso_Id = ?
+        AND (c.Curso_Profesor_Jefe_Usuario_Id = ?
+             OR EXISTS (SELECT 1 FROM horario_asignatura ha
+                         WHERE ha.Usuario_Id = ? AND ha.Curso_Id = c.Curso_Id AND ${claseVigente('ha')}))
+      LIMIT 1`,
+    [cursoId, docenteId, docenteId]
+  );
+  return Array.isArray(filas) && filas.length > 0;
+}
+
+module.exports = {
+  MAX_JEFATURAS, jefaturasDelDocente, obtenerDocente, asignarJefatura, mensajeTope, nombreCurso, esDocenteVinculadoAlCurso,
+};

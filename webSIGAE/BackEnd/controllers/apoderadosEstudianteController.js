@@ -3,7 +3,7 @@
 // El titular es estudiante.Apoderado_Usuario_Id (el mismo campo de la asociación de CU7/CU39)
 // y los suplentes, hasta MAX_SUPLENTES, se guardan en apoderado_suplente.
 const pool = require('../config/db');
-const { claseVigente } = require('../utils/clasesEliminadas');
+const { esDocenteVinculadoAlCurso } = require('../utils/jefatura');
 const { MAX_SUPLENTES, obtenerApoderadosEstudiante, puedeAsociarse, reactivarApoderados } = require('../utils/apoderadosEstudiante');
 const { registrarHistorial, refPersona, refPersonas } = require('../utils/historial');
 
@@ -169,18 +169,13 @@ const getContactosApoderados = async (req, res) => {
     const datos = await obtenerApoderadosEstudiante(pool, estudianteId);
     if (!datos) return res.status(404).json(ESTUDIANTE_NO_EXISTE);
 
-    // CU91 Excepción 2: el docente no imparte clases al estudiante
-    if (!admin) {
-      const [clases] = await pool.query(
-        `SELECT 1 FROM horario_asignatura ha
-          WHERE ha.Usuario_Id = ? AND ha.Curso_Id = ? AND ${claseVigente('ha')} LIMIT 1`,
-        [req.user.id, datos.estudiante.Curso_Id]
-      );
-      if (clases.length === 0) {
-        return res.status(403).json({
-          mensaje: 'No impartes clases a este estudiante, por lo que sus datos de contacto no están disponibles',
-        });
-      }
+    // CU91 Excepción 2: el docente no imparte clases al estudiante. Según RNF04, el
+    // profesor jefe del curso también está vinculado aunque no le haga clases.
+    if (!admin && !(await esDocenteVinculadoAlCurso(pool, req.user.id, datos.estudiante.Curso_Id))) {
+      return res.status(403).json({
+        mensaje: 'No impartes clases a este estudiante ni eres su profesor jefe, '
+          + 'por lo que sus datos de contacto no están disponibles',
+      });
     }
 
     return res.json({

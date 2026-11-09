@@ -6,8 +6,10 @@ import {
   asignarApoderado,
   editarAsociacionEstudiante,
   eliminarAsociacionEspecifica,
+  getEstudiantesAsociados,
   eliminarTodasAsociaciones,
 } from "../../services/api";
+import { etiquetaApoderado, inactivoPorFaltaDeAsociacion, puedeAsociarse } from "../../utils/apoderados";
 
 function Apoderados() {
   const { usuario } = useAuth();
@@ -69,17 +71,11 @@ function Apoderados() {
     }
   };
 
-  // Obtener los estudiantes ya asociados a un apoderado
+  // Estudiantes ya asociados a un apoderado (CU40): como titular o como suplente (RF57)
   const cargarEstudiantesDelApoderado = async (apoderadoId) => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/estudiantes", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      return Array.isArray(data)
-        ? data.filter((e) => e.Apoderado_Usuario_Id === apoderadoId)
-        : [];
+      const data = await getEstudiantesAsociados(apoderadoId);
+      return Array.isArray(data) ? data : data?.estudiantes || [];
     } catch {
       return [];
     }
@@ -351,6 +347,12 @@ function Apoderados() {
                 <td>
                   {u.Usuario_Estado_Cuenta ? (
                     <span className="badge-activo">Activo</span>
+                  ) : inactivoPorFaltaDeAsociacion(u) ? (
+                    // RF15/RF16: inactivo por quedar sin estudiantes; se reactiva al asociarlo
+                    <>
+                      <span className="badge-inactivo">Inactivo</span>
+                      <div className="cit-sub" title="Se reactiva al asociarle un estudiante">Sin estudiantes</div>
+                    </>
                   ) : (
                     <span className="badge-inactivo">Inactivo</span>
                   )}
@@ -446,8 +448,14 @@ function Apoderados() {
                           }}
                         >
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span>{e.Estudiante_Nombre_Completo} <span style={{ color: "#64748b" }}>({e.Estudiante_RUT})</span></span>
-                            {reasignando !== e.Estudiante_Id && (
+                            <span>
+                              {e.Estudiante_Nombre_Completo} <span style={{ color: "#64748b" }}>({e.Estudiante_RUT})</span>
+                              {e.Rol_Apoderado === "Suplente" && <span className="contacto-rol contacto-rol-suplente" style={{ marginLeft: "6px" }}>Suplente</span>}
+                            </span>
+                            {/* RF57: las suplencias se gestionan en Estudiantes › Apoderados; estas acciones cambian al titular */}
+                            {e.Rol_Apoderado === "Suplente" ? (
+                              <span style={{ color: "#64748b", fontSize: "0.78rem" }}>Se gestiona en Estudiantes › Apoderados</span>
+                            ) : reasignando !== e.Estudiante_Id && (
                               <div style={{ display: "flex", gap: "6px" }}>
                                 <button
                                   type="button"
@@ -481,10 +489,10 @@ function Apoderados() {
                               >
                                 <option value="">Selecciona un nuevo apoderado...</option>
                                 {apoderados
-                                  .filter((a) => a.Usuario_Id !== apoderadoSeleccionado.Usuario_Id && a.Usuario_Estado_Cuenta)
+                                  .filter((a) => a.Usuario_Id !== apoderadoSeleccionado.Usuario_Id && puedeAsociarse(a))
                                   .map((a) => (
                                     <option key={a.Usuario_Id} value={a.Usuario_Id}>
-                                      {a.Usuario_Nombre_Completo}
+                                      {etiquetaApoderado(a)}
                                     </option>
                                   ))}
                               </select>

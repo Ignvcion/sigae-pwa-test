@@ -179,11 +179,13 @@ describe('Pruebas Unitarias - CU90/CU91: Apoderado titular y suplentes (RF57)', 
     test('el docente del curso ve nombre, correo y teléfono de ambos', async () => {
       req.user = { id: 3, roles: ['Docente'] };
       mockApoderados({ suplentes: [usuario(8, 'Luis Ramos')] });
-      pool.query.mockResolvedValueOnce([[{ 1: 1 }]]); // imparte clases en el curso
+      pool.query.mockResolvedValueOnce([[{ 1: 1 }]]); // vinculado al curso
 
       await controller.getContactosApoderados(req, res);
 
-      expect(pool.query.mock.calls[3][1]).toEqual([3, 222]);
+      // Curso del estudiante, y el docente como profesor jefe o con clases en él
+      expect(pool.query.mock.calls[3][0]).toContain('Curso_Profesor_Jefe_Usuario_Id');
+      expect(pool.query.mock.calls[3][1]).toEqual([222, 3, 3]);
       const respuesta = res.json.mock.calls[0][0];
       expect(respuesta.titular).toEqual({
         Usuario_Id: 4, Usuario_Nombre_Completo: 'Pedro Fernandez', Usuario_Correo: 'u4@correo.cl', Usuario_Telefono: '94',
@@ -210,6 +212,17 @@ describe('Pruebas Unitarias - CU90/CU91: Apoderado titular y suplentes (RF57)', 
 
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json.mock.calls[0][0].mensaje).toContain('No impartes clases a este estudiante');
+    });
+
+    test('RNF04: el profesor jefe del curso ve los contactos aunque no le haga clases', async () => {
+      req.user = { id: 5, roles: ['Docente'] };
+      mockApoderados();
+      pool.query.mockResolvedValueOnce([[{ 1: 1 }]]); // es profesor jefe del curso
+
+      await controller.getContactosApoderados(req, res);
+
+      expect(res.status).not.toHaveBeenCalledWith(403);
+      expect(res.json.mock.calls[0][0].titular).toEqual(expect.objectContaining({ Usuario_Id: 4 }));
     });
 
     test('un apoderado no puede consultar los contactos', async () => {

@@ -271,6 +271,8 @@ function MainLayout() {
 
                 <Link to="/citaciones">Citaciones</Link>
 
+                <Link to="/calendario-evaluaciones">Calendario de Evaluaciones</Link>
+
                 <Link to="/citaciones/historial">
                   Historial de Citaciones
                 </Link>
@@ -310,6 +312,10 @@ function MainLayout() {
                   Citaciones
                 </Link>
 
+                <Link to="/calendario-evaluaciones">
+                  Calendario de Evaluaciones
+                </Link>
+
                 <Link to="/citaciones/historial">
                   Historial de Citaciones
                 </Link>
@@ -332,6 +338,10 @@ function MainLayout() {
 
                 <Link to="/citaciones">
                   Citaciones
+                </Link>
+
+                <Link to="/calendario-evaluaciones">
+                  Calendario de Evaluaciones
                 </Link>
 
                 <Link to="/citaciones/historial">

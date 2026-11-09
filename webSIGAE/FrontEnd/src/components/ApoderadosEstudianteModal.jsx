@@ -4,6 +4,7 @@ import {
   designarApoderadosEstudiante,
   editarAsociacionEstudiante,
 } from "../services/api";
+import { etiquetaApoderado, puedeAsociarse } from "../utils/apoderados";
 
 const MAX_SUPLENTES_POR_DEFECTO = 4;
 
@@ -47,8 +48,9 @@ function ApoderadosEstudianteModal({ estudiante, apoderados, onClose, onGuardado
     || suplentes.find((s) => String(s.Usuario_Id) === String(id))?.Usuario_Nombre_Completo
     || "";
 
-  // Solo apoderados activos que no estén ya elegidos
-  const activos = apoderados.filter((a) => a.Usuario_Estado_Cuenta);
+  // Apoderados que se pueden asociar (activos o inactivos por no tener estudiantes, que se
+  // reactivan al guardar) y que no estén ya elegidos
+  const activos = apoderados.filter(puedeAsociarse);
   const idsSuplentes = suplentes.map((s) => String(s.Usuario_Id));
   const opcionesTitular = activos.filter((a) => !idsSuplentes.includes(String(a.Usuario_Id)));
   const opcionesSuplente = activos.filter(
@@ -166,7 +168,7 @@ function ApoderadosEstudianteModal({ estudiante, apoderados, onClose, onGuardado
                   {suplentes.length > 0 ? "Selecciona el titular..." : "Ninguno (eliminar asociación)"}
                 </option>
                 {opcionesTitular.map((a) => (
-                  <option key={a.Usuario_Id} value={a.Usuario_Id}>{a.Usuario_Nombre_Completo}</option>
+                  <option key={a.Usuario_Id} value={a.Usuario_Id}>{etiquetaApoderado(a)}</option>
                 ))}
               </select>
               <span className="cit-sub">Cada estudiante tiene un único apoderado titular.</span>
@@ -204,7 +206,7 @@ function ApoderadosEstudianteModal({ estudiante, apoderados, onClose, onGuardado
                   >
                     <option value="">Selecciona un apoderado...</option>
                     {opcionesSuplente.map((a) => (
-                      <option key={a.Usuario_Id} value={a.Usuario_Id}>{a.Usuario_Nombre_Completo}</option>
+                      <option key={a.Usuario_Id} value={a.Usuario_Id}>{etiquetaApoderado(a)}</option>
                     ))}
                   </select>
                   <button type="button" className="btn-secondary" onClick={agregarSuplente} disabled={!agregarId || guardando}>

@@ -58,6 +58,7 @@ import CierrePeriodo from "../pages/academic/CierrePeriodo";
 import Mensajes from "../pages/communications/Mensajes";
 import Citaciones from "../pages/communications/Citaciones";
 import HistorialCitaciones from "../pages/communications/HistorialCitaciones";
+import CalendarioEvaluaciones from "../pages/communications/CalendarioEvaluaciones";
 
 /* REPORTS */
 
@@ -116,6 +117,15 @@ function AppRouter() {
             }
           />
           {/* CU79: historial y detalle de citaciones de un estudiante (también Admin/Super Admin) */}
+          {/* RF58 / RF59: calendario de evaluaciones (CU92–CU94) */}
+          <Route
+            path="/calendario-evaluaciones"
+            element={
+              <RoleRoute roles={["Docente", "Apoderado", "Administrador"]}>
+                <CalendarioEvaluaciones />
+              </RoleRoute>
+            }
+          />
           <Route
             path="/citaciones/historial"
             element={
