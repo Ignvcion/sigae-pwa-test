@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { registrarApoderado } from "../../services/api";
 import {
-  validarRut, normalizarRut, validarNombreCompleto, validarCorreo, validarTelefonoChileno,
+  validarRut, obtenerErrorRut, normalizarRut, validarNombreCompleto, validarCorreo, validarTelefonoChileno,
   validarFortalezaContrasena, validarDireccion, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
 } from "../../utils/validaciones";
 import CamposDireccion, { CAMPOS_DIRECCION, errorCampoDireccion } from "../../components/CamposDireccion";
@@ -46,9 +46,7 @@ function RegisterGuardian() {
           ? "Ingrese nombre y apellido, solo letras y espacios (ej: Juan Pérez)"
           : "";
       case "rut":
-        return value && !validarRut(value)
-          ? "RUT inválido. Formato esperado: 12345678-9"
-          : "";
+        return value ? obtenerErrorRut(value) : "";
       case "correo":
         return value && !validarCorreo(value)
           ? "Ingrese un correo electrónico válido"

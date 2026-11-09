@@ -15,9 +15,148 @@ import "./index.css";
 //    "Failed to fetch", "Unexpected token '<'...", etc.
 const originalFetch = window.fetch;
 
-function getMockResponseForUrl(urlStr, method = "GET") {
+function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   const p = (urlStr || "").toLowerCase();
   const m = (method || "GET").toUpperCase();
+
+  // Búsqueda de usuarios (acepta POST /api/usuarios/buscar)
+  if (p.includes("/usuarios/buscar")) {
+    let qRut = "";
+    let qNom = "";
+    let qCor = "";
+    if (reqBody) {
+      try {
+        const parsed = typeof reqBody === "string" ? JSON.parse(reqBody) : reqBody;
+        qRut = (parsed.rut || "").trim().toLowerCase();
+        qNom = (parsed.nombre || "").trim().toLowerCase();
+        qCor = (parsed.correo || "").trim().toLowerCase();
+      } catch {}
+    }
+    const listaUsuarios = [
+      {
+        Usuario_Id: 1,
+        Usuario_Nombre_Completo: "Esperanza Penelope Gonzales Farias",
+        Usuario_RUT: "5682711-0",
+        Es_Administrador: 1,
+        Es_Docente: 0,
+        Es_Apoderado: 0,
+        Administrador_Tipo: "Super Admin",
+        Administrador_Correo_Institucional: "es.gonzales@jacquescousteau.edu",
+        Usuario_Correo: "es.gonzales@jacquescousteau.edu",
+        Usuario_Telefono: "+56 9 8765 4321",
+        Usuario_Estado_Cuenta: 1,
+      },
+      {
+        Usuario_Id: 2,
+        Usuario_Nombre_Completo: "Carlos Gonzales Farias",
+        Usuario_RUT: "9343727-6",
+        Es_Administrador: 1,
+        Es_Docente: 0,
+        Es_Apoderado: 0,
+        Administrador_Tipo: "Administrador Normal",
+        Administrador_Correo_Institucional: "c.gonzales@jacquescousteau.edu",
+        Usuario_Correo: "c.gonzales@jacquescousteau.edu",
+        Usuario_Telefono: "+56 9 1234 5678",
+        Usuario_Estado_Cuenta: 1,
+      },
+      {
+        Usuario_Id: 3,
+        Usuario_Nombre_Completo: "María Morales",
+        Usuario_RUT: "3483606-k",
+        Es_Administrador: 0,
+        Es_Docente: 1,
+        Es_Apoderado: 0,
+        Docente_Correo_Institucional: "m.morales@jacquescousteau.edu",
+        Usuario_Correo: "m.morales@jacquescousteau.edu",
+        Docente_Especialidad: "Matemáticas",
+        Usuario_Telefono: "+56 9 7654 3210",
+        Usuario_Estado_Cuenta: 1,
+      },
+      {
+        Usuario_Id: 4,
+        Usuario_Nombre_Completo: "Pedro Fernandez",
+        Usuario_RUT: "5738925-7",
+        Es_Administrador: 0,
+        Es_Docente: 0,
+        Es_Apoderado: 1,
+        Apoderado_Correo_Natural: "p.fernandez@email.cl",
+        Usuario_Correo: "p.fernandez@email.cl",
+        Usuario_Telefono: "+56 9 8765 4321",
+        Usuario_Estado_Cuenta: 1,
+      },
+      {
+        Usuario_Id: 5,
+        Usuario_Nombre_Completo: "Ana Torres",
+        Usuario_RUT: "3890710-7",
+        Es_Administrador: 0,
+        Es_Docente: 1,
+        Es_Apoderado: 0,
+        Docente_Correo_Institucional: "a.torres@jacquescousteau.edu",
+        Usuario_Correo: "a.torres@jacquescousteau.edu",
+        Docente_Especialidad: "Lenguaje y Comunicación",
+        Usuario_Telefono: "+56 9 6543 2109",
+        Usuario_Estado_Cuenta: 1,
+      },
+    ];
+
+    return listaUsuarios.filter((u) => {
+      const matchRut = !qRut || (u.Usuario_RUT || "").toLowerCase().includes(qRut);
+      const matchNom = !qNom || (u.Usuario_Nombre_Completo || "").toLowerCase().includes(qNom);
+      const cor = (u.Usuario_Correo || u.Administrador_Correo_Institucional || u.Docente_Correo_Institucional || u.Apoderado_Correo_Natural || "").toLowerCase();
+      const matchCor = !qCor || cor.includes(qCor);
+      return matchRut && matchNom && matchCor;
+    });
+  }
+
+  // Asignaturas disponibles para asignar a un curso (ModalAsignarAsignaturas)
+  if (p.includes("/asignaturas/disponibles")) {
+    return [
+      {
+        Asignatura_Id: 5,
+        Asignatura_Nombre: "Inglés",
+        nombre: "Inglés",
+        Asignatura_Prioridad_Academica: "Media",
+        Horas_Semanales_Requeridas: 4,
+        horas_semanales: 4,
+        horas: 4,
+        Tipo: "Obligatorio",
+        tipo: "Obligatorio",
+      },
+      {
+        Asignatura_Id: 6,
+        Asignatura_Nombre: "Educación Física",
+        nombre: "Educación Física",
+        Asignatura_Prioridad_Academica: "Baja",
+        Horas_Semanales_Requeridas: 2,
+        horas_semanales: 2,
+        horas: 2,
+        Tipo: "Obligatorio",
+        tipo: "Obligatorio",
+      },
+      {
+        Asignatura_Id: 7,
+        Asignatura_Nombre: "Artes Visuales",
+        nombre: "Artes Visuales",
+        Asignatura_Prioridad_Academica: "Baja",
+        Horas_Semanales_Requeridas: 2,
+        horas_semanales: 2,
+        horas: 2,
+        Tipo: "Complementario",
+        tipo: "Complementario",
+      },
+      {
+        Asignatura_Id: 8,
+        Asignatura_Nombre: "Música",
+        nombre: "Música",
+        Asignatura_Prioridad_Academica: "Baja",
+        Horas_Semanales_Requeridas: 2,
+        horas_semanales: 2,
+        horas: 2,
+        Tipo: "Complementario",
+        tipo: "Complementario",
+      },
+    ];
+  }
 
   // Para cualquier mutación (POST / PUT / PATCH / DELETE) en modo fallback
   if (m !== "GET" && m !== "HEAD") {
@@ -1007,7 +1146,7 @@ window.fetch = async function (input, init = {}) {
       if (urlStr.includes("/exportar")) {
         return generateMockExportResponse(urlStr);
       }
-      const mockData = getMockResponseForUrl(urlStr, method);
+      const mockData = getMockResponseForUrl(urlStr, method, modifiedInit.body);
       if (mockData !== null) {
         return new Response(JSON.stringify(mockData), {
           status: 200,
@@ -1023,7 +1162,7 @@ window.fetch = async function (input, init = {}) {
       if (urlStr.includes("/exportar")) {
         return generateMockExportResponse(urlStr);
       }
-      const mockData = getMockResponseForUrl(urlStr, method);
+      const mockData = getMockResponseForUrl(urlStr, method, modifiedInit.body);
       if (mockData !== null) {
         return new Response(JSON.stringify(mockData), {
           status: 200,

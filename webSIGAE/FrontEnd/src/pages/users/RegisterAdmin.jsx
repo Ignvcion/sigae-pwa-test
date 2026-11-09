@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { registrarAdmin } from "../../services/api";
 import {
-  validarRut, normalizarRut, validarNombreCompleto, validarCorreoInstitucional, DOMINIO_INSTITUCIONAL,
+  validarRut, obtenerErrorRut, normalizarRut, validarNombreCompleto, validarCorreoInstitucional, DOMINIO_INSTITUCIONAL,
   validarTelefonoChileno, validarFortalezaContrasena, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
   validarDireccion,
 } from "../../utils/validaciones";
@@ -38,9 +38,7 @@ function RegisterAdmin() {
           ? "Ingrese nombre y apellido, solo letras y espacios (ej: Juan Pérez)"
           : "";
       case "rut":
-        return value && !validarRut(value)
-          ? "RUT inválido. Formato esperado: 12345678-9"
-          : "";
+        return value ? obtenerErrorRut(value) : "";
       case "correo":
         return value && !validarCorreoInstitucional(value)
           ? `El correo debe pertenecer al dominio ${DOMINIO_INSTITUCIONAL}`

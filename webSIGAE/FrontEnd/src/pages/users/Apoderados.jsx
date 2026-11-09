@@ -284,20 +284,23 @@ function Apoderados() {
       {/* noValidate: el diagrama exige que un valor no entero o negativo llegue al backend
           para que sea éste quien lo rechace, en vez de bloquearlo en el navegador */}
       <form className="usuarios-filtros" onSubmit={aplicarFiltroCantidad} noValidate>
-        <span style={{ alignSelf: "center", color: "#475569", fontSize: "0.9rem" }}>
-          Estudiantes asociados:
+        <span style={{ alignSelf: "center", color: "#475569", fontSize: "0.88rem", fontWeight: 600 }}>
+          Filtrar por N° de estudiantes:
         </span>
         <select
           className="usuarios-select"
           value={operadorFiltro}
           onChange={(e) => setOperadorFiltro(e.target.value)}
+          title="Condición de comparación"
+          aria-label="Operador de comparación"
+          style={{ minWidth: "150px" }}
         >
-          <option value="=">=</option>
-          <option value="!=">≠</option>
-          <option value=">">&gt;</option>
-          <option value="<">&lt;</option>
-          <option value=">=">&gt;=</option>
-          <option value="<=">&lt;=</option>
+          <option value="=">Igual a (=)</option>
+          <option value="!=">Distinto de (≠)</option>
+          <option value=">">Más de (&gt;)</option>
+          <option value="<">Menos de (&lt;)</option>
+          <option value=">=">Al menos (≥)</option>
+          <option value="<=">Como máximo (≤)</option>
         </select>
         <input
           type="text"

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { registrarEstudiante, verificarRutEstudiante } from "../../services/api";
-import { validarRut, normalizarRut, validarDireccion } from "../../utils/validaciones";
+import { validarRut, obtenerErrorRut, normalizarRut, validarDireccion } from "../../utils/validaciones";
 import CamposDireccion, { CAMPOS_DIRECCION, errorCampoDireccion } from "../../components/CamposDireccion";
 
 function RegisterStudent() {
@@ -55,8 +55,8 @@ function RegisterStudent() {
 
   const validarCampo = (name, value, datos = formData) => {
     if (CAMPOS_DIRECCION.includes(name)) return errorCampoDireccion(name, value, datos);
-    if (name === "rut" && value && !validarRut(value)) {
-      return "RUT inválido. Formato esperado: 12345678-9";
+    if (name === "rut" && value) {
+      return obtenerErrorRut(value);
     }
     return "";
   };

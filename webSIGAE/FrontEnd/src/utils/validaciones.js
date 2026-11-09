@@ -100,3 +100,30 @@ export function formatearDireccion(registro, columnas = COLUMNAS_DIRECCION_USUAR
 }
 
 export { DOMINIO_INSTITUCIONAL };
+
+
+export function calcularDv(cuerpo) {
+  let suma = 0;
+  let multiplo = 2;
+  const c = String(cuerpo).replace(/\D/g, "");
+  for (let i = c.length - 1; i >= 0; i--) {
+    suma += parseInt(c[i]) * multiplo;
+    multiplo = multiplo === 7 ? 2 : multiplo + 1;
+  }
+  const dvEsperado = 11 - (suma % 11);
+  return dvEsperado === 11 ? "0" : dvEsperado === 10 ? "k" : String(dvEsperado);
+}
+
+export function obtenerErrorRut(rutCompleto) {
+  const rut = normalizarRut(rutCompleto || "");
+  if (!rut) return "";
+  if (!/^\d{7,8}-[\dkK]$/.test(rut)) {
+    return "Formato inválido. Use sin puntos y con guión (ej: 12345678-5)";
+  }
+  const [cuerpo, dvIngresado] = rut.split("-");
+  const dvCorrecto = calcularDv(cuerpo);
+  if (dvCorrecto !== dvIngresado.toLowerCase()) {
+    return `Dígito verificador no coincide. Para ${cuerpo} el dígito válido es ${dvCorrecto} (ingresa ${cuerpo}-${dvCorrecto})`;
+  }
+  return "";
+}

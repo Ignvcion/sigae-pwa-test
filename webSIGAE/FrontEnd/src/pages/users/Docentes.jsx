@@ -131,7 +131,7 @@ function Docentes() {
               <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Docente_Especialidad")}>
                 Especialidad{flechaOrden("Docente_Especialidad")}
               </th>
-              <th>Correo institucional</th>
+              <th style={{ minWidth: "240px" }}>Correo institucional</th>
               <th>Teléfono</th>
               <th>Carga horaria máxima</th>
               <th>Estado</th>
@@ -144,7 +144,7 @@ function Docentes() {
                 <td>{d.Usuario_Nombre_Completo}</td>
                 <td>{d.Usuario_RUT}</td>
                 <td>{renderDato(d.Docente_Especialidad, "Sin especialidad registrada")}</td>
-                <td>{renderDato(d.Docente_Correo_Institucional, "Sin correo institucional registrado")}</td>
+                <td style={{ minWidth: "240px", wordBreak: "break-all", whiteSpace: "normal" }}>{renderDato(d.Docente_Correo_Institucional, "Sin correo institucional registrado")}</td>
                 <td>{renderDato(d.Usuario_Telefono, "Sin teléfono registrado")}</td>
                 <td>{renderDato(d.Docente_Carga_Horaria_Maxima, "Sin carga horaria registrada")}</td>
                 <td>

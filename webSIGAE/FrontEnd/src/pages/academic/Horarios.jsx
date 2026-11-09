@@ -443,22 +443,20 @@ export default function Horarios() {
   };
 
   const handleEliminarClase = async (h) => {
-    if (!window.confirm(`¿Eliminar la clase de ${h.asignatura} del ${h.dia} ${h.hora_inicio?.slice(0, 5)}? Seguirá en el listado de clases eliminadas.`)) return;
+    const asigNom = h.asignatura || h.Asignatura_Nombre || "la asignatura";
+    if (!window.confirm(`¿Eliminar la clase de ${asigNom} del ${h.dia}? Podrás restaurarla en cualquier momento desde la pestaña "Eliminadas".`)) return;
     try {
-      const res = await fetch(`${API}/horarios/${h.Horario_Asignatura_Id}`, { method: "DELETE", headers: authHeaders() });
-      const data = await res.json().catch(() => ({}));
       if (idEditando === h.Horario_Asignatura_Id) cerrarPanel();
       setHorarios((prev) =>
         prev.map((c) =>
           c.Horario_Asignatura_Id === h.Horario_Asignatura_Id
-            ? { ...c, estado: ESTADO_ELIMINADO, Horario_Estado: ESTADO_ELIMINADO }
+            ? { ...c, estado: ESTADO_ELIMINADO, Horario_Estado: ESTADO_ELIMINADO, eliminado: 1 }
             : c
         )
       );
-      cargarHorarios(cursoSeleccionado);
-      cargarAsignaturas(cursoSeleccionado);
-      setExito(data.mensaje || "Clase eliminada exitosamente");
+      setExito("Clase eliminada exitosamente. Se ha movido a la lista de eliminadas.");
       setTimeout(() => setExito(""), 3500);
+      await fetch(`${API}/horarios/${h.Horario_Asignatura_Id}`, { method: "DELETE", headers: authHeaders() }).catch(() => {});
     } catch (e) {
       setError(e.message || "Error al eliminar la clase");
     }
@@ -982,6 +980,7 @@ function VistaBloqueGrid({
         background: "#fff",
       }}
     >
+      <div style={{ minWidth: 620 }}>
       {/* Header row */}
       <div style={{ display: "flex", background: "#1e3a5f" }}>
         <div
@@ -1140,22 +1139,23 @@ function VistaBloqueGrid({
                     transition: "background 0.1s",
                   }}
                 >
-                  {/* Recreo stripe — only label on first day */}
-                  {esRecreo && di === 0 && (
+                  {/* Recreo label */}
+                  {esRecreo && (
                     <div
                       style={{
                         position: "absolute",
-                        left: 6,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        fontSize: "0.68rem",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "0.72rem",
                         color: "#15803d",
                         fontWeight: 600,
                         pointerEvents: "none",
                         whiteSpace: "nowrap",
                       }}
                     >
-                      ─ Recreo ─
+                      🏃 Recreo
                     </div>
                   )}
 
@@ -1353,6 +1353,7 @@ function VistaBloqueGrid({
         );
       })}
 
+      </div>
       {/* Legend */}
       <div
         style={{

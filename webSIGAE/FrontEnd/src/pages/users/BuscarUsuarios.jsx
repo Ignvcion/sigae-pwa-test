@@ -115,6 +115,7 @@ function BuscarUsuarios() {
       )}
 
       {!errorCarga && !mensajeInfo && usuarios.length > 0 && (
+        <div className="tabla-responsive-container">
         <table className="tabla-usuarios">
           <thead>
             <tr>
@@ -154,6 +155,7 @@ function BuscarUsuarios() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

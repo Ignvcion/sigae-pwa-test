@@ -110,9 +110,9 @@ function ModalAsignarAsignaturas({ curso, token, onClose, onExito }) {
                       checked={!!seleccionadas[a.Asignatura_Id]}
                       onChange={() => toggleSeleccion(a.Asignatura_Id)}
                     />
-                    <span className="asig-nombre">{a.Asignatura_Nombre}</span>
-                    <span className="asig-tipo">{a.Tipo}</span>
-                    <span className="asig-horas">{a.Horas_Semanales_Requeridas}h/sem</span>
+                    <span className="asig-nombre">{a.Asignatura_Nombre || a.nombre || a.asignatura || "Asignatura"}</span>
+                    <span className="asig-tipo">{a.Tipo || a.tipo || "Obligatorio"}</span>
+                    <span className="asig-horas">{a.Horas_Semanales_Requeridas ?? a.horas_semanales ?? a.horas ?? 4}h/sem</span>
                   </label>
                   {seleccionadas[a.Asignatura_Id] && (
                     <div className="asig-estado-select">
