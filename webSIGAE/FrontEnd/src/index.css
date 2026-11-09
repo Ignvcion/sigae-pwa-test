@@ -2556,3 +2556,103 @@ body.bloques-panel-open .main-content {
 .form-card input[type="file"] {
   max-width: 100%;
 }
+
+/* ── Calendario de evaluaciones (RF58, RF59 / CU92–CU94) ── */
+.ev-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.ev-navegacion { display: flex; align-items: center; gap: 8px; }
+.ev-mes { font-size: 1.1rem; margin: 0 4px; min-width: 170px; text-align: center; color: #1e293b; }
+.ev-filtros { display: flex; gap: 8px; flex-wrap: wrap; }
+.ev-filtros .usuarios-select { min-width: 180px; }
+
+.ev-calendario {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) repeat(2, minmax(0, 0.55fr));
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #e2e8f0;
+  gap: 1px;
+}
+.ev-cargando { opacity: 0.6; }
+.ev-cabecera {
+  background: #f8fafc;
+  padding: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #475569;
+  text-align: center;
+}
+.ev-dia {
+  background: white;
+  min-height: 104px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.ev-dia-vacio { background: #f8fafc; }
+.ev-pasado { background: #fbfcfd; }
+.ev-pasado .ev-dia-num { color: #94a3b8; }
+.ev-hoy { box-shadow: inset 0 0 0 2px #6366f1; }
+.ev-dia-num {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+}
+.ev-agregar {
+  border: none;
+  background: transparent;
+  color: #6366f1;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
+  opacity: 0;
+}
+.ev-dia:hover .ev-agregar,
+.ev-agregar:focus-visible { opacity: 1; background: #eef2ff; }
+.ev-chip {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #94a3b8;
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 0.74rem;
+  color: #1e293b;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ev-chip:hover { background: #f1f5f9; }
+.ev-chip-propia { border-left-color: #6366f1; background: #eef2ff; }
+.ev-chip-tipo { font-weight: 700; }
+.ev-chip-curso { display: block; color: #64748b; font-size: 0.7rem; }
+.ev-lista { display: none; }
+.ev-acciones .btn-desactivar { margin-right: auto; }
+
+@media (max-width: 760px) {
+  .ev-calendario { display: none; }
+  .ev-lista { display: flex; flex-direction: column; gap: 14px; }
+  .ev-lista-items { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+  .ev-chip { white-space: normal; font-size: 0.85rem; padding: 8px 10px; }
+  .ev-mes { min-width: 0; }
+  .ev-filtros, .ev-filtros .usuarios-select { width: 100%; }
+}
