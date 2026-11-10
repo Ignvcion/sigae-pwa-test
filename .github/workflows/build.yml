@@ -17,19 +17,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Node 22: la misma versión mayor que el codespace y el servidor
+      # (Puppeteer 25 exige >= 22.12).
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: webSIGAE/BackEnd/package-lock.json
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+        working-directory: webSIGAE/BackEnd
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+
+      - name: Run tests
+        run: npm test
         working-directory: webSIGAE/BackEnd
 
+      # Arranca el servidor de verdad y comprueba que responde (la ruta no
+      # existe, así que se espera el 404 JSON). No necesita base de datos.
       - name: Verify server starts
-        run: node -e "require('./server.js')" &
+        run: |
+          node server.js &
+          PID=$!
+          sleep 3
+          CODIGO=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/no-existe || true)
+          kill "$PID" 2>/dev/null || true
+          if [ "$CODIGO" != "404" ]; then
+            echo "El servidor no respondió como se esperaba (HTTP $CODIGO)"
+            exit 1
+          fi
         working-directory: webSIGAE/BackEnd
 
   build-frontend:
@@ -43,12 +62,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: webSIGAE/FrontEnd/package-lock.json
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
         working-directory: webSIGAE/FrontEnd
 
       - name: Build

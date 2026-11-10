@@ -115,6 +115,7 @@ Toda la documentación, salvo este README, está en `docs/`. No agregues archivo
 | [`docs/api-citaciones.md`](docs/api-citaciones.md) | Contrato entre frontend y backend del módulo de citaciones (CU74–CU79): endpoints, formato de respuestas y permisos. |
 | [`docs/navegacion-sidebar.md`](docs/navegacion-sidebar.md) | Cómo funciona el sidebar (`MainLayout.jsx`), reglas para agregar enlaces y pendientes conocidos. |
 | [`docs/tabla-historial.md`](docs/tabla-historial.md) | Estado de la tabla de auditoría `historial` y cómo se escriben sus valores. |
+| [`docs/mailer-smtp-produccion.md`](docs/mailer-smtp-produccion.md) | Cómo dejar funcionando el envío de códigos por correo en producción (Google Workspace, SPF/DKIM/DMARC, prueba desde la EC2 y diagnóstico de errores). |
 | [`docs/decisiones-rf60-rf61-periodos.txt`](docs/decisiones-rf60-rf61-periodos.txt) | Acuerdos del Incremento 4 que van más allá del mockup: profesor jefe, situación final, promoción, períodos lectivos y limpieza de datos. |
 
 ---
@@ -241,7 +242,9 @@ Producción durante la marcha blanca:
 
 ### 1. Código en el servidor
 
-El servidor solo recibe el backend y el esquema (sparse-checkout de lista blanca): `webSIGAE/BackEnd/`, `webSIGAE/Database/schema_base.sql` y `webSIGAE/Database/catalogos_base.sql`, **excluyendo** `SIGAE.sql`, `BackEnd/tests/`, `BackEnd/scripts/` y `BackEnd/hashPasswords.js`. Usa la misma versión mayor de Node que el codespace (`node --version`).
+El servidor solo recibe el backend y el esquema (sparse-checkout de lista blanca): `webSIGAE/BackEnd/`, `webSIGAE/Database/schema_base.sql` y `webSIGAE/Database/catalogos_base.sql`, **excluyendo** `SIGAE.sql`, `BackEnd/tests/` y `BackEnd/hashPasswords.js`. `BackEnd/scripts/` **sí** va al servidor: de ahí salen `crearSuperAdmin.js` (paso 2) y `backup.sh` (paso 6).
+
+**Node 22 (≥ 22.12)**, la misma versión mayor que el codespace (`node --version`): Puppeteer lo exige. `apt` de Debian 13 trae Node 20, así que instálalo desde NodeSource: `curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs`.
 
 Instala las dependencias sin las de desarrollo y sin el Chromium de Puppeteer (se usa el del sistema, `apt install chromium`):
 
@@ -256,7 +259,9 @@ cd webSIGAE/BackEnd && PUPPETEER_SKIP_DOWNLOAD=true npm ci --omit=dev
 - Crea un usuario para la app con permisos acotados (la app no necesita DDL):
   `GRANT SELECT, INSERT, UPDATE, DELETE ON sigae.* TO 'sigae_app'@'%';` (restringe el host a la subred de la EC2 si puedes).
 - Después del esquema, carga **una vez** los niveles educativos con su orden (sin ellos no funciona la promoción): `mariadb -h <endpoint> -u <admin> -p < webSIGAE/Database/catalogos_base.sql`. Es idempotente (`INSERT IGNORE`).
+- Una base **nueva** solo necesita estos dos archivos: los `ALTER TABLE` que traen los documentos de `docs/` son para una RDS que ya tenía datos y **no** se aplican.
 - El resto parte vacío: parámetros institucionales y bloques, asignaturas, planes, cursos y horarios se cargan desde la aplicación. Al guardar los parámetros institucionales queda fijado el período vigente (el año actual).
+- 🛑 **Antes de crear al primer administrador, deja funcionando y probado el correo** (paso 3 y [`docs/mailer-smtp-produccion.md`](docs/mailer-smtp-produccion.md)): el primer ingreso de **toda** cuenta exige un código enviado por correo, así que con el SMTP roto nadie puede entrar, ni el super administrador.
 - El primer administrador real (y los super administradores adicionales) se crean con `node scripts/crearSuperAdmin.js --rut 12345678-9 --nombre "Ana Pérez" --telefono 912345678 --correo an.perez@colegiojc.cl` (dominio `@colegiojc.cl` o `@colegiojacquescousteau.cl`), desde `webSIGAE/BackEnd` y con el `.env` de producción. La contraseña se pide por consola (o se toma de `SUPERADMIN_PASSWORD`) y se guarda con bcrypt. **No** se usa `hashPasswords.js`. En su primer ingreso confirma el correo con un código.
 
 ### 3. `.env` de producción
