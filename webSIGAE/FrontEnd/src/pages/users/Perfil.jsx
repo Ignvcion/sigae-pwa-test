@@ -28,7 +28,10 @@ function Perfil() {
   const esPerfilPropio = !idParam || String(idParam) === String(usuario?.id);
 
   const [datos, setDatos] = useState(null);
-  const [cargando, setCargando] = useState(true);
+  // Cada carga recuerda para qué usuario se hizo: "cargando" se deriva de eso, sin efectos
+  // que cambien el estado de forma síncrona al cambiar de perfil.
+  const [perfilCargadoDe, setPerfilCargadoDe] = useState(null);
+  const cargando = Boolean(idObjetivo) && perfilCargadoDe !== idObjetivo;
   const [errorPerfil, setErrorPerfil] = useState("");
 
   const [contrasenaActual, setContrasenaActual] = useState("");
@@ -42,14 +45,14 @@ function Perfil() {
   const [asignaciones, setAsignaciones] = useState([]);
   const [mensajeAsignaciones, setMensajeAsignaciones] = useState("");
   const [errorAsignaciones, setErrorAsignaciones] = useState("");
-  const [cargandoAsignaciones, setCargandoAsignaciones] = useState(false);
+  const [asignacionesCargadasDe, setAsignacionesCargadasDe] = useState(null);
   const [ordenAsignaciones, setOrdenAsignaciones] = useState("curso");
 
   // CU40: Estudiantes asociados al apoderado
   const [estudiantesAsociados, setEstudiantesAsociados] = useState([]);
   const [mensajeEstudiantes, setMensajeEstudiantes] = useState("");
   const [errorEstudiantes, setErrorEstudiantes] = useState("");
-  const [cargandoEstudiantes, setCargandoEstudiantes] = useState(false);
+  const [estudiantesCargadosDe, setEstudiantesCargadosDe] = useState(null);
   const [ordenEstudiantes, setOrdenEstudiantes] = useState("nombre");
 
   // CU41: Detalle de un estudiante asociado
@@ -57,6 +60,9 @@ function Perfil() {
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
   const [errorDetalle, setErrorDetalle] = useState("");
   const [avisoLista, setAvisoLista] = useState("");
+
+  const cargandoAsignaciones = Boolean(datos?.Es_Docente && idObjetivo) && asignacionesCargadasDe !== idObjetivo;
+  const cargandoEstudiantes = Boolean(datos?.Es_Apoderado && idObjetivo) && estudiantesCargadosDe !== idObjetivo;
 
   // CU19: editar datos personales del propio perfil (correo, teléfono y/o dirección)
   const [editandoPerfil, setEditandoPerfil] = useState(false);
@@ -82,12 +88,11 @@ function Perfil() {
 
   useEffect(() => {
     if (!idObjetivo) return;
-    setCargando(true);
-    setErrorPerfil("");
     apiFetch(`/api/usuarios/${idObjetivo}`)
       .then(async (r) => {
         if (!r) return; // sesión expirada: apiFetch ya redirigió
         const data = await r.json().catch(() => ({}));
+        setErrorPerfil("");
         if (!r.ok) {
           // CU18 - Excepción "Falta de permisos" u otro rechazo del backend
           setErrorPerfil(data.mensaje || "No fue posible cargar el perfil");
@@ -96,16 +101,15 @@ function Perfil() {
         setDatos(data);
       })
       .catch(() => setErrorPerfil("No fue posible cargar el perfil"))
-      .finally(() => setCargando(false));
+      .finally(() => setPerfilCargadoDe(idObjetivo));
   }, [idObjetivo]);
 
   useEffect(() => {
     if (!datos?.Es_Docente || !idObjetivo) return;
-    setCargandoAsignaciones(true);
-    setErrorAsignaciones("");
-    setMensajeAsignaciones("");
     getAsignacionesDocente(idObjetivo)
       .then((data) => {
+        setErrorAsignaciones("");
+        setMensajeAsignaciones("");
         if (Array.isArray(data)) {
           setAsignaciones(data);
         } else {
@@ -118,16 +122,15 @@ function Perfil() {
         // Excepción 2 (docente no encontrado) y Excepción 3 (error técnico)
         setErrorAsignaciones(error.message || "No fue posible cargar las asignaciones académicas, reintente más tarde");
       })
-      .finally(() => setCargandoAsignaciones(false));
+      .finally(() => setAsignacionesCargadasDe(idObjetivo));
   }, [datos?.Es_Docente, idObjetivo]);
 
   useEffect(() => {
     if (!datos?.Es_Apoderado || !idObjetivo) return;
-    setCargandoEstudiantes(true);
-    setErrorEstudiantes("");
-    setMensajeEstudiantes("");
     getEstudiantesAsociados(idObjetivo)
       .then((data) => {
+        setErrorEstudiantes("");
+        setMensajeEstudiantes("");
         if (Array.isArray(data)) {
           setEstudiantesAsociados(data);
         } else {
@@ -140,7 +143,7 @@ function Perfil() {
         // Excepción 2 (apoderado no encontrado) y Excepción 3 (error técnico)
         setErrorEstudiantes(error.message || "No fue posible cargar estudiantes, reintente más tarde");
       })
-      .finally(() => setCargandoEstudiantes(false));
+      .finally(() => setEstudiantesCargadosDe(idObjetivo));
   }, [datos?.Es_Apoderado, idObjetivo]);
 
   // CU41: abrir/cerrar el detalle de un estudiante desde la lista de asociados

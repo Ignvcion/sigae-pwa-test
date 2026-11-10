@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 
 const TOKEN = () => localStorage.getItem("token");
@@ -539,31 +539,34 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
     cargar();
   }, []);
 
-  useEffect(() => {
-    if (!planOrigenId) { setAsignaturas([]); return; }
-    const precargar = async () => {
-      setCargandoAsig(true);
-      try {
-        const res = await fetch(`/api/planes/${planOrigenId}`, { headers: { Authorization: `Bearer ${TOKEN()}` } });
-        const data = await res.json();
-        if (!res.ok) { setError(data.error); return; }
-        setAsignaturas(
-          data.asignaturas.map((a) => ({
-            Asignatura_Id                 : a.Asignatura_Id,
-            Asignatura_Nombre             : a.Asignatura_Nombre,
-            Asignatura_Tramo              : a.Asignatura_Tramo,
-            tipo                          : a.Tipo,
-            horas_semanales               : a.Horas_Semanales_Requeridas,
-          }))
-        );
-      } catch {
-        setError("Error al cargar asignaturas del plan origen");
-      } finally {
-        setCargandoAsig(false);
-      }
-    };
-    precargar();
-  }, [planOrigenId]);
+  // Al elegir el plan origen se precargan sus asignaturas (en el evento, no en un efecto).
+  // Si se elige otro plan antes de que llegue la respuesta, la anterior se descarta.
+  const ultimoPlanOrigen = useRef("");
+  const elegirPlanOrigen = async (id) => {
+    setPlanOrigenId(id);
+    ultimoPlanOrigen.current = id;
+    if (!id) { setAsignaturas([]); return; }
+    setCargandoAsig(true);
+    try {
+      const res = await fetch(`/api/planes/${id}`, { headers: { Authorization: `Bearer ${TOKEN()}` } });
+      const data = await res.json();
+      if (ultimoPlanOrigen.current !== id) return;
+      if (!res.ok) { setError(data.error); return; }
+      setAsignaturas(
+        data.asignaturas.map((a) => ({
+          Asignatura_Id                 : a.Asignatura_Id,
+          Asignatura_Nombre             : a.Asignatura_Nombre,
+          Asignatura_Tramo              : a.Asignatura_Tramo,
+          tipo                          : a.Tipo,
+          horas_semanales               : a.Horas_Semanales_Requeridas,
+        }))
+      );
+    } catch {
+      if (ultimoPlanOrigen.current === id) setError("Error al cargar asignaturas del plan origen");
+    } finally {
+      if (ultimoPlanOrigen.current === id) setCargandoAsig(false);
+    }
+  };
 
   const agregarAsig = (asig) => {
     if (asignaturas.find((a) => a.Asignatura_Id === asig.Asignatura_Id)) return;
@@ -634,7 +637,7 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
       {error && <p className="msg-error">{error}</p>}
 
       <label>Plan Origen</label>
-      <select value={planOrigenId} onChange={(e) => setPlanOrigenId(e.target.value)} required>
+      <select value={planOrigenId} onChange={(e) => elegirPlanOrigen(e.target.value)} required>
         <option value="">Seleccionar plan origen...</option>
         {planesExistentes.map((p) => (
           <option key={p.Plan_Educativo_Id} value={p.Plan_Educativo_Id}>
@@ -719,21 +722,23 @@ function PlanEducativo() {
   const [planDetalleId, setPlanDetalleId] = useState(null);
   const [planEditarId, setPlanEditarId]   = useState(null);
 
-  const cargarPlanes = useCallback(async () => {
-    setCargando(true);
-    try {
-      const res = await fetch("/api/planes", { headers: { Authorization: `Bearer ${TOKEN()}` } });
-      const data = await res.json();
-      if (!res.ok) setError(data.error || "Error al cargar planes");
-      else setPlanes(data);
-    } catch {
-      setError("Error al conectar con el servidor");
-    } finally {
-      setCargando(false);
-    }
-  }, []);
+  // El estado cambia solo al llegar la respuesta (callbacks), así puede llamarse desde el efecto.
+  const pedirPlanes = useCallback(() =>
+    fetch("/api/planes", { headers: { Authorization: `Bearer ${TOKEN()}` } })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) setError(data.error || "Error al cargar planes");
+        else setPlanes(data);
+      })
+      .catch(() => setError("Error al conectar con el servidor"))
+      .finally(() => setCargando(false)), []);
 
-  useEffect(() => { cargarPlanes(); }, [cargarPlanes]);
+  const cargarPlanes = () => {
+    setCargando(true);
+    return pedirPlanes();
+  };
+
+  useEffect(() => { pedirPlanes(); }, [pedirPlanes]);
 
   const handleExito = (msg) => {
     setExito(msg);

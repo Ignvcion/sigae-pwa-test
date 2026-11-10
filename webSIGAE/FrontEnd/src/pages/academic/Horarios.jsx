@@ -251,7 +251,8 @@ export default function Horarios() {
   const [cursoSeleccionado, setCursoSeleccionado] = useState("");
   const [asignaturaActiva, setAsignaturaActiva] = useState(null);
   const [horarios, setHorarios] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // El docente carga su horario al entrar: parte en "cargando"
+  const [loading, setLoading] = useState(esDocente);
   const [error, setError] = useState("");
 
   // Panel state
@@ -307,22 +308,26 @@ export default function Horarios() {
       .catch(() => {});
   }, []);
 
-  const cargarHorarios = useCallback(async (cursoId) => {
+  // Pide las clases; el estado cambia solo al llegar la respuesta (callbacks), así puede
+  // llamarse desde un efecto. cargarHorarios() además muestra el "cargando" y limpia el error.
+  const pedirHorarios = useCallback((cursoId) => {
+    // Con curso (vista de administrador) se piden también las clases eliminadas para el listado
+    const url = cursoId ? `${API}/horarios?curso_id=${cursoId}&incluir_eliminadas=1` : `${API}/horarios`;
+    return fetch(url, { headers: authHeaders() })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setHorarios(data);
+      })
+      .catch((e) => setError(e.message || "Error al cargar horarios."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const cargarHorarios = useCallback((cursoId) => {
     setLoading(true);
     setError("");
-    try {
-      // Con curso (vista de administrador) se piden también las clases eliminadas para el listado
-      const url = cursoId ? `${API}/horarios?curso_id=${cursoId}&incluir_eliminadas=1` : `${API}/horarios`;
-      const res = await fetch(url, { headers: authHeaders() });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setHorarios(data);
-    } catch (e) {
-      setError(e.message || "Error al cargar horarios.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    return pedirHorarios(cursoId);
+  }, [pedirHorarios]);
 
   const cargarAsignaturas = useCallback(async (cursoId) => {
     if (!cursoId) { setAsignaturasCurso([]); return; }
@@ -337,19 +342,17 @@ export default function Horarios() {
     }
   }, []);
 
-  const cargarResumenCursos = useCallback(async () => {
-    try {
-      const res = await fetch(`${API}/horarios/resumen-cursos`, { headers: authHeaders() });
-      const data = await res.json();
-      setResumenCursos(res.ok && Array.isArray(data) ? data : []);
-    } catch {
-      setResumenCursos([]);
-    }
-  }, []);
+  const cargarResumenCursos = useCallback(() =>
+    fetch(`${API}/horarios/resumen-cursos`, { headers: authHeaders() })
+      .then(async (res) => {
+        const data = await res.json();
+        setResumenCursos(res.ok && Array.isArray(data) ? data : []);
+      })
+      .catch(() => setResumenCursos([])), []);
 
   useEffect(() => {
-    if (esDocente) cargarHorarios("");
-  }, [esDocente, cargarHorarios]);
+    if (esDocente) pedirHorarios("");
+  }, [esDocente, pedirHorarios]);
 
   useEffect(() => {
     if (listadoAbierto) cargarResumenCursos();
@@ -913,7 +916,6 @@ export default function Horarios() {
               horarios={horariosVigentes}
               electivos={electivosCurso}
               esAdmin={esAdmin}
-              asignaturaActiva={asignaturaActiva}
               colorMap={colorMap}
               colorDeClase={colorDeClase}
               colorearPor={colorearPor}
@@ -1017,7 +1019,6 @@ function VistaBloqueGrid({
   horarios,
   electivos = [],
   esAdmin,
-  asignaturaActiva,
   colorMap,
   colorDeClase,
   colorearPor = "asignatura",
@@ -1682,16 +1683,16 @@ function PanelForm({
   onClose,
   onEliminar,
 }) {
-  const [docentesInfo, setDocentesInfo] = useState([]);
-  const [cargandoDoc, setCargandoDoc] = useState(false);
-
   const bloque = bloques.find((b) => b.Bloque_Horario_Id === Number(form.Bloque_Horario_Id));
   const camposListos =
     !!form.Asignatura_Id && !!form.Bloque_Horario_Id && !!form.Horario_Asignatura_Dia_Semana;
 
-  useEffect(() => {
-    if (!camposListos) { setDocentesInfo([]); return; }
-    setCargandoDoc(true);
+  // Consulta de docentes disponibles para los campos actuales (null si faltan campos).
+  // La respuesta se guarda junto a la consulta que la produjo: si los campos cambian, la
+  // lista anterior deja de mostrarse sin tener que vaciarla desde el efecto, y una
+  // respuesta atrasada nunca pisa a la de la consulta vigente.
+  let consulta = null;
+  if (camposListos) {
     const params = new URLSearchParams({
       asignatura_id: form.Asignatura_Id,
       bloque_id: form.Bloque_Horario_Id,
@@ -1699,8 +1700,15 @@ function PanelForm({
     });
     if (modoEdicion && idEditando) params.append("horario_id", idEditando);
     if (form.Curso_Id) params.append("curso_id", form.Curso_Id); // período del curso (CU107)
+    consulta = params.toString();
+  }
+  const [resultadoDoc, setResultadoDoc] = useState({ consulta: null, docentes: [] });
+  const docentesInfo = consulta && resultadoDoc.consulta === consulta ? resultadoDoc.docentes : [];
+  const cargandoDoc = Boolean(consulta) && resultadoDoc.consulta !== consulta;
 
-    fetch(`/api/horarios/docentes-disponibles?${params}`, { headers: authHeaders() })
+  useEffect(() => {
+    if (!consulta) return;
+    fetch(`/api/horarios/docentes-disponibles?${consulta}`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => {
         // CU56: el servidor indica si alguna especialidad (etiqueta) coincide con la asignatura;
@@ -1711,11 +1719,10 @@ function PanelForm({
           const sB = (b.disponible ? 10 : 0) + (b.coincide_especialidad ? 5 : 0);
           return sB - sA || a.Usuario_Nombre_Completo.localeCompare(b.Usuario_Nombre_Completo);
         });
-        setDocentesInfo(enriched);
+        setResultadoDoc({ consulta, docentes: enriched });
       })
-      .catch(() => setDocentesInfo([]))
-      .finally(() => setCargandoDoc(false));
-  }, [form.Asignatura_Id, form.Bloque_Horario_Id, form.Horario_Asignatura_Dia_Semana, form.Curso_Id, modoEdicion, idEditando]);
+      .catch(() => setResultadoDoc({ consulta, docentes: [] }));
+  }, [consulta]);
 
   const sugeridos = docentesInfo.filter((d) => d.disponible && d.coincide_especialidad);
   const disponibles = docentesInfo.filter((d) => d.disponible && !d.coincide_especialidad);

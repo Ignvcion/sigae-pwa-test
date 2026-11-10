@@ -35,7 +35,6 @@ import BuscarUsuarios from "../pages/users/BuscarUsuarios";
 import Perfil from "../pages/users/Perfil";
 
 /* NUEVOS COMPONENTES */
-import ListaEstudiantesApoderado from "../components/ListaEstudiantesApoderado";
 
 /* ACADEMIC */
 

@@ -61,44 +61,48 @@ function Estudiantes() {
   const [editandoAsociacion, setEditandoAsociacion] = useState(null);
   const [msgExitoAsociacion, setMsgExitoAsociacion] = useState("");
 
+  // CU34 y CU35: listado con filtros opcionales de curso y estado académico, resueltos en el backend
+  // Pide el listado; el estado cambia solo al llegar la respuesta (callbacks), así el efecto
+  // de montaje no provoca renders en cascada. cargarEstudiantes() además limpia los avisos.
+  const pedirEstudiantes = (filtros, esInicial = false) =>
+    getEstudiantes(filtros)
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setEstudiantes(data);
+          // Las opciones de los selects se fijan solo en la carga inicial (sin filtros),
+          // para que no se reduzcan a medida que se aplican filtros posteriores.
+          if (esInicial) {
+            setCursosDisponibles([...new Set(data.map((e) => e.Curso_Nombre).filter(Boolean))].sort());
+            // El filtro ofrece siempre todos los estados (CU35, CU37) y además cualquier otro presente
+            const presentes = data.map((e) => e.Estudiante_Estado_Academico).filter(Boolean);
+            setEstadosDisponibles([...new Set([...ESTADOS_ACADEMICOS, ...presentes])]);
+          }
+        } else {
+          // Excepciones: sin estudiantes registrados / sin coincidencias / docente sin cursos asignados
+          setEstudiantes(data.estudiantes || []);
+          setMensajeInfo(data.mensaje || "No hay estudiantes registrados.");
+        }
+      })
+      // Error técnico en la consulta
+      .catch((error) => setErrorCarga(error.message || "No fue posible recuperar los registros"))
+      .finally(() => setLoading(false));
+
+  // CU34 y CU35: listado con filtros opcionales de curso y estado académico, resueltos en el backend
+  const cargarEstudiantes = (filtros, esInicial = false) => {
+    setLoading(true);
+    setErrorCarga("");
+    setMensajeInfo("");
+    return pedirEstudiantes(filtros, esInicial);
+  };
+
   useEffect(() => {
-    cargarEstudiantes({}, true);
+    pedirEstudiantes({}, true);
     if (esAdmin) {
       getCursos().then(setCursosOpciones).catch(() => {});
       getApoderados().then((data) => setApoderadosOpciones(Array.isArray(data) ? data : [])).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // CU34 y CU35: listado con filtros opcionales de curso y estado académico, resueltos en el backend
-  const cargarEstudiantes = async (filtros, esInicial = false) => {
-    setLoading(true);
-    setErrorCarga("");
-    setMensajeInfo("");
-    try {
-      const data = await getEstudiantes(filtros);
-      if (Array.isArray(data)) {
-        setEstudiantes(data);
-        // Las opciones de los selects se fijan solo en la carga inicial (sin filtros),
-        // para que no se reduzcan a medida que se aplican filtros posteriores.
-        if (esInicial) {
-          setCursosDisponibles([...new Set(data.map((e) => e.Curso_Nombre).filter(Boolean))].sort());
-          // El filtro ofrece siempre todos los estados (CU35, CU37) y además cualquier otro presente
-          const presentes = data.map((e) => e.Estudiante_Estado_Academico).filter(Boolean);
-          setEstadosDisponibles([...new Set([...ESTADOS_ACADEMICOS, ...presentes])]);
-        }
-      } else {
-        // Excepciones: sin estudiantes registrados / sin coincidencias / docente sin cursos asignados
-        setEstudiantes(data.estudiantes || []);
-        setMensajeInfo(data.mensaje || "No hay estudiantes registrados.");
-      }
-    } catch (error) {
-      // Error técnico en la consulta
-      setErrorCarga(error.message || "No fue posible recuperar los registros");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const alternarOrden = (campo) => {
     setOrden((prev) => ({

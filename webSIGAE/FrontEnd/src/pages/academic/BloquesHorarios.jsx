@@ -457,27 +457,31 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
     return () => document.body.classList.remove("bloques-panel-open");
   }, [panelAbierto]);
 
-  const cargar = useCallback(async () => {
+  // Pide bloques y parámetros; el estado cambia solo al llegar la respuesta (callbacks),
+  // así el efecto no provoca renders en cascada. cargar() además muestra el "cargando".
+  const pedir = useCallback(() =>
+    Promise.all([
+      fetch(API, { headers: authHeaders() }),
+      fetch(`${API}/parametros`, { headers: authHeaders() }),
+    ])
+      .then(async ([rB, rP]) => {
+        const dataBloques = await rB.json();
+        const dataParams  = await rP.json();
+        if (!rB.ok) throw new Error(dataBloques.error);
+        setBloques(dataBloques);
+        setParametros(dataParams);
+        setError("");
+      })
+      .catch((e) => setError(e.message || "Error al cargar bloques"))
+      .finally(() => setLoading(false)), []);
+
+  const cargar = () => {
     setLoading(true);
     setError("");
-    try {
-      const [rB, rP] = await Promise.all([
-        fetch(API, { headers: authHeaders() }),
-        fetch(`${API}/parametros`, { headers: authHeaders() }),
-      ]);
-      const dataBloques = await rB.json();
-      const dataParams  = await rP.json();
-      if (!rB.ok) throw new Error(dataBloques.error);
-      setBloques(dataBloques);
-      setParametros(dataParams);
-    } catch (e) {
-      setError(e.message || "Error al cargar bloques");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    return pedir();
+  };
 
-  useEffect(() => { cargar(); }, [cargar, version]);
+  useEffect(() => { pedir(); }, [pedir, version]);
 
   /* Duración estándar según tipo (solo Clase y Recreo) */
   const duracionSugerida = (tipo) => {
@@ -995,22 +999,25 @@ function TabEventos() {
     return () => document.body.classList.remove("bloques-panel-open");
   }, [panelAbierto]);
 
-  const cargar = useCallback(async () => {
+  // Igual que en TabBloques: el estado cambia solo al llegar la respuesta.
+  const pedir = useCallback(() =>
+    fetch(`${API}/eventos`, { headers: authHeaders() })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setEventos(data);
+        setError("");
+      })
+      .catch((e) => setError(e.message || "Error al cargar eventos"))
+      .finally(() => setLoading(false)), []);
+
+  const cargar = () => {
     setLoading(true);
     setError("");
-    try {
-      const res  = await fetch(`${API}/eventos`, { headers: authHeaders() });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setEventos(data);
-    } catch (e) {
-      setError(e.message || "Error al cargar eventos");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    return pedir();
+  };
 
-  useEffect(() => { cargar(); }, [cargar]);
+  useEffect(() => { pedir(); }, [pedir]);
 
   const abrirCrear = () => {
     setForm(EMPTY_EVENTO);

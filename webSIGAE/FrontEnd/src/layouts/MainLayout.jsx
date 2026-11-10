@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../pages/context/AuthContext";
 import { MOSTRAR_MIS_CURSOS } from "../config/funcionalidades";
@@ -9,17 +9,16 @@ function MainLayout() {
   const location = useLocation();
 
   // Sidebar responsiva: en pantallas angostas se comporta como panel deslizable
-  const [sidebarMovilAbierta, setSidebarMovilAbierta] = useState(false);
+  // La sidebar móvil queda abierta solo en la página donde se abrió: al navegar a otra
+  // se cierra sola (se deriva de la ruta, sin un efecto que cambie el estado).
+  const [sidebarAbiertaEn, setSidebarAbiertaEn] = useState(null);
+  const sidebarMovilAbierta = sidebarAbiertaEn === location.pathname;
+  const setSidebarMovilAbierta = (abierta) => setSidebarAbiertaEn(abierta ? location.pathname : null);
 
   // Estados para los dropdowns
   const [gestionAbierto, setGestionAbierto] = useState(false);
   const [registrarAbierto, setRegistrarAbierto] = useState(false);
   const [gestionAcademicaAbierto, setGestionAcademicaAbierto] = useState(false);
-
-  // Cierra la sidebar móvil automáticamente al navegar a otra página
-  useEffect(() => {
-    setSidebarMovilAbierta(false);
-  }, [location.pathname]);
 
   const rolEfectivo = rolActivo || usuario?.roles?.[0];
   const esSuperAdmin = usuario?.administradorTipo === "Super Admin";
