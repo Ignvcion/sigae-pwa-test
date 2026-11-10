@@ -1287,7 +1287,32 @@ const SEED_ESTUDIANTES = [
     "Usuario_Correo": "apoderado@email.cl"
   }
 ];
-let STORE_ESTUDIANTES = loadStore("SIGAE_ESTUDIANTES", SEED_ESTUDIANTES);
+function normalizarEstudiante(e) {
+  if (!e) return e;
+  const calle = e.Estudiante_Calle || e.Estudiante_Direccion_Calle || e.calle || "";
+  const numero = e.Estudiante_Numero || e.Estudiante_Direccion_Numero || e.numero || "";
+  const depto = e.Estudiante_Depto || e.Estudiante_Direccion_Depto || e.depto || "";
+  const comuna = e.Estudiante_Comuna || e.Estudiante_Direccion_Comuna || e.comuna || "";
+
+  return {
+    ...e,
+    Estudiante_Calle: calle,
+    Estudiante_Numero: numero,
+    Estudiante_Depto: depto,
+    Estudiante_Comuna: comuna,
+    Estudiante_Direccion_Calle: calle,
+    Estudiante_Direccion_Numero: numero,
+    Estudiante_Direccion_Depto: depto,
+    Estudiante_Direccion_Comuna: comuna,
+    calle,
+    numero,
+    depto,
+    comuna,
+  };
+}
+
+let STORE_ESTUDIANTES = loadStore("SIGAE_ESTUDIANTES", SEED_ESTUDIANTES).map(normalizarEstudiante);
+saveStore("SIGAE_ESTUDIANTES", STORE_ESTUDIANTES);
 
 // Helper para extraer ID numérico de URL
 function parseUrlId(url) {
@@ -1469,6 +1494,11 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     if (p.includes("/estudiantes")) {
       const cId = Number(b?.Curso_Id || b?.curso) || 1;
       const cNombre = STORE_CURSOS.find(c => c.Curso_Id === cId)?.Curso_Nombre || (cId + "° Básico A");
+      const calle = b?.Estudiante_Calle || b?.calle || b?.Estudiante_Direccion_Calle || "";
+      const numero = b?.Estudiante_Numero || b?.numero || b?.Estudiante_Direccion_Numero || "";
+      const depto = b?.Estudiante_Depto || b?.depto || b?.Estudiante_Direccion_Depto || "";
+      const comuna = b?.Estudiante_Comuna || b?.comuna || b?.Estudiante_Direccion_Comuna || "";
+
       const nuevoEst = {
         Estudiante_Id: nextId(),
         Estudiante_Nombre_Completo: b?.Estudiante_Nombre_Completo || b?.nombre || "Estudiante Nuevo",
@@ -1476,14 +1506,18 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
         Curso_Id: cId,
         Curso_Nombre: cNombre,
         Estudiante_Estado_Academico: b?.Estudiante_Estado_Academico || b?.estadoAcademico || "Regular",
-        Estudiante_Direccion_Calle: b?.Estudiante_Calle || b?.calle || "",
-        Estudiante_Direccion_Numero: b?.Estudiante_Numero || b?.numero || "",
-        Estudiante_Direccion_Depto: b?.Estudiante_Depto || b?.depto || "",
-        Estudiante_Direccion_Comuna: b?.Estudiante_Comuna || b?.comuna || "",
-        calle: b?.Estudiante_Calle || b?.calle || "",
-        numero: b?.Estudiante_Numero || b?.numero || "",
-        depto: b?.Estudiante_Depto || b?.depto || "",
-        comuna: b?.Estudiante_Comuna || b?.comuna || "",
+        Estudiante_Calle: calle,
+        Estudiante_Numero: numero,
+        Estudiante_Depto: depto,
+        Estudiante_Comuna: comuna,
+        Estudiante_Direccion_Calle: calle,
+        Estudiante_Direccion_Numero: numero,
+        Estudiante_Direccion_Depto: depto,
+        Estudiante_Direccion_Comuna: comuna,
+        calle: calle,
+        numero: numero,
+        depto: depto,
+        comuna: comuna,
         Apoderado_Nombre: null,
         Apoderado_Usuario_Id: null,
         Usuario_Telefono: "",
@@ -1774,12 +1808,29 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
         if (e.Estudiante_Id === reqId) {
           const cId = b?.Curso_Id ? Number(b.Curso_Id) : e.Curso_Id;
           const cNombre = b?.Curso_Nombre || STORE_CURSOS.find(c => c.Curso_Id === cId)?.Curso_Nombre || e.Curso_Nombre;
+          const calle = b?.Estudiante_Calle ?? b?.calle ?? b?.Estudiante_Direccion_Calle ?? e.Estudiante_Calle ?? e.calle ?? "";
+          const numero = b?.Estudiante_Numero ?? b?.numero ?? b?.Estudiante_Direccion_Numero ?? e.Estudiante_Numero ?? e.numero ?? "";
+          const depto = b?.Estudiante_Depto ?? b?.depto ?? b?.Estudiante_Direccion_Depto ?? e.Estudiante_Depto ?? e.depto ?? "";
+          const comuna = b?.Estudiante_Comuna ?? b?.comuna ?? b?.Estudiante_Direccion_Comuna ?? e.Estudiante_Comuna ?? e.comuna ?? "";
+
           return {
             ...e,
             ...b,
             Curso_Id: cId,
             Curso_Nombre: cNombre,
             Estudiante_Estado_Academico: b?.Estudiante_Estado_Academico || b?.estadoAcademico || e.Estudiante_Estado_Academico,
+            Estudiante_Calle: calle,
+            Estudiante_Numero: numero,
+            Estudiante_Depto: depto,
+            Estudiante_Comuna: comuna,
+            Estudiante_Direccion_Calle: calle,
+            Estudiante_Direccion_Numero: numero,
+            Estudiante_Direccion_Depto: depto,
+            Estudiante_Direccion_Comuna: comuna,
+            calle,
+            numero,
+            depto,
+            comuna,
           };
         }
         return e;
@@ -2050,9 +2101,10 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   // Estudiantes general con filtros curso y estado
   if (p.includes("/estudiantes")) {
     if (reqId) {
-      return STORE_ESTUDIANTES.find(e => e.Estudiante_Id === reqId) || STORE_ESTUDIANTES[0];
+      const target = STORE_ESTUDIANTES.find(e => e.Estudiante_Id === reqId) || STORE_ESTUDIANTES[0];
+      return normalizarEstudiante(target);
     }
-    let lista = [...STORE_ESTUDIANTES];
+    let lista = STORE_ESTUDIANTES.map(normalizarEstudiante);
     try {
       const urlObj = new URL(urlStr, "http://localhost");
       const curso = urlObj.searchParams.get("curso");

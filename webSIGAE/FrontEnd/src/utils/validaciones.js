@@ -94,9 +94,20 @@ export const COLUMNAS_DIRECCION_ESTUDIANTE = {
 
 // "Calle Número, Depto X, Comuna" a partir de las columnas del usuario (o del estudiante)
 export function formatearDireccion(registro, columnas = COLUMNAS_DIRECCION_USUARIO) {
-  if (!registro?.[columnas.calle]) return "";
-  const calleNumero = [registro[columnas.calle], registro[columnas.numero]].filter(Boolean).join(" ");
-  return [calleNumero, registro[columnas.depto], registro[columnas.comuna]].filter(Boolean).join(", ");
+  if (!registro) return "";
+  const colCalle = columnas?.calle || "calle";
+  const colNumero = columnas?.numero || "numero";
+  const colDepto = columnas?.depto || "depto";
+  const colComuna = columnas?.comuna || "comuna";
+
+  const calle = registro[colCalle] || registro.Estudiante_Calle || registro.Estudiante_Direccion_Calle || registro.Usuario_Direccion_Calle || registro.calle || "";
+  if (!calle) return "";
+  const numero = registro[colNumero] || registro.Estudiante_Numero || registro.Estudiante_Direccion_Numero || registro.Usuario_Direccion_Numero || registro.numero || "";
+  const depto = registro[colDepto] || registro.Estudiante_Depto || registro.Estudiante_Direccion_Depto || registro.Usuario_Direccion_Depto || registro.depto || "";
+  const comuna = registro[colComuna] || registro.Estudiante_Comuna || registro.Estudiante_Direccion_Comuna || registro.Usuario_Direccion_Comuna || registro.comuna || "";
+
+  const calleNumero = [calle, numero].filter(Boolean).join(" ");
+  return [calleNumero, depto, comuna].filter(Boolean).join(", ");
 }
 
 export { DOMINIO_INSTITUCIONAL };

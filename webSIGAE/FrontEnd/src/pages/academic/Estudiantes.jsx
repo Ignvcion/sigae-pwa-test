@@ -147,10 +147,10 @@ function Estudiantes() {
     setForm({
       Curso_Id: estudiante.Curso_Id ?? "",
       Estudiante_Estado_Academico: estudiante.Estudiante_Estado_Academico ?? "",
-      calle:  estudiante.Estudiante_Calle  ?? "",
-      numero: estudiante.Estudiante_Numero ?? "",
-      depto:  estudiante.Estudiante_Depto  ?? "",
-      comuna: estudiante.Estudiante_Comuna ?? "",
+      calle:  estudiante.Estudiante_Calle ?? estudiante.Estudiante_Direccion_Calle ?? estudiante.calle ?? "",
+      numero: estudiante.Estudiante_Numero ?? estudiante.Estudiante_Direccion_Numero ?? estudiante.numero ?? "",
+      depto:  estudiante.Estudiante_Depto ?? estudiante.Estudiante_Direccion_Depto ?? estudiante.depto ?? "",
+      comuna: estudiante.Estudiante_Comuna ?? estudiante.Estudiante_Direccion_Comuna ?? estudiante.comuna ?? "",
     });
     setMsgErrorForm("");
     setMsgExitoForm("");
@@ -322,7 +322,7 @@ function Estudiantes() {
                         <span className="badge-inactivo">{e.Estudiante_Estado_Academico}</span>
                       )}
                     </td>
-                    <td>{formatearDireccion(e, COLUMNAS_DIRECCION_ESTUDIANTE) || "—"}</td>
+                    <td style={{ minWidth: "160px" }}>{formatearDireccion(e, COLUMNAS_DIRECCION_ESTUDIANTE) || "—"}</td>
                     {esAdmin && (
                       <td>
                         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
