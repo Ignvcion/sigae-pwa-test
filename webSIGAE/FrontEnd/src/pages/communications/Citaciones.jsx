@@ -291,31 +291,34 @@ function Citaciones() {
                   {dia === hoy && <span className="cit-hoy">Hoy</span>}
                 </div>
                 <div className="cit-dia-items">
-                  {items.map((c) => (
-                    <button
-                      key={c.Citacion_Id}
-                      type="button"
-                      className={`cit-card cit-card-${categoriaCitacion(c)}`}
-                      onClick={() => {
-                        setMsgExito("");
-                        setDetalleId(c.Citacion_Id);
-                      }}
-                    >
-                      <div className="cit-card-tramo">{c.Citacion_Tramo_Horario}</div>
-                      <div className="cit-card-cuerpo">
-                        <div className="cit-card-titulo">
-                          {c.Estudiante_Nombre_Completo || "Estudiante sin nombre"}
-                          {c.Curso_Nombre && <span className="cit-sub"> · {c.Curso_Nombre}</span>}
+                  {items.map((c) => {
+                    const tramoTexto = c.Citacion_Tramo_Horario || (c.Citacion_Hora_Inicio && c.Citacion_Hora_Fin ? `${c.Citacion_Hora_Inicio.slice(0, 5)} - ${c.Citacion_Hora_Fin.slice(0, 5)}` : (c.Citacion_Hora_Inicio ? c.Citacion_Hora_Inicio.slice(0, 5) : ""));
+                    return (
+                      <button
+                        key={c.Citacion_Id}
+                        type="button"
+                        className={`cit-card cit-card-${categoriaCitacion(c)}`}
+                        onClick={() => {
+                          setMsgExito("");
+                          setDetalleId(c.Citacion_Id);
+                        }}
+                      >
+                        {tramoTexto && <div className="cit-card-tramo">{tramoTexto}</div>}
+                        <div className="cit-card-cuerpo">
+                          <div className="cit-card-titulo">
+                            {c.Estudiante_Nombre_Completo || "Estudiante sin nombre"}
+                            {c.Curso_Nombre && <span className="cit-sub"> · {c.Curso_Nombre}</span>}
+                          </div>
+                          <div className="cit-sub">
+                            {participantes(c) && `${participantes(c)} · `}
+                            {c.Citacion_Modalidad}
+                          </div>
+                          <div className="cit-card-motivo">{c.Citacion_Motivo}</div>
                         </div>
-                        <div className="cit-sub">
-                          {participantes(c) && `${participantes(c)} · `}
-                          {c.Citacion_Modalidad}
-                        </div>
-                        <div className="cit-card-motivo">{c.Citacion_Motivo}</div>
-                      </div>
-                      <EstadoCitacionBadge citacion={c} />
-                    </button>
-                  ))}
+                        <EstadoCitacionBadge citacion={c} />
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ))}

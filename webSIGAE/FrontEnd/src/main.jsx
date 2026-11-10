@@ -299,6 +299,7 @@ const SEED_CITACIONES = [
     Citacion_Fecha: "2026-11-12",
     Citacion_Hora_Inicio: "10:00:00",
     Citacion_Hora_Fin: "10:45:00",
+    Citacion_Tramo_Horario: "10:00 - 10:45",
     Citacion_Estado: "Futura",
     Citacion_Motivo: "Revisión de rendimiento académico y apoyo en lenguaje.",
     Citacion_Modalidad: "Presencial",
@@ -316,6 +317,7 @@ const SEED_CITACIONES = [
     Citacion_Fecha: "2026-11-16",
     Citacion_Hora_Inicio: "11:30:00",
     Citacion_Hora_Fin: "12:15:00",
+    Citacion_Tramo_Horario: "11:30 - 12:15",
     Citacion_Estado: "Pendiente",
     Citacion_Motivo: "Coordinación de plan de apoyo pedagógico.",
     Citacion_Modalidad: "Online",
@@ -333,6 +335,7 @@ const SEED_CITACIONES = [
     Citacion_Fecha: "2026-11-05",
     Citacion_Hora_Inicio: "08:45:00",
     Citacion_Hora_Fin: "09:30:00",
+    Citacion_Tramo_Horario: "08:45 - 09:30",
     Citacion_Estado: "Confirmada",
     Citacion_Motivo: "Entrevista de seguimiento primer semestre.",
     Citacion_Modalidad: "Presencial",
@@ -347,7 +350,10 @@ const SEED_CITACIONES = [
   },
 ];
 
-let STORE_CITACIONES = loadStore("SIGAE_CITACIONES", SEED_CITACIONES);
+let STORE_CITACIONES = loadStore("SIGAE_CITACIONES", SEED_CITACIONES).map(c => ({
+  ...c,
+  Citacion_Tramo_Horario: c.Citacion_Tramo_Horario || (c.Citacion_Hora_Inicio && c.Citacion_Hora_Fin ? `${c.Citacion_Hora_Inicio.slice(0, 5)} - ${c.Citacion_Hora_Fin.slice(0, 5)}` : (c.Citacion_Hora_Inicio ? c.Citacion_Hora_Inicio.slice(0, 5) : ""))
+}));
 
 // 6. Horarios de Curso y Docentes
 const SEED_HORARIOS = [

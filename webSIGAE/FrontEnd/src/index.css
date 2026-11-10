@@ -2078,6 +2078,10 @@ body.bloques-panel-open .main-content {
   font-size: 0.82rem;
   color: #64748b;
   font-weight: 400;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .cit-toolbar {
@@ -2138,6 +2142,8 @@ body.bloques-panel-open .main-content {
   align-items: flex-start;
   gap: 16px;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   text-align: left;
   background: white;
   border: 1px solid #e2e8f0;
@@ -2147,6 +2153,9 @@ body.bloques-panel-open .main-content {
   cursor: pointer;
   font: inherit;
   transition: box-shadow 0.15s, border-color 0.15s;
+  overflow: hidden;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .cit-card:hover {
@@ -2164,26 +2173,42 @@ body.bloques-panel-open .main-content {
   font-size: 0.88rem;
   white-space: nowrap;
   min-width: 110px;
+  flex-shrink: 0;
 }
 
 .cit-card-cuerpo {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .cit-card-titulo {
   font-weight: 600;
   color: #0f172a;
   font-size: 0.95rem;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .cit-card-motivo {
   margin-top: 4px;
   font-size: 0.85rem;
   color: #475569;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .cit-badge {
@@ -2423,7 +2448,32 @@ body.bloques-panel-open .main-content {
 
   .cit-card {
     flex-direction: column;
-    gap: 6px;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px 12px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .cit-card-tramo {
+    min-width: 0;
+    width: 100%;
+    font-size: 0.82rem;
+    color: #475569;
+  }
+
+  .cit-card-cuerpo {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .cit-card .cit-badge,
+  .cit-card > span {
+    align-self: flex-start;
   }
 
   .cit-select-estudiante {
