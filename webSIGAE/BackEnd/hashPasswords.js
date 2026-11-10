@@ -1,4 +1,7 @@
-// SOLO DESARROLLO: hashea las contraseñas en texto plano que trae SIGAE.sql.
+// SOLO DESARROLLO: hashea las contraseñas en texto plano que trae SIGAE.sql y deja a los
+// usuarios de prueba con el correo ya verificado, para que entren sin código de verificación
+// (en desarrollo no hay SMTP). En producción nada de esto aplica: el primer ingreso de cada
+// cuenta confirma su correo con un código (docs/mailer-smtp-produccion.md).
 // No se usa en producción (el primer administrador real se crea con un script
 // puntual); en un servidor marcado con /etc/sigae-production se niega a correr.
 const fs = require('fs');
@@ -32,6 +35,11 @@ require('dotenv').config({ path: path.resolve(__dirname, '.env') });
     await conn.execute('UPDATE usuario SET Usuario_Contraseña = ? WHERE Usuario_Id = ?', [hash, u.Usuario_Id]);
     console.log(`✅ Usuario ${u.Usuario_Id} hasheado.`);
   }
+
+  // Usuarios de prueba: sin verificación de correo por código (SIGAE.sql ya los trae verificados;
+  // esto cubre a los que se agreguen al dump con 0).
+  const [verificados] = await conn.execute('UPDATE usuario SET Usuario_Correo_Verificado = 1 WHERE Usuario_Correo_Verificado = 0');
+  console.log(`Correo verificado en ${verificados.affectedRows} usuario(s) de prueba.`);
 
   await conn.end();
   console.log('Listo!');
