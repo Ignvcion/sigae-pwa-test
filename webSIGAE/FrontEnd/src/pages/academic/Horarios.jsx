@@ -732,8 +732,7 @@ export default function Horarios() {
                             background: "#e5e7eb",
                             borderRadius: "4px",
                             height: "4px",
-                            overflowX: "auto",
-        WebkitOverflowScrolling: "touch",
+                            overflow: "hidden",
                           }}
                         >
                           <div
@@ -980,20 +979,27 @@ function VistaBloqueGrid({
         background: "#fff",
       }}
     >
-      <div style={{ minWidth: 620 }}>
-      {/* Header row */}
-      <div style={{ display: "flex", background: "#1e3a5f" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "130px repeat(5, minmax(130px, 1fr))",
+          minWidth: 780,
+          width: "100%",
+        }}
+      >
+        {/* Header row cells */}
         <div
           style={{
-            width: 130,
-            flexShrink: 0,
             padding: "0.65rem 0.75rem",
             fontSize: "0.75rem",
             fontWeight: 700,
             color: "rgba(255,255,255,0.7)",
             textTransform: "uppercase",
             letterSpacing: "0.04em",
+            background: "#1e3a5f",
             borderRight: "1px solid rgba(255,255,255,0.12)",
+            display: "flex",
+            alignItems: "center",
           }}
         >
           Bloque Horario
@@ -1002,7 +1008,6 @@ function VistaBloqueGrid({
           <div
             key={d}
             style={{
-              flex: 1,
               textAlign: "center",
               padding: "0.65rem 0.25rem",
               fontSize: "0.78rem",
@@ -1010,349 +1015,349 @@ function VistaBloqueGrid({
               color: "#fff",
               textTransform: "uppercase",
               letterSpacing: "0.04em",
+              background: "#1e3a5f",
               borderLeft: "1px solid rgba(255,255,255,0.12)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
             {DIAS_ABR[i]}
           </div>
         ))}
-      </div>
 
-      {/* Block rows */}
-      {bloquesVisibles.map((bloque, bi) => {
-        const esRecreo = bloque.Bloque_Horario_Tipo === "Recreo";
-        const esEvento = bloque.Bloque_Horario_Tipo === "Evento Académico";
-        const desajustado = esDesajustado(bloque);
+        {/* Block rows */}
+        {bloquesVisibles.map((bloque, bi) => {
+          const esRecreo = bloque.Bloque_Horario_Tipo === "Recreo";
+          const esEvento = bloque.Bloque_Horario_Tipo === "Evento Académico";
+          const desajustado = esDesajustado(bloque);
 
-        return (
-          <div
-            key={bloque.Bloque_Horario_Id}
-            style={{
-              display: "flex",
-              borderTop: bi === 0 ? "none" : "1px solid #f0f0f0",
-              minHeight: 56,
-            }}
-          >
-            {/* Block label */}
-            <div
-              style={{
-                width: 130,
-                flexShrink: 0,
-                padding: "0.5rem 0.65rem",
-                borderRight: "1px solid #e5e7eb",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-                background: desajustado
-                  ? COLOR_PENDIENTE.bg
-                  : esRecreo
-                  ? "#f0fdf4"
-                  : esEvento
-                  ? "#f5f3ff"
-                  : bi % 2 === 0
-                  ? "#f8fafc"
-                  : "#fff",
-              }}
-              title={desajustado ? `⚠ ${bloque.motivo_desajuste}: reubica sus clases desde el panel de avisos` : undefined}
-            >
-              <span
+          return (
+            <React.Fragment key={bloque.Bloque_Horario_Id}>
+              {/* Block label cell */}
+              <div
                 style={{
-                  fontSize: "0.78rem",
-                  fontWeight: 700,
-                  color: esRecreo ? "#15803d" : esEvento ? "#5b21b6" : "#1e3a5f",
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {bloque.Bloque_Horario_Hora_Inicio?.slice(0, 5)} –{" "}
-                {bloque.Bloque_Horario_Hora_Fin?.slice(0, 5)}
-              </span>
-              <span
-                style={{
-                  fontSize: "0.67rem",
-                  color: esRecreo ? "#15803d" : esEvento ? "#5b21b6" : "#94a3b8",
-                  marginTop: 2,
+                  padding: "0.5rem 0.65rem",
+                  borderRight: "1px solid #e5e7eb",
+                  borderTop: "1px solid #f0f0f0",
                   display: "flex",
-                  alignItems: "center",
-                  gap: "3px",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  minHeight: 56,
+                  boxSizing: "border-box",
+                  background: desajustado
+                    ? COLOR_PENDIENTE.bg
+                    : esRecreo
+                    ? "#f0fdf4"
+                    : esEvento
+                    ? "#f5f3ff"
+                    : bi % 2 === 0
+                    ? "#f8fafc"
+                    : "#fff",
                 }}
+                title={desajustado ? `⚠ ${bloque.motivo_desajuste}: reubica sus clases desde el panel de avisos` : undefined}
               >
-                {tipoIcon(bloque.Bloque_Horario_Tipo)}{" "}
-                {esRecreo ? "Recreo" : esEvento ? "Evento" : bloque.Bloque_Horario_Jornada}
-              </span>
-              {desajustado && (
-                <span style={{ fontSize: "0.62rem", fontWeight: 700, color: COLOR_PENDIENTE.text, marginTop: 2 }}>
-                  ⚠ {bloque.motivo_desajuste}
-                </span>
-              )}
-            </div>
-
-            {/* Day cells */}
-            {DIAS.map((dia, di) => {
-              const key = `${bloque.Bloque_Horario_Id}_${dia}`;
-              const h = cellMap[key];
-              const isPreview =
-                preview?.Bloque_Horario_Id === bloque.Bloque_Horario_Id &&
-                preview?.dia === dia;
-              const isHovered =
-                hoveredCell?.bloqueId === bloque.Bloque_Horario_Id &&
-                hoveredCell?.dia === dia;
-              const canClick = esAdmin && !esRecreo && !desajustado && !h && !!onCelda && !modoSeleccion;
-              const seleccionado = !!h && seleccionados.includes(h.Horario_Asignatura_Id);
-              const asigColor = h ? colorMap[h.Asignatura_Id] || ASIG_COLORS[0] : null;
-
-              return (
-                <div
-                  key={dia}
-                  onMouseEnter={() => {
-                    if (esAdmin && !esRecreo) setHoveredCell({ bloqueId: bloque.Bloque_Horario_Id, dia });
-                  }}
-                  onMouseLeave={() => setHoveredCell(null)}
-                  onClick={() => {
-                    if (modoSeleccion) {
-                      if (h) onToggleSeleccion(h.Horario_Asignatura_Id);
-                      return;
-                    }
-                    if (h && esAdmin && onEditar) { onEditar(h); return; }
-                    // CU69: quien no edita (docente) abre el detalle del bloque
-                    if (h && !esAdmin && onVerDetalle) { onVerDetalle(h); return; }
-                    if (canClick) onCelda(bloque.Bloque_Horario_Id, dia);
-                  }}
+                <span
                   style={{
-                    flex: 1,
-                    borderLeft: "1px solid " + (di === 0 ? "#e5e7eb" : "#f0f0f0"),
-                    padding: "4px",
-                    position: "relative",
-                    cursor: h && (esAdmin || onVerDetalle) ? "pointer" : canClick ? "cell" : "default",
-                    background: isPreview
-                      ? "rgba(251,146,60,0.10)"
-                      : h
-                      ? desajustado
-                        ? COLOR_PENDIENTE.bg
-                        : h.estado === "Suspendido"
-                        ? "#fef9f9"
-                        : asigColor?.bg || "#eff6ff"
-                      : esRecreo
-                      ? "#f0fdf4"
-                      : isHovered && canClick
-                      ? "#f0f9ff"
-                      : "transparent",
-                    transition: "background 0.1s",
+                    fontSize: "0.78rem",
+                    fontWeight: 700,
+                    color: esRecreo ? "#15803d" : esEvento ? "#5b21b6" : "#1e3a5f",
+                    fontVariantNumeric: "tabular-nums",
                   }}
                 >
-                  {/* Recreo label */}
-                  {esRecreo && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "0.72rem",
-                        color: "#15803d",
-                        fontWeight: 600,
-                        pointerEvents: "none",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      🏃 Recreo
-                    </div>
-                  )}
+                  {bloque.Bloque_Horario_Hora_Inicio?.slice(0, 5)} –{" "}
+                  {bloque.Bloque_Horario_Hora_Fin?.slice(0, 5)}
+                </span>
+                <span
+                  style={{
+                    fontSize: "0.67rem",
+                    color: esRecreo ? "#15803d" : esEvento ? "#5b21b6" : "#94a3b8",
+                    marginTop: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "3px",
+                  }}
+                >
+                  {tipoIcon(bloque.Bloque_Horario_Tipo)}{" "}
+                  {esRecreo ? "Recreo" : esEvento ? "Evento" : bloque.Bloque_Horario_Jornada}
+                </span>
+                {desajustado && (
+                  <span style={{ fontSize: "0.62rem", fontWeight: 700, color: COLOR_PENDIENTE.text, marginTop: 2 }}>
+                    ⚠ {bloque.motivo_desajuste}
+                  </span>
+                )}
+              </div>
 
-                  {/* Preview dashed border */}
-                  {isPreview && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 3,
-                        border: "2px dashed #f97316",
-                        borderRadius: 5,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        pointerEvents: "none",
-                        zIndex: 2,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: "0.65rem",
-                          color: "#ea580c",
-                          fontWeight: 700,
-                          textAlign: "center",
-                          padding: "0 2px",
-                          overflowX: "auto",
-        WebkitOverflowScrolling: "touch",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          maxWidth: "90%",
-                        }}
-                      >
-                        {preview.asignatura}
-                      </span>
-                    </div>
-                  )}
+              {/* Day cells */}
+              {DIAS.map((dia, di) => {
+                const key = `${bloque.Bloque_Horario_Id}_${dia}`;
+                const h = cellMap[key];
+                const isPreview =
+                  preview?.Bloque_Horario_Id === bloque.Bloque_Horario_Id &&
+                  preview?.dia === dia;
+                const isHovered =
+                  hoveredCell?.bloqueId === bloque.Bloque_Horario_Id &&
+                  hoveredCell?.dia === dia;
+                const canClick = esAdmin && !esRecreo && !desajustado && !h && !!onCelda && !modoSeleccion;
+                const seleccionado = !!h && seleccionados.includes(h.Horario_Asignatura_Id);
+                const asigColor = h ? colorMap[h.Asignatura_Id] || ASIG_COLORS[0] : null;
 
-                  {/* Scheduled block */}
-                  {h && !isPreview && (
-                    <div
-                      style={{
-                        background: desajustado
+                return (
+                  <div
+                    key={dia}
+                    onMouseEnter={() => {
+                      if (esAdmin && !esRecreo) setHoveredCell({ bloqueId: bloque.Bloque_Horario_Id, dia });
+                    }}
+                    onMouseLeave={() => setHoveredCell(null)}
+                    onClick={() => {
+                      if (modoSeleccion) {
+                        if (h) onToggleSeleccion(h.Horario_Asignatura_Id);
+                        return;
+                      }
+                      if (h && esAdmin && onEditar) { onEditar(h); return; }
+                      // CU69: quien no edita (docente) abre el detalle del bloque
+                      if (h && !esAdmin && onVerDetalle) { onVerDetalle(h); return; }
+                      if (canClick) onCelda(bloque.Bloque_Horario_Id, dia);
+                    }}
+                    style={{
+                      borderLeft: "1px solid " + (di === 0 ? "#e5e7eb" : "#f0f0f0"),
+                      borderTop: "1px solid #f0f0f0",
+                      padding: "4px",
+                      position: "relative",
+                      minWidth: 0,
+                      overflow: "hidden",
+                      minHeight: 56,
+                      boxSizing: "border-box",
+                      cursor: h && (esAdmin || onVerDetalle) ? "pointer" : canClick ? "cell" : "default",
+                      background: isPreview
+                        ? "rgba(251,146,60,0.10)"
+                        : h
+                        ? desajustado
                           ? COLOR_PENDIENTE.bg
                           : h.estado === "Suspendido"
-                          ? "rgba(254,226,226,0.4)"
-                          : asigColor?.bg,
-                        border: `1px solid ${
-                          desajustado ? COLOR_PENDIENTE.border : h.estado === "Suspendido" ? "#fca5a5" : asigColor?.border || "#93c5fd"
-                        }`,
-                        borderLeft: `3px solid ${
-                          desajustado ? "#eab308" : h.estado === "Suspendido" ? "#ef4444" : asigColor?.text || "#1e40af"
-                        }`,
-                        borderRadius: 5,
-                        padding: modoSeleccion ? "3px 5px 3px 22px" : "3px 5px",
-                        height: "100%",
-                        minHeight: 44,
-                        boxSizing: "border-box",
-                        position: "relative",
-                        boxShadow: seleccionado ? "0 0 0 2px #7c3aed" : "none",
-                      }}
-                    >
-                      {/* CU63 / CU64 — casilla de selección */}
-                      {modoSeleccion && (
-                        <input
-                          type="checkbox"
-                          checked={seleccionado}
-                          readOnly
-                          style={{ position: "absolute", top: 4, left: 4, margin: 0, cursor: "pointer", accentColor: "#7c3aed" }}
-                        />
-                      )}
+                          ? "#fef9f9"
+                          : asigColor?.bg || "#eff6ff"
+                        : esRecreo
+                        ? "#f0fdf4"
+                        : isHovered && canClick
+                        ? "#f0f9ff"
+                        : "transparent",
+                      transition: "background 0.1s",
+                    }}
+                  >
+                    {/* Recreo label */}
+                    {esRecreo && (
                       <div
                         style={{
+                          position: "absolute",
+                          inset: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                           fontSize: "0.72rem",
-                          fontWeight: 700,
-                          color: desajustado
-                            ? COLOR_PENDIENTE.text
-                            : h.estado === "Suspendido" ? "#9b1c1c" : asigColor?.text || "#1e40af",
-                          lineHeight: 1.3,
-                          overflowX: "auto",
-        WebkitOverflowScrolling: "touch",
-                          textOverflow: "ellipsis",
+                          color: "#15803d",
+                          fontWeight: 600,
+                          pointerEvents: "none",
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {desajustado && "⚠ "}{h.asignatura}
+                        🏃 Recreo
                       </div>
-                      {h.docente && (
-                        <div
+                    )}
+
+                    {/* Preview dashed border */}
+                    {isPreview && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 3,
+                          border: "2px dashed #f97316",
+                          borderRadius: 5,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          pointerEvents: "none",
+                          zIndex: 2,
+                        }}
+                      >
+                        <span
                           style={{
-                            fontSize: "0.62rem",
-                            color: "#6b7280",
-                            lineHeight: 1.2,
-                            overflowX: "auto",
-        WebkitOverflowScrolling: "touch",
+                            fontSize: "0.65rem",
+                            color: "#ea580c",
+                            fontWeight: 700,
+                            textAlign: "center",
+                            padding: "0 2px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            maxWidth: "90%",
+                          }}
+                        >
+                          {preview.asignatura}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Scheduled block */}
+                    {h && !isPreview && (
+                      <div
+                        style={{
+                          background: desajustado
+                            ? COLOR_PENDIENTE.bg
+                            : h.estado === "Suspendido"
+                            ? "rgba(254,226,226,0.4)"
+                            : asigColor?.bg,
+                          border: `1px solid ${
+                            desajustado ? COLOR_PENDIENTE.border : h.estado === "Suspendido" ? "#fca5a5" : asigColor?.border || "#93c5fd"
+                          }`,
+                          borderLeft: `3px solid ${
+                            desajustado ? "#eab308" : h.estado === "Suspendido" ? "#ef4444" : asigColor?.text || "#1e40af"
+                          }`,
+                          borderRadius: 5,
+                          padding: modoSeleccion ? "3px 5px 3px 22px" : "3px 5px",
+                          height: "100%",
+                          minHeight: 44,
+                          boxSizing: "border-box",
+                          position: "relative",
+                          boxShadow: seleccionado ? "0 0 0 2px #7c3aed" : "none",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {/* CU63 / CU64 — casilla de selección */}
+                        {modoSeleccion && (
+                          <input
+                            type="checkbox"
+                            checked={seleccionado}
+                            readOnly
+                            style={{ position: "absolute", top: 4, left: 4, margin: 0, cursor: "pointer", accentColor: "#7c3aed" }}
+                          />
+                        )}
+                        <div
+                          title={h.asignatura}
+                          style={{
+                            fontSize: "0.72rem",
+                            fontWeight: 700,
+                            color: desajustado
+                              ? COLOR_PENDIENTE.text
+                              : h.estado === "Suspendido" ? "#9b1c1c" : asigColor?.text || "#1e40af",
+                            lineHeight: 1.3,
+                            overflow: "hidden",
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {h.docente}
+                          {desajustado && "⚠ "}{h.asignatura}
                         </div>
-                      )}
-                      {h.estado === "Suspendido" && (
-                        <div style={{ fontSize: "0.6rem", color: "#dc2626", fontWeight: 700 }}>
-                          Suspendido
-                        </div>
-                      )}
-                      {/* RF42 — suspensión por evento institucional (CU65 / CU66) */}
-                      {h.suspension_evento && (
-                        <div
-                          title={`Suspendido el ${h.suspension_evento.fecha} por "${h.suspension_evento.nombre}"`}
-                          style={{ fontSize: "0.6rem", color: "#7c2d12", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-                        >
-                          ⏸ Suspendido {h.suspension_evento.fecha.slice(8, 10)}/{h.suspension_evento.fecha.slice(5, 7)}
-                        </div>
-                      )}
-                      {/* Hover action buttons */}
-                      {isHovered && esAdmin && !modoSeleccion && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: 2,
-                            right: 2,
-                            display: "flex",
-                            gap: 2,
-                          }}
-                          onMouseLeave={(e) => e.stopPropagation()}
-                        >
-                          {onVerDetalle && (
-                            <button
-                              title="Ver detalle"
-                              onClick={(e) => { e.stopPropagation(); onVerDetalle(h); }}
-                              style={{ ...s.cellBtn, background: "#475569" }}
-                            >
-                              ℹ
-                            </button>
-                          )}
-                          <button
-                            title="Editar"
-                            onClick={(e) => { e.stopPropagation(); onEditar(h); }}
-                            style={s.cellBtn}
-                          >
-                            ✏
-                          </button>
-                          <button
-                            title={h.estado === "Activo" ? "Suspender" : "Activar"}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onCambiarEstado(h.Horario_Asignatura_Id, h.estado);
-                            }}
+                        {h.docente && (
+                          <div
+                            title={h.docente}
                             style={{
-                              ...s.cellBtn,
-                              background: h.estado === "Activo" ? "#dc2626" : "#166534",
+                              fontSize: "0.62rem",
+                              color: "#6b7280",
+                              lineHeight: 1.2,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
                             }}
                           >
-                            {h.estado === "Activo" ? "⏸" : "▶"}
-                          </button>
-                          {onEliminar && (
+                            {h.docente}
+                          </div>
+                        )}
+                        {h.estado === "Suspendido" && (
+                          <div style={{ fontSize: "0.6rem", color: "#dc2626", fontWeight: 700 }}>
+                            Suspendido
+                          </div>
+                        )}
+                        {/* RF42 — suspensión por evento institucional (CU65 / CU66) */}
+                        {h.suspension_evento && (
+                          <div
+                            title={`Suspendido el ${h.suspension_evento.fecha} por "${h.suspension_evento.nombre}"`}
+                            style={{ fontSize: "0.6rem", color: "#7c2d12", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                          >
+                            ⏸ Suspendido {h.suspension_evento.fecha.slice(8, 10)}/{h.suspension_evento.fecha.slice(5, 7)}
+                          </div>
+                        )}
+                        {/* Hover action buttons */}
+                        {isHovered && esAdmin && !modoSeleccion && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: 2,
+                              right: 2,
+                              display: "flex",
+                              gap: 2,
+                            }}
+                            onMouseLeave={(e) => e.stopPropagation()}
+                          >
+                            {onVerDetalle && (
+                              <button
+                                title="Ver detalle"
+                                onClick={(e) => { e.stopPropagation(); onVerDetalle(h); }}
+                                style={{ ...s.cellBtn, background: "#475569" }}
+                              >
+                                ℹ
+                              </button>
+                            )}
                             <button
-                              title="Eliminar clase"
-                              onClick={(e) => { e.stopPropagation(); onEliminar(h); }}
-                              style={{ ...s.cellBtn, background: "#7f1d1d" }}
+                              title="Editar"
+                              onClick={(e) => { e.stopPropagation(); onEditar(h); }}
+                              style={s.cellBtn}
                             >
-                              🗑
+                              ✏
                             </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                            <button
+                              title={h.estado === "Activo" ? "Suspender" : "Activar"}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onCambiarEstado(h.Horario_Asignatura_Id, h.estado);
+                              }}
+                              style={{
+                                ...s.cellBtn,
+                                background: h.estado === "Activo" ? "#dc2626" : "#166534",
+                              }}
+                            >
+                              {h.estado === "Activo" ? "⏸" : "▶"}
+                            </button>
+                            {onEliminar && (
+                              <button
+                                title="Eliminar clase"
+                                onClick={(e) => { e.stopPropagation(); onEliminar(h); }}
+                                style={{ ...s.cellBtn, background: "#7f1d1d" }}
+                              >
+                                🗑
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                  {/* Hover "add" hint for empty cell */}
-                  {!h && !esRecreo && isHovered && canClick && !isPreview && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 3,
-                        border: "2px dashed #93c5fd",
-                        borderRadius: 5,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        pointerEvents: "none",
-                        zIndex: 2,
-                      }}
-                    >
-                      <span style={{ fontSize: "0.68rem", color: "#1e40af", fontWeight: 600 }}>
-                        + Agregar
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
-
+                    {/* Hover "add" hint for empty cell */}
+                    {!h && !esRecreo && isHovered && canClick && !isPreview && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 3,
+                          border: "2px dashed #93c5fd",
+                          borderRadius: 5,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          pointerEvents: "none",
+                          zIndex: 2,
+                        }}
+                      >
+                        <span style={{ fontSize: "0.68rem", color: "#1e40af", fontWeight: 600 }}>
+                          + Agregar
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </React.Fragment>
+          );
+        })}
       </div>
       {/* Legend */}
       <div
