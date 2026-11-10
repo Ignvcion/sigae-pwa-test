@@ -77,7 +77,7 @@ Presiona **F5** o ve al bicho triángulo _Run › Start Debugging_ (`Run All`). 
 
 > El login se realiza con **RUT** (sin puntos, con guión). Las contraseñas están en texto plano en el dump — recuerda correr el script de hasheo después de importar.
 >
-> Todos los usuarios de prueba traen el correo **ya verificado** (`Usuario_Correo_Verificado = 1` en `SIGAE.sql`, y `hashPasswords.js` lo refuerza), así que entran **sin código de verificación** y sin SMTP. Esto es solo de desarrollo: en producción no existe `SIGAE.sql` y el primer ingreso de cada cuenta exige el código por correo. Sus correos usan los dominios del colegio (`@colegiojc.cl`).
+> Todos los usuarios de prueba traen el correo **ya verificado** (`Usuario_Correo_Verificado = 1` en `SIGAE.sql`, y `hashPasswords.js` lo refuerza), así que entran **sin código de verificación** y sin SMTP. Esto es solo de desarrollo: en producción no existe `SIGAE.sql` y el primer ingreso de cada cuenta exige el código por correo. Docentes y administradores usan correos institucionales (`@colegiojc.cl`); los apoderados, correos personales, porque el colegio no les entrega dominio.
 
 | RUT       | Contraseña     | Nombre             | Rol                 |
 | --------- | -------------- | ------------------ | ------------------- |
