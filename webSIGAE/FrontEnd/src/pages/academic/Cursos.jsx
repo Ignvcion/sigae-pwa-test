@@ -181,7 +181,7 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
         <div>
           <button className="btn-volver" onClick={onVolver}>← Volver a cursos</button>
           <h2 style={{ marginTop: "0.5rem" }}>
-            {curso.Curso_Nombre} <span className="curso-seccion-badge">{curso.Curso_Periodo_Lectivo}</span>
+            {curso.Curso_Nombre} <span className="curso-seccion-badge">{curso.Curso_Periodo_Lectivo || curso.periodo || "2026"}</span>
           </h2>
         </div>
         {esAdmin && (
@@ -335,7 +335,7 @@ function Cursos() {
 
   // Agrupados por período y nivel (durante el cierre conviven dos períodos)
   const cursosAgrupados = cursos.reduce((acc, curso) => {
-    const nivel = `${curso.Nivel_Educativo_Nombre} · ${curso.Curso_Periodo_Lectivo}`;
+    const nivel = `${curso.Nivel_Educativo_Nombre || "Curso"} · ${curso.Curso_Periodo_Lectivo || curso.periodo || "2026"}`;
     if (!acc[nivel]) acc[nivel] = [];
     acc[nivel].push(curso);
     return acc;
@@ -465,8 +465,8 @@ function Cursos() {
                 >
                   <td className="tabla-curso-nombre">{c.Curso_Nombre}</td>
                   <td>{c.Nivel_Educativo_Nombre}</td>
-                  <td>{c.Curso_Seccion}</td>
-                  <td>{c.Curso_Periodo_Lectivo}</td>
+                  <td>{c.Curso_Seccion || c.seccion || "A"}</td>
+                  <td>{c.Curso_Periodo_Lectivo || c.periodo || "2026"}</td>
                   <td>{c.Profesor_Jefe_Nombre || "—"}</td>
                   <td>
                     <span className="badge-asig-count">{c.Total_Asignaturas_Activas ?? 0}</span>
@@ -492,7 +492,7 @@ function Cursos() {
                 >
                   <div className="curso-card-header">
                     <span className="curso-nombre">{c.Curso_Nombre}</span>
-                    <span className="curso-seccion-badge">Sec. {c.Curso_Seccion}</span>
+                    <span className="curso-seccion-badge">Sec. {c.Curso_Seccion || c.seccion || "A"}</span>
                   </div>
                   <div className="curso-card-body">
                     <div className="curso-info-item">

@@ -843,14 +843,82 @@ if (!Array.isArray(STORE_HORARIOS) || STORE_HORARIOS.length < SEED_HORARIOS.leng
 }
 
 // 7. Cursos Institucionales
-const STORE_CURSOS = [
-  { Curso_Id: 1, Curso_Nombre: "1° Básico A", curso: "1° Básico A", Nivel_Educativo_Id: 1, Nivel_Educativo_Nombre: "1° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
-  { Curso_Id: 2, Curso_Nombre: "2° Básico A", curso: "2° Básico A", Nivel_Educativo_Id: 2, Nivel_Educativo_Nombre: "2° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
-  { Curso_Id: 3, Curso_Nombre: "3° Básico A", curso: "3° Básico A", Nivel_Educativo_Id: 3, Nivel_Educativo_Nombre: "3° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
-  { Curso_Id: 4, Curso_Nombre: "4° Básico A", curso: "4° Básico A", Nivel_Educativo_Id: 4, Nivel_Educativo_Nombre: "4° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
-  { Curso_Id: 5, Curso_Nombre: "5° Básico A", curso: "5° Básico A", Nivel_Educativo_Id: 5, Nivel_Educativo_Nombre: "5° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
-  { Curso_Id: 6, Curso_Nombre: "6° Básico A", curso: "6° Básico A", Nivel_Educativo_Id: 6, Nivel_Educativo_Nombre: "6° Básico", Cupo_Maximo: 35, Jornada: "Mañana" },
+function normalizarCurso(curso) {
+  const nId = Number(curso?.Nivel_Educativo_Id || curso?.nivel_educativo_id || 1);
+  const nivelInfo = NIVELES_EDUCATIVOS.find(n => n.Nivel_Educativo_Id === nId) || {};
+  const nivelNombre = curso?.Nivel_Educativo_Nombre || nivelInfo.Nivel_Educativo_Nombre || (nId + "° Básico");
+
+  let seccion = (curso?.Curso_Seccion || curso?.seccion || "").trim().toUpperCase();
+  if (!seccion && curso?.Curso_Nombre) {
+    const parts = curso.Curso_Nombre.trim().split(" ");
+    const lastPart = parts[parts.length - 1];
+    if (lastPart.length === 1 && /[A-Z]/i.test(lastPart)) {
+      seccion = lastPart.toUpperCase();
+    }
+  }
+  if (!seccion) seccion = "A";
+
+  const periodo = String(curso?.Curso_Periodo_Lectivo || curso?.periodo || "2026").trim();
+  const nombre = curso?.Curso_Nombre || `${nivelNombre} ${seccion}`;
+  const cId = Number(curso?.Curso_Id || curso?.id || nextId());
+
+  let profeJefeNombre = curso?.Profesor_Jefe_Nombre || null;
+  let profeJefeId = curso?.Profesor_Jefe_Id ? Number(curso.Profesor_Jefe_Id) : null;
+  if (!profeJefeNombre && profeJefeId) {
+    profeJefeNombre = STORE_USUARIOS.find(u => u.Usuario_Id === profeJefeId)?.Usuario_Nombre_Completo || null;
+  }
+  if (!profeJefeNombre && !profeJefeId && cId === 1) {
+    profeJefeId = 3;
+    profeJefeNombre = "María Morales";
+  }
+
+  const defaultAsignaturas = [
+    { tieneasig_Id: 1, Asignatura_Id: 1, Asignatura_Nombre: "Lenguaje y Comunicación", Asignatura_Prioridad_Academica: "Alta", Estado_Asignacion: "Activa" },
+    { tieneasig_Id: 2, Asignatura_Id: 2, Asignatura_Nombre: "Matemáticas", Asignatura_Prioridad_Academica: "Alta", Estado_Asignacion: "Activa" },
+    { tieneasig_Id: 3, Asignatura_Id: 3, Asignatura_Nombre: "Ciencias Naturales", Asignatura_Prioridad_Academica: "Media", Estado_Asignacion: "Activa" },
+    { tieneasig_Id: 4, Asignatura_Id: 4, Asignatura_Nombre: "Historia y Geografía", Asignatura_Prioridad_Academica: "Media", Estado_Asignacion: "Activa" },
+  ];
+
+  const asignaturas = (Array.isArray(curso?.asignaturas) && curso.asignaturas.length > 0)
+    ? curso.asignaturas
+    : defaultAsignaturas;
+
+  const totalActivas = curso?.Total_Asignaturas_Activas !== undefined
+    ? Number(curso.Total_Asignaturas_Activas)
+    : asignaturas.filter(a => a.Estado_Asignacion === "Activa" || a.estado === "Activa").length;
+
+  return {
+    Curso_Id: cId,
+    id: cId,
+    Curso_Nombre: nombre,
+    curso: nombre,
+    Nivel_Educativo_Id: nId,
+    nivel_educativo_id: nId,
+    Nivel_Educativo_Nombre: nivelNombre,
+    Curso_Seccion: seccion,
+    seccion: seccion,
+    Curso_Periodo_Lectivo: periodo,
+    periodo: periodo,
+    Cupo_Maximo: Number(curso?.Cupo_Maximo || 35),
+    Jornada: curso?.Jornada || "Mañana",
+    Profesor_Jefe_Id: profeJefeId,
+    Profesor_Jefe_Nombre: profeJefeNombre,
+    Total_Asignaturas_Activas: totalActivas,
+    asignaturas: asignaturas
+  };
+}
+
+const SEED_CURSOS = [
+  { Curso_Id: 1, Curso_Nombre: "1° Básico A", curso: "1° Básico A", Nivel_Educativo_Id: 1, Nivel_Educativo_Nombre: "1° Básico", Curso_Seccion: "A", seccion: "A", Curso_Periodo_Lectivo: "2026", periodo: "2026", Cupo_Maximo: 35, Jornada: "Mañana", Profesor_Jefe_Id: 3, Profesor_Jefe_Nombre: "María Morales" },
+  { Curso_Id: 2, Curso_Nombre: "2° Básico A", curso: "2° Básico A", Nivel_Educativo_Id: 2, Nivel_Educativo_Nombre: "2° Básico", Curso_Seccion: "A", seccion: "A", Curso_Periodo_Lectivo: "2026", periodo: "2026", Cupo_Maximo: 35, Jornada: "Mañana" },
+  { Curso_Id: 3, Curso_Nombre: "3° Básico A", curso: "3° Básico A", Nivel_Educativo_Id: 3, Nivel_Educativo_Nombre: "3° Básico", Curso_Seccion: "A", seccion: "A", Curso_Periodo_Lectivo: "2026", periodo: "2026", Cupo_Maximo: 35, Jornada: "Mañana" },
+  { Curso_Id: 4, Curso_Nombre: "4° Básico A", curso: "4° Básico A", Nivel_Educativo_Id: 4, Nivel_Educativo_Nombre: "4° Básico", Curso_Seccion: "A", seccion: "A", Curso_Periodo_Lectivo: "2026", periodo: "2026", Cupo_Maximo: 35, Jornada: "Mañana" },
+  { Curso_Id: 5, Curso_Nombre: "5° Básico A", curso: "5° Básico A", Nivel_Educativo_Id: 5, Nivel_Educativo_Nombre: "5° Básico", Curso_Seccion: "A", seccion: "A", Curso_Periodo_Lectivo: "2026", periodo: "2026", Cupo_Maximo: 35, Jornada: "Mañana" },
+  { Curso_Id: 6, Curso_Nombre: "6° Básico A", curso: "6° Básico A", Nivel_Educativo_Id: 6, Nivel_Educativo_Nombre: "6° Básico", Curso_Seccion: "A", seccion: "A", Curso_Periodo_Lectivo: "2026", periodo: "2026", Cupo_Maximo: 35, Jornada: "Mañana" },
 ];
+
+let STORE_CURSOS = loadStore("SIGAE_CURSOS", SEED_CURSOS).map(normalizarCurso);
+saveStore("SIGAE_CURSOS", STORE_CURSOS);
 
 // 8. Estudiantes (24 estudiantes base vinculados a cursos y apoderados)
 const SEED_ESTUDIANTES = [
@@ -1520,6 +1588,77 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
       return { ok: true, status: 201, id: nuevoPlan.Plan_Educativo_Id, mensaje: "Plan educativo creado correctamente" };
     }
 
+    // Asignar asignaturas a un curso (/api/cursos/:id/asignaturas)
+    if (p.includes("/cursos/") && p.includes("/asignaturas")) {
+      const cId = reqId;
+      const nuevasAsigs = b?.asignaturas || [];
+      STORE_CURSOS = STORE_CURSOS.map(c => {
+        if (Number(c.Curso_Id) === Number(cId)) {
+          let asigs = Array.isArray(c.asignaturas) ? [...c.asignaturas] : [];
+          nuevasAsigs.forEach(item => {
+            const asigId = Number(item.asignatura_id || item.Asignatura_Id);
+            const asigObj = STORE_ASIGNATURAS.find(a => a.Asignatura_Id === asigId) || {};
+            const existingIdx = asigs.findIndex(a => Number(a.Asignatura_Id) === asigId);
+            const estado = item.estado || item.Estado_Asignacion || "Activa";
+            if (existingIdx >= 0) {
+              asigs[existingIdx] = {
+                ...asigs[existingIdx],
+                Estado_Asignacion: estado,
+              };
+            } else {
+              asigs.push({
+                tieneasig_Id: nextId(),
+                Asignatura_Id: asigId,
+                Asignatura_Nombre: asigObj.Asignatura_Nombre || "Asignatura",
+                Asignatura_Prioridad_Academica: asigObj.Asignatura_Prioridad_Academica || "Media",
+                Estado_Asignacion: estado,
+              });
+            }
+          });
+          const totalActivas = asigs.filter(a => a.Estado_Asignacion === "Activa").length;
+          return {
+            ...c,
+            asignaturas: asigs,
+            Total_Asignaturas_Activas: totalActivas,
+          };
+        }
+        return c;
+      });
+      saveStore("SIGAE_CURSOS", STORE_CURSOS);
+      return { ok: true, status: 200, mensaje: "Asignaturas asociadas correctamente" };
+    }
+
+    // Registrar nuevo Curso (/api/cursos)
+    if (p.includes("/cursos") && !p.includes("/asignaturas") && !p.includes("/niveles")) {
+      const nId = Number(b?.nivel_educativo_id || b?.Nivel_Educativo_Id);
+      let sec = (b?.seccion || b?.Curso_Seccion || "").trim().toUpperCase();
+      if (!sec) sec = "A";
+      const per = String(b?.periodo || b?.Curso_Periodo_Lectivo || "2026").trim();
+
+      const existe = STORE_CURSOS.some(c =>
+        Number(c.Nivel_Educativo_Id) === nId &&
+        String(c.Curso_Seccion || c.seccion || "").toUpperCase() === sec &&
+        String(c.Curso_Periodo_Lectivo || c.periodo || "2026") === per
+      );
+
+      if (existe) {
+        return { ok: false, status: 409, error: "El curso ya existe para este periodo lectivo" };
+      }
+
+      const nuevoCurso = normalizarCurso({
+        Curso_Id: nextId(),
+        nivel_educativo_id: nId,
+        seccion: sec,
+        periodo: per,
+        Cupo_Maximo: Number(b?.Cupo_Maximo || 35),
+        Jornada: b?.Jornada || "Mañana",
+      });
+
+      STORE_CURSOS.push(nuevoCurso);
+      saveStore("SIGAE_CURSOS", STORE_CURSOS);
+      return { ok: true, status: 201, id: nuevoCurso.Curso_Id, mensaje: `Curso ${nuevoCurso.Curso_Nombre} registrado exitosamente` };
+    }
+
     // Crear Clase en Horario
     if (p.includes("/horarios")) {
       const nuevaClase = {
@@ -1744,6 +1883,22 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   }
 
   if (m === "DELETE") {
+    // Retirar profesor jefe de un curso (/api/cursos/:id/profesor-jefe)
+    if (p.includes("/cursos/") && p.includes("/profesor-jefe") && reqId) {
+      STORE_CURSOS = STORE_CURSOS.map(c => {
+        if (Number(c.Curso_Id) === Number(reqId)) {
+          return {
+            ...c,
+            Profesor_Jefe_Id: null,
+            Profesor_Jefe_Nombre: null,
+          };
+        }
+        return c;
+      });
+      saveStore("SIGAE_CURSOS", STORE_CURSOS);
+      return { ok: true, status: 200, mensaje: "Profesor jefe retirado exitosamente" };
+    }
+
     // Eliminar todas las asociaciones de un apoderado
     if (p.includes("/estudiantes/apoderado/") && p.includes("/todas")) {
       const apoId = reqId;
@@ -1807,6 +1962,25 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   }
 
   if (m === "PUT" || m === "PATCH") {
+    // Designar profesor jefe de un curso (/api/cursos/:id/profesor-jefe)
+    if (p.includes("/cursos/") && p.includes("/profesor-jefe") && reqId) {
+      const docId = Number(b?.docenteId || b?.docente_id || b?.Profesor_Jefe_Id || b?.usuario_id);
+      const doc = STORE_USUARIOS.find(u => Number(u.Usuario_Id) === docId);
+      const docNombre = doc ? doc.Usuario_Nombre_Completo : "Docente Asignado";
+      STORE_CURSOS = STORE_CURSOS.map(c => {
+        if (Number(c.Curso_Id) === Number(reqId)) {
+          return {
+            ...c,
+            Profesor_Jefe_Id: docId,
+            Profesor_Jefe_Nombre: docNombre,
+          };
+        }
+        return c;
+      });
+      saveStore("SIGAE_CURSOS", STORE_CURSOS);
+      return { ok: true, status: 200, mensaje: `Profesor jefe ${docNombre} designado exitosamente` };
+    }
+
     // Desactivar / Reactivar cuenta de usuario (CU21 / CU22)
     if (p.includes("/usuarios/") && p.includes("/estado") && reqId) {
       let nuevoEstado = 0;
@@ -2252,19 +2426,58 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     return lista;
   }
 
-  // Cursos
+  // Cursos y sub-rutas
   if (p.includes("/horarios/cursos") || p.includes("/cursos")) {
     if (p.includes("/niveles")) {
-      return [
-        { Nivel_Educativo_Id: 1, Nivel_Educativo_Nombre: "1° Básico" },
-        { Nivel_Educativo_Id: 2, Nivel_Educativo_Nombre: "2° Básico" },
-        { Nivel_Educativo_Id: 3, Nivel_Educativo_Nombre: "3° Básico" },
-        { Nivel_Educativo_Id: 4, Nivel_Educativo_Nombre: "4° Básico" },
-        { Nivel_Educativo_Id: 5, Nivel_Educativo_Nombre: "5° Básico" },
-        { Nivel_Educativo_Id: 6, Nivel_Educativo_Nombre: "6° Básico" },
-      ];
+      return NIVELES_EDUCATIVOS;
+    }
+    if (p.includes("/mis-jefaturas")) {
+      return STORE_CURSOS.filter(c => c.Profesor_Jefe_Id != null);
+    }
+    if (p.includes("/asignaturas/disponibles") && reqId) {
+      const targetCurso = STORE_CURSOS.find(c => Number(c.Curso_Id) === Number(reqId));
+      const asignadasIds = (targetCurso?.asignaturas || []).map(a => Number(a.Asignatura_Id));
+      return STORE_ASIGNATURAS.filter(a => !asignadasIds.includes(Number(a.Asignatura_Id))).map(a => ({
+        Asignatura_Id: a.Asignatura_Id,
+        Asignatura_Nombre: a.Asignatura_Nombre,
+        Tipo: "Obligatorio",
+        Horas_Semanales_Requeridas: 4,
+      }));
+    }
+    if (p.includes("/asignaturas") && reqId) {
+      const targetCurso = STORE_CURSOS.find(c => Number(c.Curso_Id) === Number(reqId));
+      return targetCurso?.asignaturas || [];
+    }
+    if (p.includes("/estudiantes") && reqId) {
+      const ests = STORE_ESTUDIANTES.filter(e => Number(e.Curso_Id) === Number(reqId));
+      return {
+        ok: true,
+        estudiantes: ests.map(e => ({
+          Estudiante_Id: e.Estudiante_Id,
+          Estudiante_Nombre_Completo: e.Estudiante_Nombre_Completo,
+          Estudiante_RUT: e.Estudiante_RUT,
+          Estudiante_Estado_Academico: e.Estudiante_Estado_Academico || "Regular",
+        })),
+        mensaje: ests.length === 0 ? "No hay estudiantes registrados en este curso." : ""
+      };
+    }
+    if (reqId && !p.includes("/cursos?")) {
+      const matchCurso = STORE_CURSOS.find(c => Number(c.Curso_Id) === Number(reqId));
+      if (matchCurso) return matchCurso;
     }
     return STORE_CURSOS;
+  }
+
+  // Estado del periodo y cambio de periodo
+  if (p.includes("/promocion/periodos/estado")) {
+    return {
+      estado: "Regular",
+      periodoActual: "2026",
+      periodos: {
+        vigente: "2026",
+        siguiente: "2027"
+      }
+    };
   }
 
   // Horario Maestro
@@ -2529,8 +2742,9 @@ window.fetch = async function (input, init = {}) {
       }
       const mockData = getMockResponseForUrl(urlStr, method, modifiedInit.body);
       if (mockData !== null) {
+        const httpStatus = (mockData && typeof mockData === "object" && typeof mockData.status === "number") ? mockData.status : 200;
         return new Response(JSON.stringify(mockData), {
-          status: 200,
+          status: httpStatus,
           headers: { "Content-Type": "application/json" },
         });
       }
@@ -2545,8 +2759,9 @@ window.fetch = async function (input, init = {}) {
       }
       const mockData = getMockResponseForUrl(urlStr, method, modifiedInit.body);
       if (mockData !== null) {
+        const httpStatus = (mockData && typeof mockData === "object" && typeof mockData.status === "number") ? mockData.status : 200;
         return new Response(JSON.stringify(mockData), {
-          status: 200,
+          status: httpStatus,
           headers: { "Content-Type": "application/json" },
         });
       }
