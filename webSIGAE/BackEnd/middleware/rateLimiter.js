@@ -20,4 +20,16 @@ const recoveryLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-module.exports = { loginLimiter, recoveryLimiter };
+// Códigos de verificación (recuperación, activación y cambio de correo): cuentan
+// solo los intentos FALLIDOS. Además, cada código se bloquea a los 5 intentos
+// incorrectos (utils/codigosVerificacion.js).
+const codigoLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  skipSuccessfulRequests: true,
+  message: { error: 'Demasiados intentos con códigos de verificación. Intente más tarde.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+module.exports = { loginLimiter, recoveryLimiter, codigoLimiter };

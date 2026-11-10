@@ -6,7 +6,7 @@
 //
 // Uso (desde webSIGAE/BackEnd, con el .env de la base a usar):
 //   node scripts/crearSuperAdmin.js --rut 12345678-9 --nombre "Ana Pérez" \
-//        --telefono 912345678 --correo an.perez@jacquescousteau.edu
+//        --telefono 912345678 --correo an.perez@colegiojc.cl
 // La contraseña se pide por consola sin mostrarla, o se toma de SUPERADMIN_PASSWORD.
 //
 // Reglas: RUT y correo institucional válidos, contraseña fuerte (8+ caracteres, una
@@ -20,6 +20,7 @@ const {
   validarTelefonoChileno,
   normalizarTelefono,
   validarCorreoInstitucional,
+  TEXTO_DOMINIOS_INSTITUCIONALES,
   validarFortalezaContrasena,
 } = require('../middleware/validation');
 
@@ -51,7 +52,7 @@ function validarDatos({ rut, nombre, telefono, correo, contrasena }) {
   if (!rut || !validarRut(rut)) errores.push('RUT inválido (formato 12345678-9, con dígito verificador correcto)');
   if (!nombre || !validarNombreCompleto(nombre)) errores.push('Nombre completo inválido (nombre y apellido, solo letras)');
   if (!telefono || !validarTelefonoChileno(telefono)) errores.push('Teléfono inválido (9 dígitos, opcionalmente con +56)');
-  if (!correo || !validarCorreoInstitucional(correo)) errores.push('El correo debe ser institucional');
+  if (!correo || !validarCorreoInstitucional(correo)) errores.push(`El correo debe ser institucional (${TEXTO_DOMINIOS_INSTITUCIONALES})`);
   const errorContrasena = validarFortalezaContrasena(contrasena);
   if (errorContrasena) errores.push(errorContrasena);
   return errores;

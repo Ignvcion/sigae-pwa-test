@@ -56,7 +56,7 @@ function DetalleBloqueModal({ horarioId, onClose }) {
             <dt>Asignatura</dt>
             <dd>
               {detalle.asignatura}
-              {detalle.prioridadAcademica ? ` · Prioridad ${detalle.prioridadAcademica}` : ""}
+              {detalle.tramo ? ` · Tramo ${detalle.tramo}` : ""}
             </dd>
 
             <dt>Docente</dt>

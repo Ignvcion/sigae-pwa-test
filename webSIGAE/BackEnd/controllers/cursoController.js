@@ -8,7 +8,7 @@ const getCursos = async (req, res) => {
   try {
     const [rows] = await pool.execute(`
       SELECT c.Curso_Id, c.Curso_Seccion, c.Curso_Nombre,
-             c.Nivel_Educativo_Id, n.Nivel_Educativo_Nombre, n.Nivel_Educativo_Orden,
+             c.Nivel_Educativo_Id, n.Nivel_Educativo_Nombre, n.Nivel_Educativo_Orden, n.Nivel_Educativo_Tramo,
              c.Curso_Periodo_Lectivo,
              ${estadoPeriodoCursoSQL('c')} AS Curso_Periodo_Estado,
              c.Curso_Profesor_Jefe_Usuario_Id,
@@ -20,7 +20,7 @@ const getCursos = async (req, res) => {
       LEFT JOIN tieneasig ta ON c.Curso_Id = ta.Curso_Id AND ta.Estado_Asignacion = 'Activa'
       WHERE ${cursoNoArchivado('c')}
       GROUP BY c.Curso_Id, c.Curso_Seccion, c.Curso_Nombre, c.Nivel_Educativo_Id, n.Nivel_Educativo_Nombre,
-               n.Nivel_Educativo_Orden, c.Curso_Periodo_Lectivo, c.Curso_Profesor_Jefe_Usuario_Id,
+               n.Nivel_Educativo_Orden, n.Nivel_Educativo_Tramo, c.Curso_Periodo_Lectivo, c.Curso_Profesor_Jefe_Usuario_Id,
                pj.Usuario_Nombre_Completo
       ORDER BY c.Curso_Periodo_Lectivo, n.Nivel_Educativo_Orden, c.Curso_Seccion
     `);
@@ -109,7 +109,7 @@ const getAsignaturasDeCurso = async (req, res) => {
   try {
     const [rows] = await pool.execute(`
       SELECT ta.tieneasig_Id, ta.Estado_Asignacion,
-             a.Asignatura_Id, a.Asignatura_Nombre, a.Asignatura_Prioridad_Academica
+             a.Asignatura_Id, a.Asignatura_Nombre, a.Asignatura_Tramo
       FROM tieneasig ta
       JOIN asignatura a ON ta.Asignatura_Id = a.Asignatura_Id
       WHERE ta.Curso_Id = ?
@@ -143,7 +143,7 @@ const getAsignaturasDisponibles = async (req, res) => {
     const planId = planes[0].Plan_Educativo_Id;
 
     const [rows] = await pool.execute(`
-      SELECT a.Asignatura_Id, a.Asignatura_Nombre, a.Asignatura_Prioridad_Academica,
+      SELECT a.Asignatura_Id, a.Asignatura_Nombre, a.Asignatura_Tramo,
              ia.Horas_Semanales_Requeridas, ia.Tipo
       FROM incluyeasig ia
       JOIN asignatura a ON ia.Asignatura_Id = a.Asignatura_Id

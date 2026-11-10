@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { registrarAdmin } from "../../services/api";
 import {
-  validarRut, normalizarRut, validarNombreCompleto, validarCorreoInstitucional, DOMINIO_INSTITUCIONAL,
+  validarRut, normalizarRut, validarNombreCompleto, validarCorreoInstitucional, DOMINIO_INSTITUCIONAL, TEXTO_DOMINIOS_INSTITUCIONALES,
   validarTelefonoChileno, validarFortalezaContrasena, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
   validarDireccion,
 } from "../../utils/validaciones";
@@ -43,7 +43,7 @@ function RegisterAdmin() {
           : "";
       case "correo":
         return value && !validarCorreoInstitucional(value)
-          ? `El correo debe pertenecer al dominio ${DOMINIO_INSTITUCIONAL}`
+          ? `El correo debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}`
           : "";
       case "telefono":
         return value && !validarTelefonoChileno(value) ? MENSAJE_TELEFONO : "";

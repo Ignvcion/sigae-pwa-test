@@ -10,6 +10,7 @@ const { obtenerPeriodos, periodoSiguienteDe } = require('../utils/periodos');
 const { registrarHistorial } = require('../utils/historial');
 const { ESTADOS } = require('../utils/situacionFinal');
 const { calcularLimpieza, conteo, datosRespaldo, ejecutarLimpieza } = require('../utils/limpiezaPeriodo');
+const { CORREO_RESPALDOS } = require('../config/institucion');
 const { cursoConElectivosSQL, completitudElectivos } = require('../utils/electivos');
 
 /**
@@ -175,7 +176,8 @@ const valorCelda = (v) => (v instanceof Date ? v.toISOString().replace('T', ' ')
 
 // GET /api/promocion/periodos/respaldo   (Super Admin)
 // Excel con todo lo que se eliminará o desactivará al iniciar el nuevo período.
-// Contiene datos personales: se descarga solo para subirlo al Drive de respaldos.
+// Contiene datos personales: se descarga solo para subirlo al Drive de respaldos
+// (respaldosigae@colegiojc.cl).
 const descargarRespaldo = async (req, res) => {
   try {
     const { vigente, siguiente } = await obtenerPeriodos(pool);
@@ -189,7 +191,7 @@ const descargarRespaldo = async (req, res) => {
       ['Generado', new Date().toISOString().replace('T', ' ').slice(0, 19)],
       ['Período vigente', vigente],
       ['Período siguiente', siguiente || '—'],
-      ['Contiene datos personales: subir al Drive de respaldos y no guardar copias en equipos personales.'],
+      [`Contiene datos personales: subir al Google Drive de ${CORREO_RESPALDOS} y no guardar copias en equipos personales.`],
       [],
       ['Qué se elimina o modifica', 'Cantidad'],
       ...Object.entries(conteo(limpieza)),

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
+import BloquePIE from "../../components/BloquePIE";
 import { getEspecialidades, getDisponibilidadDocente } from "../../services/api";
 import EtiquetasInput, { separarEtiquetas } from "../../components/EtiquetasInput";
 import DisponibilidadSemanal, { errorTramos } from "../../components/DisponibilidadSemanal";
 import "./FormEditarUsuario.css";
 import {
-  validarNombreCompleto, validarCorreoInstitucional, validarCorreo, DOMINIO_INSTITUCIONAL,
+  validarNombreCompleto, validarCorreoInstitucional, validarCorreo, DOMINIO_INSTITUCIONAL, TEXTO_DOMINIOS_INSTITUCIONALES,
   validarTelefonoChileno, validarDireccion, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
 } from "../../utils/validaciones";
 
@@ -31,6 +32,8 @@ const CAMPOS_DIRECCION = [
 const direccionDesdeForm = (f) =>
   Object.fromEntries(Object.entries(COLUMNAS_DIRECCION).map(([col, clave]) => [clave, f[col] || ""]));
 
+const CAMPOS_CORREO = ["Administrador_Correo_Institucional", "Docente_Correo_Institucional", "Apoderado_Correo_Natural"];
+
 function validarCampo(name, value, form) {
   if (name === "Docente_Especialidades") {
     return value.length === 0 ? "Agrega al menos una especialidad" : "";
@@ -48,11 +51,13 @@ function validarCampo(name, value, form) {
         ? "La carga horaria semanal debe ser un número entre 1 y 44 horas"
         : "";
   }
+  // Los correos de cada rol son obligatorios: el backend tampoco acepta dejarlos vacíos
+  if (CAMPOS_CORREO.includes(name) && !String(value ?? "").trim()) return "El correo es obligatorio";
   if (!value) return "";
   switch (name) {
     case "Administrador_Correo_Institucional":
     case "Docente_Correo_Institucional":
-      return !validarCorreoInstitucional(value) ? `El correo debe pertenecer al dominio ${DOMINIO_INSTITUCIONAL}` : "";
+      return !validarCorreoInstitucional(value) ? `El correo debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}` : "";
     case "Apoderado_Correo_Natural":
       return !validarCorreo(value) ? "Ingrese un correo electrónico válido" : "";
     default:
@@ -331,6 +336,7 @@ function FormEditarUsuario({ datos, onGuardado }) {
         <BloqueCorreoRol datos={datos} onGuardado={onGuardado} titulo="Datos de apoderado"
           name="Apoderado_Correo_Natural" label="Correo personal" />
       )}
+      {!!datos.Es_Docente && <BloquePIE datos={datos} onGuardado={onGuardado} />}
       {!!datos.Es_Docente && <BloqueDisponibilidad datos={datos} onGuardado={onGuardado} />}
     </section>
   );

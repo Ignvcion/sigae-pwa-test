@@ -5,6 +5,7 @@ const {
   validarNombreCompleto,
   validarFortalezaContrasena,
   validarDireccion,
+  validarCorreoInstitucional,
 } = require('../middleware/validation');
 
 // Ejecuta la cadena de middlewares de express-validator como lo haría Express
@@ -25,6 +26,28 @@ async function ejecutarCadena(cadena, body) {
 }
 
 describe('Glosario 6.1.2 - Validaciones de datos de entrada', () => {
+  describe('Correo institucional (docentes y administradores)', () => {
+    test.each([
+      'ma.morales@colegiojc.cl',
+      'ma.morales@colegiojacquescousteau.cl',
+      ' Ma.Morales@ColegioJC.cl ',
+    ])('acepta %p', (correo) => {
+      expect(validarCorreoInstitucional(correo)).toBe(true);
+    });
+
+    test.each([
+      'ma.morales@jacquescousteau.edu', // dominio anterior
+      'ma.morales@gmail.com',
+      'ma.morales@otro.colegiojc.cl', // subdominio
+      'ma.moralescolegiojc.cl',
+      '@colegiojc.cl',
+      'ma morales@colegiojc.cl',
+      '',
+    ])('rechaza %p', (correo) => {
+      expect(validarCorreoInstitucional(correo)).toBe(false);
+    });
+  });
+
   describe('Número telefónico', () => {
     test.each(['912345678', '+56912345678', '56912345678', ' 912345678 '])('acepta %p', (tel) => {
       expect(validarTelefonoChileno(tel)).toBe(true);
@@ -104,7 +127,7 @@ describe('validateCrearUsuario', () => {
     Usuario_Telefono: '+56946789765',
     Usuario_Contraseña: 'Segura123',
     Es_Docente: 1,
-    Docente_Correo_Institucional: 'ma.morales@jacquescousteau.edu',
+    Docente_Correo_Institucional: 'ma.morales@colegiojc.cl',
     Usuario_Direccion_Calle: 'Los Aromos',
     Usuario_Direccion_Numero: '45',
     Usuario_Direccion_Comuna: 'Ñuñoa',
@@ -170,7 +193,7 @@ describe('validateCrearUsuario', () => {
       Usuario_Telefono: '979746782',
       Usuario_Contraseña: 'Segura123',
       Es_Administrador: 1,
-      Administrador_Correo_Institucional: 'ca.gonzales@jacquescousteau.edu',
+      Administrador_Correo_Institucional: 'ca.gonzales@colegiojc.cl',
     };
     const sinDireccion = await ejecutarCadena(validateCrearUsuario, admin);
     expect(sinDireccion.llegoAlFinal).toBe(false);

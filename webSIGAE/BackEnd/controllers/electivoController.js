@@ -17,7 +17,8 @@ const { condicionDesajustado } = require('../utils/bloquesDesajustados');
 const { RUTAS_ELECTIVO, normalizarRuta } = require('../utils/rutaFormacion');
 const { validarDisponibilidad, resumenSemanal, advertenciaHorasAdeudadas } = require('../utils/disponibilidadLaboral');
 const { sugerenciaEspecialidad } = require('../utils/especialidades');
-const { DURACION_SQL, cursoConElectivosSQL, horasElectivoDocente, completitudElectivos } = require('../utils/electivos');
+const { DURACION_SQL, cursoConElectivosSQL, completitudElectivos } = require('../utils/electivos');
+const { verificarCargaLectiva, docentesConPIEEnBloque } = require('../utils/cargaLectiva');
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 const idValido = (v) => Number.isInteger(Number(v)) && Number(v) > 0;
@@ -468,23 +469,14 @@ const programarElectivo = async (req, res) => {
     });
     if (fueraDisponibilidad) throw new ErrorElectivo(422, fueraDisponibilidad);
 
-    // RF35: carga horaria semanal (clases regulares + electivos del período)
-    if (docente.Docente_Carga_Horaria_Semanal != null) {
-      const [[reg]] = await conn.query(
-        `SELECT COALESCE(SUM(${DURACION_SQL('bh')}), 0) AS horas
-           FROM horario_asignatura ha
-           JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
-           JOIN curso c ON c.Curso_Id = ha.Curso_Id
-          WHERE ha.Usuario_Id = ? AND ha.Horario_Asignatura_Estado = 'Activo' AND c.Curso_Periodo_Lectivo = ?`,
-        [docenteId, periodo]
-      );
-      const actual = Number(reg.horas) + await horasElectivoDocente(conn, docenteId, periodo);
-      const carga = Number(docente.Docente_Carga_Horaria_Semanal);
-      if (actual + duracion > carga + 1e-9) {
-        throw new ErrorElectivo(422, `${docente.Usuario_Nombre_Completo} excedería su carga horaria semanal de ${carga} h `
-          + `(actual: ${actual.toFixed(1)} h, este bloque añade: ${duracion.toFixed(1)} h)`);
-      }
+    // Horas P.I.E.: un bloque P.I.E. del docente no admite clases
+    if ((await docentesConPIEEnBloque(conn, [docenteId], periodo, dia, bloqueId)).size > 0) {
+      throw new ErrorElectivo(409, `${docente.Usuario_Nombre_Completo} tiene horas P.I.E. ese ${dia} en ese bloque`);
     }
+    // RF35 / regla 65/35: clases regulares + electivos del período, en horas pedagógicas,
+    // hasta el 65 % de (carga − horas P.I.E.)
+    const excedeLectivas = await verificarCargaLectiva(conn, docenteId, periodo);
+    if (excedeLectivas) throw new ErrorElectivo(422, excedeLectivas);
 
     const [r] = await conn.query(
       `INSERT INTO clase_electivo (Clase_Electivo_Periodo_Lectivo, Clase_Electivo_Dia_Semana, Bloque_Horario_Id,

@@ -301,6 +301,18 @@ describe('Pruebas Unitarias - CU74–CU79: Módulo de Citaciones', () => {
     ]);
   });
 
+  test('CU89/CU75: el apoderado que solicitó la citación no puede confirmarla él mismo', async () => {
+    req.user = { id: 4, roles: ['Apoderado'] };
+    req.params.id = '50';
+    pool.query.mockResolvedValueOnce([[filaCitacion({ Citacion_Solicitante_Rol: 'Apoderado' })]]);
+
+    await citacionController.confirmarCitacion(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ mensaje: 'La confirmación de esta citación le corresponde a la contraparte' });
+    expect(pool.getConnection).not.toHaveBeenCalled();
+  });
+
   test('CU75: el Administrador no puede confirmar en nombre del apoderado', async () => {
     req.user = { id: 2, roles: ['Administrador'] };
     req.params.id = '50';

@@ -27,10 +27,10 @@ function origenesCors() {
 const OBLIGATORIAS_PRODUCCION = [
   'DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME',
   'JWT_SECRET',
-  'FRONTEND_URL',            // enlaces de recuperación de contraseña y CORS
+  'FRONTEND_URL',            // CORS
   'UPLOADS_DIR',             // fotos de perfil fuera del repo
   'PUPPETEER_EXECUTABLE_PATH', // Chromium del sistema para exportar PNG
-  'SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'EMAIL_FROM', // correo de recuperación (CU14)
+  'SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'EMAIL_FROM', // bot de códigos (noreply@colegiojc.cl)
 ];
 
 // Devuelve la lista de problemas (nombres de variables, nunca valores).

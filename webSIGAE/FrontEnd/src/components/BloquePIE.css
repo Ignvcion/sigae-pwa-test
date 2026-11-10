@@ -1,0 +1,136 @@
+/* components/BloquePIE.jsx */
+.pie-fila {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.pie-campo-horas {
+  max-width: 160px;
+}
+
+.pie-campo-periodo {
+  max-width: 220px;
+}
+
+.pie-reparto {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  margin: 8px 0 12px;
+  border-radius: 8px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #3730a3;
+  font-size: 0.88rem;
+}
+
+.pie-reparto span {
+  color: #475569;
+  font-size: 0.82rem;
+}
+
+.pie-reparto--excede {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.pie-reparto--excede span {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.pie-contador {
+  font-size: 0.85rem;
+  color: #475569;
+  margin: 4px 0 8px;
+}
+
+/* La grilla se desplaza dentro de su caja en pantallas angostas */
+.pie-grilla-envoltura {
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+
+.pie-grilla {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.pie-grilla th,
+.pie-grilla td {
+  border: 1px solid #e2e8f0;
+  padding: 3px;
+  text-align: center;
+}
+
+.pie-grilla thead th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 600;
+  padding: 6px 4px;
+}
+
+.pie-grilla tbody th {
+  white-space: nowrap;
+  color: #475569;
+  font-weight: 600;
+  background: #f8fafc;
+  padding: 0 8px;
+}
+
+.pie-celda {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 30px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #6d28d9;
+  font-weight: 700;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.pie-celda:hover:not(:disabled) {
+  background: #f5f3ff;
+  border-color: #a78bfa;
+}
+
+.pie-celda:disabled {
+  cursor: not-allowed;
+  background: #f8fafc;
+}
+
+.pie-celda:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 1px;
+}
+
+.pie-celda--pie {
+  border: 1px solid #7c3aed;
+  background: #ede9fe;
+}
+
+.pie-celda--clase {
+  cursor: default;
+  border: 1px solid #e2e8f0;
+  background: #f1f5f9;
+  color: #64748b;
+  font-weight: 500;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  padding: 2px 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+}

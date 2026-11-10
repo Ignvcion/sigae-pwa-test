@@ -1,0 +1,77 @@
+SIGAE - Horas P.I.E. y regla 65/35 de la carga del docente
+
+======================================================================
+1. REGLA
+======================================================================
+
+- El administrador asigna al docente HORAS P.I.E. (Programa de Integración
+  Escolar) al crearlo o en la edición de su perfil (bloque "Horas P.I.E. y
+  regla 65/35"). Se guardan en usuario.Docente_Horas_PIE.
+- Las horas P.I.E. se restan de la carga horaria semanal y sobre el resto se
+  aplica la regla 65/35: el 65 % son clases y el 35 %, horas no lectivas.
+    44 h − 3 h P.I.E. = 41 h → máximo 26 clases (65 %) y 15 h no lectivas
+- Las clases se cuentan en HORAS PEDAGÓGICAS: cada bloque de clase (regular
+  o electivo) vale 1, sin importar sus minutos. El 65 % se redondea hacia
+  abajo (26,65 → 26).
+- Asignar una clase por sobre ese máximo se RECHAZA (crear o editar una
+  clase, reasignación y edición masiva, electivos). Reemplaza al límite
+  anterior, que era la carga completa contada en horas reloj.
+- Las horas P.I.E. también se UBICAN en el horario: en la edición del
+  docente se marcan los bloques de la semana (por período) que son P.I.E.,
+  hasta la cantidad asignada. Un bloque P.I.E. no admite clases (ni
+  electivos) y aparece en Mi horario / Horario de docente. Los bloques
+  donde el docente ya tiene clase no se pueden marcar.
+- La carga horaria semanal no puede quedar por debajo de las horas P.I.E.
+- Si al aumentar las horas P.I.E. el docente ya tiene más clases que su
+  nuevo máximo, se guarda y se avisa: hay que reasignar clases.
+
+Archivos: BackEnd/utils/cargaLectiva.js (regla), controllers/pieController.js
+(GET/PUT /api/usuarios/:id/pie), FrontEnd/src/components/BloquePIE.jsx.
+
+======================================================================
+2. PRODUCCIÓN (RDS)
+======================================================================
+
+IMPORTANTE: el límite de clases baja. Antes un docente de 38 h podía tener
+clases hasta sumar 38 h reloj; ahora, como máximo floor(0,65 × 38) = 24
+clases. Las clases ya asignadas NO se quitan, pero a quien supere el máximo
+no se le pueden asignar más. Para revisarlos después de migrar:
+
+    SELECT u.Usuario_Id, u.Usuario_Nombre_Completo, u.Docente_Carga_Horaria_Semanal AS carga,
+           FLOOR(GREATEST(0, CAST(u.Docente_Carga_Horaria_Semanal AS SIGNED) - CAST(u.Docente_Horas_PIE AS SIGNED))
+                 * 0.65 + 0.000000001) AS max_clases,
+           (SELECT COUNT(*) FROM horario_asignatura ha JOIN curso c ON c.Curso_Id = ha.Curso_Id
+             WHERE ha.Usuario_Id = u.Usuario_Id AND ha.Horario_Asignatura_Estado = 'Activo'
+               AND c.Curso_Periodo_Lectivo = p.Parametro_Institucional_Periodo_Vigente)
+         + (SELECT COUNT(*) FROM clase_electivo ce
+             WHERE ce.Docente_Usuario_Id = u.Usuario_Id
+               AND ce.Clase_Electivo_Periodo_Lectivo = p.Parametro_Institucional_Periodo_Vigente) AS clases
+      FROM usuario u CROSS JOIN parametro_institucional p
+     WHERE u.Es_Docente = 1 AND u.Docente_Carga_Horaria_Semanal IS NOT NULL
+    HAVING clases > max_clases;
+
+Snapshot de la RDS y luego (MariaDB). Verificado: el esquema de main + estos
+ALTER queda idéntico al schema_base.sql nuevo. Publicar backend y frontend
+juntos.
+
+    SET NAMES utf8mb4;
+    
+    ALTER TABLE usuario
+      ADD COLUMN Docente_Horas_PIE int unsigned NOT NULL DEFAULT 0;
+    
+    CREATE TABLE bloque_pie_docente (
+      Bloque_Pie_Id int unsigned NOT NULL AUTO_INCREMENT,
+      Docente_Usuario_Id int unsigned NOT NULL,
+      Bloque_Pie_Periodo_Lectivo varchar(10) NOT NULL,
+      Bloque_Pie_Dia_Semana varchar(20) NOT NULL,
+      Bloque_Horario_Id int unsigned NOT NULL,
+      PRIMARY KEY (Bloque_Pie_Id),
+      UNIQUE KEY Bloque_Pie_UNIQUE (Docente_Usuario_Id, Bloque_Pie_Periodo_Lectivo, Bloque_Pie_Dia_Semana, Bloque_Horario_Id),
+      KEY fk_Bloque_Pie_Bloque_idx (Bloque_Horario_Id),
+      CONSTRAINT fk_Bloque_Pie_Bloque FOREIGN KEY (Bloque_Horario_Id)
+        REFERENCES bloque_horario (Bloque_Horario_Id) ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT fk_Bloque_Pie_Docente FOREIGN KEY (Docente_Usuario_Id)
+        REFERENCES usuario (Usuario_Id) ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT chk_Bloque_Pie_Dia
+        CHECK (Bloque_Pie_Dia_Semana IN ('Lunes','Martes','Miércoles','Jueves','Viernes'))
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

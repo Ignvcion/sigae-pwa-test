@@ -172,16 +172,30 @@ describe('CU106: programación de electivos', () => {
     expect(r.json.mock.calls[0][0].mensaje).toContain('ya tiene 1ero Básico A (Matemática)');
   });
 
-  test('RF35: el electivo cuenta en la carga horaria semanal del docente', async () => {
+  test('RF35 / regla 65/35: el electivo cuenta como una clase más del docente', async () => {
     pool.query = porPatron([PERIODOS]);
     mockConn([PLAN, ITEMS, DOCENTES_PLAN, BLOQUE,
       [/FROM usuario WHERE Usuario_Id = \? AND Es_Docente = 1/, [[{ Usuario_Id: 7, Usuario_Nombre_Completo: 'Carmen', Docente_Carga_Horaria_Semanal: 2 }]]],
-      [/FROM horario_asignatura ha\s+JOIN bloque_horario bh/, [[{ horas: 0.75 }]]],
-      [/FROM clase_electivo ce JOIN bloque_horario bh/, [[{ horas: 0.75 }]]]]);
+      // Carga 2 h, sin P.I.E.: máximo floor(65 % de 2) = 1 clase; ya tiene 1 regular
+      [/FROM usuario WHERE Usuario_Id IN/, [[{ Usuario_Id: 7, Usuario_Nombre_Completo: 'Carmen', Docente_Carga_Horaria_Semanal: 2, Docente_Horas_PIE: 0 }]]],
+      [/COUNT\(\*\) AS n\s+FROM horario_asignatura/, [[{ id: 7, n: 1 }]]]]);
     const r = res();
     await electivos.programarElectivo(programar({}), r);
     expect(r.status).toHaveBeenCalledWith(422);
-    expect(r.json.mock.calls[0][0].mensaje).toContain('carga horaria semanal de 2 h');
+    expect(r.json.mock.calls[0][0].mensaje).toBe(
+      'Carmen superaría su máximo semanal de 1 clase (2 h → 1 clase (65 %) y 1 h no lectivas (35 %)). Ya tiene 1 clase y quedaría con 2.'
+    );
+  });
+
+  test('Horas P.I.E.: no se programa un electivo en un bloque P.I.E. del docente', async () => {
+    pool.query = porPatron([PERIODOS]);
+    mockConn([PLAN, ITEMS, DOCENTES_PLAN, BLOQUE,
+      [/FROM usuario WHERE Usuario_Id = \? AND Es_Docente = 1/, [[{ Usuario_Id: 7, Usuario_Nombre_Completo: 'Carmen', Docente_Carga_Horaria_Semanal: 40 }]]],
+      [/FROM bloque_pie_docente/, [[{ id: 7 }]]]]);
+    const r = res();
+    await electivos.programarElectivo(programar({}), r);
+    expect(r.status).toHaveBeenCalledWith(409);
+    expect(r.json.mock.calls[0][0].mensaje).toContain('tiene horas P.I.E.');
   });
 });
 
@@ -233,17 +247,18 @@ describe('RF27 y CU47: asignaturas electivas', () => {
   test('CU47: se registra una asignatura marcada como electiva', async () => {
     pool.execute = porPatron([[/INSERT INTO asignatura/, [{ insertId: 3000 }]]]);
     const r = res();
-    await planController.crearAsignatura({ body: { nombre: 'Química Avanzada', prioridad: 'Media', electiva: true } }, r);
+    await planController.crearAsignatura({ body: { nombre: 'Química Avanzada', tramo: 'Media', electiva: true } }, r);
     expect(r.status).toHaveBeenCalledWith(201);
     const insert = pool.execute.mock.calls.find(([sql]) => /INSERT INTO asignatura/.test(sql));
-    expect(insert[1]).toEqual(['Química Avanzada', 'Media', 1]);
+    // El último valor es el color aleatorio de la paleta (utils/colores.js)
+    expect(insert[1]).toEqual(['Química Avanzada', 'Media', 1, expect.stringMatching(/^#[0-9A-F]{6}$/)]);
   });
 
   test('CU47: no se marca como electiva una asignatura usada en planes o cursos', async () => {
-    pool.execute = porPatron([[/SELECT Asignatura_Id, Asignatura_Es_Electiva FROM asignatura/, [[{ Asignatura_Id: 2222, Asignatura_Es_Electiva: 0 }]]]]);
+    pool.execute = porPatron([[/SELECT Asignatura_Id, Asignatura_Es_Electiva, Asignatura_Tramo FROM asignatura/, [[{ Asignatura_Id: 2231, Asignatura_Es_Electiva: 0, Asignatura_Tramo: 'Media' }]]]]);
     pool.query = porPatron([[/FROM incluyeasig/, [[{ n: 2 }]]]]);
     const r = res();
-    await planController.editarAsignatura({ params: { id: '2222' }, body: { nombre: 'Matemática', prioridad: 'Alta', electiva: true } }, r);
+    await planController.editarAsignatura({ params: { id: '2231' }, body: { nombre: 'Matemática', tramo: 'Media', electiva: true } }, r);
     expect(r.status).toHaveBeenCalledWith(409);
     expect(pool.execute.mock.calls.some(([sql]) => /UPDATE asignatura/.test(sql))).toBe(false);
   });

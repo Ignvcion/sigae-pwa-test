@@ -8,7 +8,7 @@ import {
   validarCorreoInstitucional,
   validarCorreo,
   validarDireccion,
-  DOMINIO_INSTITUCIONAL,
+  DOMINIO_INSTITUCIONAL, TEXTO_DOMINIOS_INSTITUCIONALES,
 } from "../../utils/validaciones";
 
 // Columnas de la dirección estructurada ↔ claves que usa validarDireccion
@@ -330,7 +330,7 @@ function GestionRoles() {
     if (!value) return "";
     if (name === "Docente_Correo_Institucional" || name === "Administrador_Correo_Institucional")
       return !validarCorreoInstitucional(value)
-        ? `El correo debe pertenecer al dominio ${DOMINIO_INSTITUCIONAL}`
+        ? `El correo debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}`
         : "";
     if (name === "Apoderado_Correo_Natural")
       return !validarCorreo(value) ? "Ingrese un correo electrónico válido" : "";

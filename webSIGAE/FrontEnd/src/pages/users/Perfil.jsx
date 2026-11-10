@@ -5,7 +5,9 @@ import FormEditarUsuario from "./FormEditarUsuario";
 import { EtiquetasLectura } from "../../components/EtiquetasInput";
 import MiDisponibilidadLaboral from "../../components/MiDisponibilidadLaboral";
 import HorarioAtencionSemanal from "../../components/HorarioAtencionSemanal";
-import { apiFetch, getAsignacionesDocente, getEstudiantesAsociados, getDetalleEstudiante, editarPerfilPropio, actualizarFotoPerfil } from "../../services/api";
+import { apiFetch, getAsignacionesDocente, getEstudiantesAsociados, getDetalleEstudiante, editarPerfilPropio, confirmarCorreoPropio, actualizarFotoPerfil } from "../../services/api";
+import { CampoCodigo, AvisoDevCodigo, textoReenviar } from "../../components/CodigoVerificacion";
+import useEspera from "../../hooks/useEspera";
 import { validarTelefonoChileno, validarDireccion, formatearDireccion, COLUMNAS_DIRECCION_ESTUDIANTE, MENSAJE_TELEFONO } from "../../utils/validaciones";
 
 // CU20: placeholder cuando el usuario no tiene fotografía de perfil registrada
@@ -62,6 +64,14 @@ function Perfil() {
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [msgExitoPerfil, setMsgExitoPerfil] = useState("");
   const [msgErrorPerfil, setMsgErrorPerfil] = useState("");
+
+  // CU19: el correo nuevo se guarda al confirmar el código que se le envía
+  const [cambioCorreo, setCambioCorreo] = useState(null); // { correoNuevo, correoEnmascarado, devCodigo }
+  const [codigoCorreo, setCodigoCorreo] = useState("");
+  const [msgCorreo, setMsgCorreo] = useState({ tipo: "", texto: "" });
+  const [confirmandoCorreo, setConfirmandoCorreo] = useState(false);
+  const [reenviandoCorreo, setReenviandoCorreo] = useState(false);
+  const [esperaCorreo, setEsperaCorreo] = useEspera();
 
   // CU20: editar fotografía de perfil mediante carga de archivo
   const [archivoFoto, setArchivoFoto] = useState(null);
@@ -300,14 +310,77 @@ function Perfil() {
       if (incluyeDireccion) payload.direccion = { calle, numero, depto, comuna };
 
       const data = await editarPerfilPropio(payload);
-      setMsgExitoPerfil(data.mensaje || "Cambios guardados correctamente");
       recargarDatos();
+      if (data.verificacionCorreo?.pendiente) {
+        // El correo cambia al ingresar el código (tarjeta "Confirmar nuevo correo")
+        iniciarConfirmacionCorreo(formPerfil.correo.trim(), data.verificacionCorreo, data.mensaje);
+        setEditandoPerfil(false);
+        return;
+      }
+      setMsgExitoPerfil(data.mensaje || "Cambios guardados correctamente");
     } catch (error) {
       // CU19 - Excepciones "Formato de datos incorrecto" y "Correo ya registrado"
       setMsgErrorPerfil(error.message || "No fue posible actualizar tu perfil, reintente más tarde");
     } finally {
       setGuardandoPerfil(false);
     }
+  };
+
+  // CU19: confirmación del correo nuevo con el código enviado desde noreply@colegiojc.cl
+  const iniciarConfirmacionCorreo = (correoNuevo, verificacion, mensaje) => {
+    setCambioCorreo({
+      correoNuevo,
+      correoEnmascarado: verificacion.correoEnmascarado,
+      devCodigo: verificacion.devCodigo || "",
+    });
+    setCodigoCorreo("");
+    setMsgCorreo({ tipo: "exito", texto: mensaje });
+    setEsperaCorreo(60);
+    requestAnimationFrame(() => document.getElementById("confirmar-correo")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+
+  const handleConfirmarCorreo = async (e) => {
+    e.preventDefault();
+    if (codigoCorreo.length !== 6) {
+      setMsgCorreo({ tipo: "error", texto: "El código tiene 6 dígitos." });
+      return;
+    }
+    setConfirmandoCorreo(true);
+    setMsgCorreo({ tipo: "", texto: "" });
+    try {
+      const data = await confirmarCorreoPropio(codigoCorreo);
+      setCambioCorreo(null);
+      setMsgCorreo({ tipo: "exito", texto: data.mensaje || "Correo actualizado correctamente" });
+      recargarDatos();
+    } catch (error) {
+      setCodigoCorreo("");
+      setMsgCorreo({ tipo: "error", texto: error.message || "No fue posible confirmar el correo" });
+    } finally {
+      setConfirmandoCorreo(false);
+    }
+  };
+
+  const handleReenviarCodigoCorreo = async () => {
+    setReenviandoCorreo(true);
+    setMsgCorreo({ tipo: "", texto: "" });
+    try {
+      const data = await editarPerfilPropio({ correo: cambioCorreo.correoNuevo });
+      if (data.verificacionCorreo?.pendiente) {
+        iniciarConfirmacionCorreo(cambioCorreo.correoNuevo, data.verificacionCorreo,
+          "Te enviamos un código nuevo. El anterior ya no sirve.");
+      }
+    } catch (error) {
+      if (error.data?.segundos) setEsperaCorreo(error.data.segundos);
+      setMsgCorreo({ tipo: "error", texto: error.message || "No se pudo reenviar el código" });
+    } finally {
+      setReenviandoCorreo(false);
+    }
+  };
+
+  const cerrarConfirmacionCorreo = () => {
+    setCambioCorreo(null);
+    setCodigoCorreo("");
+    setMsgCorreo({ tipo: "", texto: "" });
   };
 
   // CU20: editar fotografía de perfil mediante carga de archivo
@@ -700,6 +773,56 @@ function Perfil() {
                 </button>
               </div>
             </form>
+          </div>
+        )}
+
+        {/* CU19: el correo nuevo se guarda al ingresar el código enviado a esa dirección */}
+        {esPerfilPropio && (cambioCorreo || msgCorreo.texto) && (
+          <div className="perfil-card" id="confirmar-correo">
+            <h2>{cambioCorreo ? "Confirmar nuevo correo" : "Correo"}</h2>
+            {msgCorreo.texto && (
+              <div className={msgCorreo.tipo === "error" ? "msg-error-form" : "msg-exito"}>{msgCorreo.texto}</div>
+            )}
+            {cambioCorreo ? (
+              <form className="cambiar-pwd-form" onSubmit={handleConfirmarCorreo}>
+                <p className="texto-codigo">
+                  Enviamos un código de 6 dígitos a <strong>{cambioCorreo.correoEnmascarado}</strong> desde{" "}
+                  <strong>noreply@colegiojc.cl</strong>. Vence en 10 minutos. Hasta que lo ingreses, tu cuenta sigue
+                  usando el correo anterior.
+                </p>
+                <div className="campo-pwd">
+                  <label htmlFor="codigoCorreo">Código de verificación</label>
+                  <CampoCodigo
+                    id="codigoCorreo"
+                    value={codigoCorreo}
+                    onChange={setCodigoCorreo}
+                    disabled={confirmandoCorreo}
+                    autoFocus
+                  />
+                  <AvisoDevCodigo codigo={cambioCorreo.devCodigo} />
+                </div>
+                <div style={{ display: "flex", gap: "10px", marginTop: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                  <button type="submit" className="btn-primario" disabled={confirmandoCorreo || codigoCorreo.length !== 6}>
+                    {confirmandoCorreo ? "Confirmando..." : "Confirmar correo"}
+                  </button>
+                  <button type="button" className="btn-desactivar" onClick={cerrarConfirmacionCorreo} disabled={confirmandoCorreo}>
+                    Cancelar cambio
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-enlace"
+                    onClick={handleReenviarCodigoCorreo}
+                    disabled={reenviandoCorreo || esperaCorreo > 0 || confirmandoCorreo}
+                  >
+                    {textoReenviar(esperaCorreo, reenviandoCorreo)}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button type="button" className="btn-desactivar" onClick={cerrarConfirmacionCorreo} style={{ marginTop: "10px" }}>
+                Cerrar
+              </button>
+            )}
           </div>
         )}
 

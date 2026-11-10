@@ -190,6 +190,8 @@ async function ejecutarLimpieza(conn, l, nuevoVigente) {
 
   // CU107: la disponibilidad laboral es por período; la de períodos ya cerrados no se usa más
   await run('DELETE FROM disponibilidad_docente WHERE Disponibilidad_Docente_Periodo_Lectivo < ?', [nuevoVigente]);
+  // Horas P.I.E.: los bloques también son por período
+  await run('DELETE FROM bloque_pie_docente WHERE Bloque_Pie_Periodo_Lectivo < ?', [nuevoVigente]);
 }
 
 module.exports = { calcularLimpieza, conteo, datosRespaldo, ejecutarLimpieza };

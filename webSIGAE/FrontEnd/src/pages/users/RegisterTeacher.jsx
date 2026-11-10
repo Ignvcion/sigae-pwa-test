@@ -4,10 +4,11 @@ import { registrarDocente, getEspecialidades, getOpcionesDisponibilidad } from "
 import EtiquetasInput from "../../components/EtiquetasInput";
 import DisponibilidadSemanal, { errorTramos } from "../../components/DisponibilidadSemanal";
 import {
-  validarRut, normalizarRut, validarNombreCompleto, validarCorreoInstitucional, DOMINIO_INSTITUCIONAL,
+  validarRut, normalizarRut, validarNombreCompleto, validarCorreoInstitucional, DOMINIO_INSTITUCIONAL, TEXTO_DOMINIOS_INSTITUCIONALES,
   validarTelefonoChileno, validarFortalezaContrasena, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
   validarDireccion,
 } from "../../utils/validaciones";
+import { calcularCargaLectiva, textoReparto, errorHorasPIE } from "../../utils/cargaLectiva";
 import CamposDireccion, { CAMPOS_DIRECCION, errorCampoDireccion } from "../../components/CamposDireccion";
 
 
@@ -28,6 +29,7 @@ function RegisterTeacher() {
     password: "",
     especialidades: [],
     cargaHoraria: "",
+    horasPIE: "0",
     disponibilidad: [],
     estado: "Activo",
   });
@@ -59,7 +61,7 @@ function RegisterTeacher() {
           : "";
       case "correo":
         return value && !validarCorreoInstitucional(value)
-          ? `El correo debe pertenecer al dominio ${DOMINIO_INSTITUCIONAL}`
+          ? `El correo debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}`
           : "";
       case "telefono":
         return value && !validarTelefonoChileno(value) ? MENSAJE_TELEFONO : "";
@@ -71,6 +73,8 @@ function RegisterTeacher() {
           : "";
       case "especialidades":
         return value.length === 0 ? "Agrega al menos una especialidad" : "";
+      case "horasPIE":
+        return errorHorasPIE(value, formData.cargaHoraria);
       default:
         return "";
     }
@@ -96,6 +100,7 @@ function RegisterTeacher() {
       telefono: validarCampo("telefono", formData.telefono),
       password: validarCampo("password", formData.password),
       cargaHoraria: validarCampo("cargaHoraria", formData.cargaHoraria),
+      horasPIE: validarCampo("horasPIE", formData.horasPIE),
       especialidades: validarCampo("especialidades", formData.especialidades),
       disponibilidad: opcionesDisp ? errorTramos(formData.disponibilidad, opcionesDisp.dias || []) : "",
       ...validarDireccion(formData),
@@ -304,6 +309,28 @@ function RegisterTeacher() {
               required
             />
             {errores.cargaHoraria && <span className="input-error-msg">{errores.cargaHoraria}</span>}
+          </div>
+
+          <div className="campo-pwd">
+            <label htmlFor="horas-pie">Horas P.I.E.</label>
+            <input
+              id="horas-pie"
+              type="number"
+              name="horasPIE"
+              value={formData.horasPIE}
+              onChange={handleChange}
+              min="0"
+              max={formData.cargaHoraria || 44}
+              className={errores.horasPIE ? "input-invalid" : ""}
+            />
+            {errores.horasPIE && <span className="input-error-msg">{errores.horasPIE}</span>}
+            <span className="etiquetas-ayuda">
+              Se restan de la carga y sobre el resto se aplica la regla 65/35.
+              {calcularCargaLectiva(formData.cargaHoraria || null, formData.horasPIE) && (
+                <> <strong>{textoReparto(calcularCargaLectiva(formData.cargaHoraria, formData.horasPIE))}</strong>.</>
+              )}
+              {" "}Los bloques P.I.E. se ubican en el horario desde la edición del docente.
+            </span>
           </div>
 
 

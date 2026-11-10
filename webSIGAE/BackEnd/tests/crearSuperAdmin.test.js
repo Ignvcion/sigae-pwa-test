@@ -4,7 +4,7 @@ const { validarDatos, crearSuperAdmin } = require('../scripts/crearSuperAdmin');
 
 const DATOS = {
   rut: '11111111-1', nombre: 'Rosa Muñoz', telefono: '912345678',
-  correo: 'ro.munoz@jacquescousteau.edu', contrasena: 'Clave1234',
+  correo: 'ro.munoz@colegiojc.cl', contrasena: 'Clave1234',
 };
 
 describe('scripts/crearSuperAdmin', () => {

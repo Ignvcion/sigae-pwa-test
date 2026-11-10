@@ -72,6 +72,12 @@ CREATE TABLE `apoderado_suplente` (
 
 --
 -- Table structure for table `asignatura`
+-- Asignatura_Tramo: Kinder, Básica o Media. La asignatura solo se usa en planes (y por ende en cursos,
+-- horarios y evaluaciones) de niveles de su tramo (nivel_educativo.Nivel_Educativo_Tramo). El nombre
+-- es único dentro del tramo: "Matemática" de Básica y de Media son asignaturas distintas.
+-- Reemplaza a la prioridad académica (Alta/Media/Baja), que se eliminó.
+-- Asignatura_Color: color (#RRGGBB) que la identifica en los horarios; al crearla se asigna
+-- al azar de la paleta básica de 12 colores (BackEnd/utils/colores.js) y se cambia en Asignaturas
 -- Incremento 4, CU47 (RF28): Asignatura_Es_Electiva marca las asignaturas electivas de 3° y 4°
 -- medio: solo van en el plan de electivos, no en planes regulares ni en cursos (RF27, RF33).
 --
@@ -81,10 +87,13 @@ CREATE TABLE `apoderado_suplente` (
 CREATE TABLE `asignatura` (
   `Asignatura_Id` int unsigned NOT NULL AUTO_INCREMENT,
   `Asignatura_Nombre` varchar(100) NOT NULL,
-  `Asignatura_Prioridad_Academica` varchar(50) NOT NULL,
+  `Asignatura_Tramo` varchar(10) NOT NULL,
   `Asignatura_Es_Electiva` tinyint(1) NOT NULL DEFAULT 0,
+  `Asignatura_Color` char(7) NOT NULL DEFAULT '#2563EB',
   PRIMARY KEY (`Asignatura_Id`),
-  UNIQUE KEY `Asignatura_Nombre_UNIQUE` (`Asignatura_Nombre`)
+  UNIQUE KEY `Asignatura_Nombre_Tramo_UNIQUE` (`Asignatura_Nombre`,`Asignatura_Tramo`),
+  CONSTRAINT `chk_Asignatura_Tramo` CHECK (`Asignatura_Tramo` IN ('Kinder','Básica','Media')),
+  CONSTRAINT `chk_Asignatura_Electiva_Media` CHECK (`Asignatura_Es_Electiva` = 0 OR `Asignatura_Tramo` = 'Media')
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -114,6 +123,33 @@ CREATE TABLE `bloque_horario` (
 --
 --
 
+
+--
+-- Table structure for table `bloque_pie_docente`
+-- Horas P.I.E. ubicadas en el horario semanal del docente, por período (día y bloque horario). Un
+-- bloque P.I.E. ocupa ese día y bloque: no se le asignan clases. Su cantidad no supera
+-- usuario.Docente_Horas_PIE (BackEnd/utils/cargaLectiva.js).
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `bloque_pie_docente` (
+  `Bloque_Pie_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Docente_Usuario_Id` int unsigned NOT NULL,
+  `Bloque_Pie_Periodo_Lectivo` varchar(10) NOT NULL,
+  `Bloque_Pie_Dia_Semana` varchar(20) NOT NULL,
+  `Bloque_Horario_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Bloque_Pie_Id`),
+  UNIQUE KEY `Bloque_Pie_UNIQUE` (`Docente_Usuario_Id`,`Bloque_Pie_Periodo_Lectivo`,`Bloque_Pie_Dia_Semana`,`Bloque_Horario_Id`),
+  KEY `fk_Bloque_Pie_Bloque_idx` (`Bloque_Horario_Id`),
+  CONSTRAINT `fk_Bloque_Pie_Bloque` FOREIGN KEY (`Bloque_Horario_Id`) REFERENCES `bloque_horario` (`Bloque_Horario_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Bloque_Pie_Docente` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `chk_Bloque_Pie_Dia` CHECK (`Bloque_Pie_Dia_Semana` IN ('Lunes','Martes','Miércoles','Jueves','Viernes'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+--
 
 --
 -- Table structure for table `citacion`
@@ -181,6 +217,39 @@ CREATE TABLE `clase_electivo` (
 --
 --
 
+
+--
+-- Table structure for table `codigo_verificacion`
+-- Códigos de verificación de 6 dígitos que envía noreply@colegiojc.cl (utils/codigosVerificacion.js):
+-- Recuperacion (CU14), Cambio de correo (CU19) y Activacion (primer ingreso). Se guarda el hash del
+-- código con su sal, nunca el código; Codigo_Verificacion_Desafio es el hash del desafío de activación.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `codigo_verificacion` (
+  `Codigo_Verificacion_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Usuario_Id` int unsigned NOT NULL,
+  `Codigo_Verificacion_Proposito` varchar(20) NOT NULL,
+  `Codigo_Verificacion_Correo` varchar(100) NOT NULL,
+  `Codigo_Verificacion_Hash` char(64) NOT NULL,
+  `Codigo_Verificacion_Sal` char(32) NOT NULL,
+  `Codigo_Verificacion_Desafio` char(64) DEFAULT NULL,
+  `Codigo_Verificacion_Intentos` tinyint unsigned NOT NULL DEFAULT 0,
+  `Codigo_Verificacion_Estado` varchar(20) NOT NULL,
+  `Codigo_Verificacion_Fecha_Creacion` datetime NOT NULL,
+  `Codigo_Verificacion_Fecha_Expiracion` datetime NOT NULL,
+  PRIMARY KEY (`Codigo_Verificacion_Id`),
+  UNIQUE KEY `Codigo_Verificacion_Desafio_UNIQUE` (`Codigo_Verificacion_Desafio`),
+  KEY `fk_Codigo_Verificacion_Usuario_idx` (`Usuario_Id`,`Codigo_Verificacion_Proposito`),
+  CONSTRAINT `fk_Codigo_Verificacion_Usuario` FOREIGN KEY (`Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `chk_Codigo_Verificacion_Proposito` CHECK (`Codigo_Verificacion_Proposito` IN ('Recuperacion','Cambio de correo','Activacion')),
+  CONSTRAINT `chk_Codigo_Verificacion_Estado` CHECK (`Codigo_Verificacion_Estado` IN ('Pendiente','Utilizado','Expirado','Bloqueado'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+--
 
 --
 -- Table structure for table `conversacion`
@@ -540,6 +609,8 @@ CREATE TABLE `mensaje` (
 --
 -- Table structure for table `nivel_educativo`
 -- Incremento 4, RF61: Nivel_Educativo_Orden define el nivel siguiente (Pre-Kinder = 1 ... 4to Medio = 14)
+-- Nivel_Educativo_Tramo (calculada desde el orden): Pre-Kinder y Kinder → Kinder; 1ero a 6to Básico
+-- → Básica; 7mo Básico a 4to Medio → Media. Las asignaturas quedan bloqueadas a su tramo.
 --
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -548,6 +619,7 @@ CREATE TABLE `nivel_educativo` (
   `Nivel_Educativo_Id` int unsigned NOT NULL AUTO_INCREMENT,
   `Nivel_Educativo_Nombre` varchar(100) NOT NULL,
   `Nivel_Educativo_Orden` int unsigned NOT NULL,
+  `Nivel_Educativo_Tramo` varchar(10) GENERATED ALWAYS AS (case when `Nivel_Educativo_Orden` <= 2 then 'Kinder' when `Nivel_Educativo_Orden` <= 8 then 'Básica' else 'Media' end) VIRTUAL,
   PRIMARY KEY (`Nivel_Educativo_Id`),
   UNIQUE KEY `Nivel_Educativo_Nombre_UNIQUE` (`Nivel_Educativo_Nombre`),
   UNIQUE KEY `Nivel_Educativo_Orden_UNIQUE` (`Nivel_Educativo_Orden`)
@@ -811,6 +883,11 @@ CREATE TABLE `tieneasig` (
 -- Table structure for table `usuario`
 -- Incremento 4, RF61: Apoderado_Sin_Asociaciones_Desde marca el período en que un apoderado quedó
 -- sin estudiantes (inactivo); se elimina en el siguiente cambio de período si sigue así
+-- Usuario_Correo_Verificado: 0 hasta confirmar el correo principal con un código (primer ingreso);
+-- vuelve a 0 si la administración cambia un correo de la cuenta
+-- Docente_Color: color (#RRGGBB) que identifica al docente; se asigna al azar de la paleta básica
+-- Docente_Horas_PIE: horas P.I.E. del docente; se restan de la carga y sobre el resto se aplica la regla
+-- 65/35 (máximo de clases = 65 % de carga − P.I.E., en horas pedagógicas). Ver bloque_pie_docente
 --
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -838,6 +915,9 @@ CREATE TABLE `usuario` (
   `Apoderado_Correo_Natural` varchar(100) DEFAULT NULL,
   `Docente_Recepcion_Mensajes` tinyint(1) NOT NULL DEFAULT 1,
   `Apoderado_Sin_Asociaciones_Desde` varchar(10) DEFAULT NULL,
+  `Usuario_Correo_Verificado` tinyint(1) NOT NULL DEFAULT 0,
+  `Docente_Color` char(7) DEFAULT NULL,
+  `Docente_Horas_PIE` int unsigned NOT NULL DEFAULT 0,
   PRIMARY KEY (`Usuario_Id`),
   UNIQUE KEY `Usuario_RUT_UNIQUE` (`Usuario_RUT`),
   UNIQUE KEY `Apoderado_Correo_Natural_UNIQUE` (`Apoderado_Correo_Natural`),

@@ -3,6 +3,8 @@ import { getHorarioMaestro, getDocentes } from "../../services/api";
 import ExportMenu from "../../components/ExportMenu";
 import { COLORES_ASIGNATURA, COLOR_PENDIENTE, DIAS_SEMANA, aMinutos, hhmm } from "../../utils/horarios";
 import EtiquetaPeriodo, { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
+import useColores from "../../hooks/useColores";
+import { PuntoColor } from "../../components/SelectorColor";
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
@@ -17,6 +19,8 @@ function diaInicial() {
 // Se muestra como grilla: por día (bloques × cursos) o la semana completa
 // (bloques × días), con los mismos colores por asignatura en ambas vistas.
 function HorarioMaestro() {
+  // Colores guardados de asignaturas y docentes (Asignaturas y Docentes)
+  const { tonosAsignatura, colorDocente } = useColores();
   const [horario, setHorario] = useState([]);
   const [bloques, setBloques] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,10 +81,11 @@ function HorarioMaestro() {
       docentes: [...docentesMap.entries()].sort(porNombre).map(([id, nombre]) => ({ id, nombre })),
       asignaturas: asigOrdenadas.map(([id, nombre]) => ({ id, nombre })),
       colorAsig: Object.fromEntries(
-        asigOrdenadas.map(([id], i) => [id, COLORES_ASIGNATURA[i % COLORES_ASIGNATURA.length]])
+        asigOrdenadas.map(([id], i) => [id, tonosAsignatura(id) || COLORES_ASIGNATURA[i % COLORES_ASIGNATURA.length]])
       ),
     };
-  }, [horario]);
+  // tonosAsignatura cambia cuando cargan o se editan los colores
+  }, [horario, tonosAsignatura]);
 
   const filtradas = horario.filter(
     (h) =>
@@ -235,7 +240,7 @@ function HorarioMaestro() {
                                 {delCurso.length === 0 ? <Vacio /> : (
                                   <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                                     {delCurso.map((clase) => (
-                                      <TarjetaClase key={clase.Horario_Asignatura_Id} clase={clase} color={colorAsig[clase.Asignatura_Id]} />
+                                      <TarjetaClase key={clase.Horario_Asignatura_Id} clase={clase} color={colorAsig[clase.Asignatura_Id]} colorDoc={colorDocente(clase.Usuario_Id)} />
                                     ))}
                                   </div>
                                 )}
@@ -253,7 +258,7 @@ function HorarioMaestro() {
                                 ) : filtroCurso ? (
                                   <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                                     {delDia.map((h) => (
-                                      <TarjetaClase key={h.Horario_Asignatura_Id} clase={h} color={colorAsig[h.Asignatura_Id]} />
+                                      <TarjetaClase key={h.Horario_Asignatura_Id} clase={h} color={colorAsig[h.Asignatura_Id]} colorDoc={colorDocente(h.Usuario_Id)} />
                                     ))}
                                   </div>
                                 ) : (
@@ -296,7 +301,7 @@ function HorarioMaestro() {
   );
 }
 
-function TarjetaClase({ clase, color }) {
+function TarjetaClase({ clase, color, colorDoc }) {
   return (
     <div
       title={`${clase.curso} (${clase.periodo}) · ${clase.asignatura} · ${clase.docente || "Sin docente"} (${clase.dia} ${hhmm(clase.hora_inicio)}–${hhmm(clase.hora_fin)})`}
@@ -313,7 +318,8 @@ function TarjetaClase({ clase, color }) {
     >
       <EtiquetaPeriodo periodo={clase.periodo} estado={clase.periodo_estado} esquina compacta />
       <div style={{ fontSize: "0.74rem", fontWeight: 700, color: color.text, lineHeight: 1.25, paddingRight: 54 }}>{clase.asignatura}</div>
-      <div style={{ fontSize: "0.66rem", color: clase.docente ? "#475569" : "#b91c1c", marginTop: 2, lineHeight: 1.2 }}>
+      <div style={{ fontSize: "0.66rem", color: clase.docente ? "#475569" : "#b91c1c", marginTop: 2, lineHeight: 1.2, display: "flex", alignItems: "center", gap: 4 }}>
+        {clase.docente && <PuntoColor color={colorDoc} />}
         {clase.docente || "Sin docente"}
       </div>
     </div>

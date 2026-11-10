@@ -79,6 +79,12 @@ UNLOCK TABLES;
 
 --
 -- Table structure for table `asignatura`
+-- Asignatura_Tramo: Kinder, Básica o Media. La asignatura solo se usa en planes (y por ende en cursos,
+-- horarios y evaluaciones) de niveles de su tramo (nivel_educativo.Nivel_Educativo_Tramo). El nombre
+-- es único dentro del tramo: "Matemática" de Básica y de Media son asignaturas distintas.
+-- Reemplaza a la prioridad académica (Alta/Media/Baja), que se eliminó.
+-- Asignatura_Color: color (#RRGGBB) que la identifica en los horarios; al crearla se asigna
+-- al azar de la paleta básica de 12 colores (BackEnd/utils/colores.js) y se cambia en Asignaturas
 -- Incremento 4, CU47 (RF28): Asignatura_Es_Electiva marca las asignaturas electivas de 3° y 4°
 -- medio: solo van en el plan de electivos, no en planes regulares ni en cursos (RF27, RF33).
 --
@@ -89,11 +95,14 @@ DROP TABLE IF EXISTS `asignatura`;
 CREATE TABLE `asignatura` (
   `Asignatura_Id` int unsigned NOT NULL AUTO_INCREMENT,
   `Asignatura_Nombre` varchar(100) NOT NULL,
-  `Asignatura_Prioridad_Academica` varchar(50) NOT NULL,
+  `Asignatura_Tramo` varchar(10) NOT NULL,
   `Asignatura_Es_Electiva` tinyint(1) NOT NULL DEFAULT 0,
+  `Asignatura_Color` char(7) NOT NULL DEFAULT '#2563EB',
   PRIMARY KEY (`Asignatura_Id`),
-  UNIQUE KEY `Asignatura_Nombre_UNIQUE` (`Asignatura_Nombre`)
-) ENGINE=InnoDB AUTO_INCREMENT=2231 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  UNIQUE KEY `Asignatura_Nombre_Tramo_UNIQUE` (`Asignatura_Nombre`,`Asignatura_Tramo`),
+  CONSTRAINT `chk_Asignatura_Tramo` CHECK (`Asignatura_Tramo` IN ('Kinder','Básica','Media')),
+  CONSTRAINT `chk_Asignatura_Electiva_Media` CHECK (`Asignatura_Es_Electiva` = 0 OR `Asignatura_Tramo` = 'Media')
+) ENGINE=InnoDB AUTO_INCREMENT=2233 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -102,7 +111,7 @@ CREATE TABLE `asignatura` (
 
 LOCK TABLES `asignatura` WRITE;
 /*!40000 ALTER TABLE `asignatura` DISABLE KEYS */;
-INSERT INTO `asignatura` VALUES (2222,'Matemática','Alta',0),(2223,'Lenguaje y Comunicación','Alta',0),(2224,'Historia, Geografía y Ciencias Sociales','Media',0),(2225,'Ciencias Naturales','Media',0),(2226,'Inglés','Media',0),(2227,'Biología de los Ecosistemas','Media',1),(2228,'Física','Media',1),(2229,'Comprensión Histórica del Presente','Media',1),(2230,'Filosofía Política','Media',1);
+INSERT INTO `asignatura` VALUES (2222,'Matemática','Básica',0,'#DC2626'),(2223,'Lenguaje y Comunicación','Básica',0,'#EA580C'),(2224,'Historia, Geografía y Ciencias Sociales','Media',0,'#CA8A04'),(2225,'Ciencias Naturales','Media',0,'#65A30D'),(2226,'Inglés','Básica',0,'#16A34A'),(2227,'Biología de los Ecosistemas','Media',1,'#0D9488'),(2228,'Física','Media',1,'#0284C7'),(2229,'Comprensión Histórica del Presente','Media',1,'#2563EB'),(2230,'Filosofía Política','Media',1,'#4F46E5'),(2231,'Matemática','Media',0,'#DC2626'),(2232,'Historia, Geografía y Ciencias Sociales','Básica',0,'#CA8A04');
 /*!40000 ALTER TABLE `asignatura` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -135,6 +144,31 @@ LOCK TABLES `bloque_horario` WRITE;
 INSERT INTO `bloque_horario` VALUES (11111111,'09:15:00','Clase','10:00:00','Mañana',111111),(11111112,'10:00:00','Clase','10:45:00','Mañana',111111),(11111113,'11:00:00','Clase','11:45:00','Mañana',111111),(11111114,'14:00:00','Clase','14:45:00','Tarde',111111);
 /*!40000 ALTER TABLE `bloque_horario` ENABLE KEYS */;
 UNLOCK TABLES;
+
+--
+-- Table structure for table `bloque_pie_docente`
+-- Horas P.I.E. ubicadas en el horario semanal del docente, por período (día y bloque horario). Un
+-- bloque P.I.E. ocupa ese día y bloque: no se le asignan clases. Su cantidad no supera
+-- usuario.Docente_Horas_PIE (BackEnd/utils/cargaLectiva.js).
+--
+
+DROP TABLE IF EXISTS `bloque_pie_docente`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `bloque_pie_docente` (
+  `Bloque_Pie_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Docente_Usuario_Id` int unsigned NOT NULL,
+  `Bloque_Pie_Periodo_Lectivo` varchar(10) NOT NULL,
+  `Bloque_Pie_Dia_Semana` varchar(20) NOT NULL,
+  `Bloque_Horario_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Bloque_Pie_Id`),
+  UNIQUE KEY `Bloque_Pie_UNIQUE` (`Docente_Usuario_Id`,`Bloque_Pie_Periodo_Lectivo`,`Bloque_Pie_Dia_Semana`,`Bloque_Horario_Id`),
+  KEY `fk_Bloque_Pie_Bloque_idx` (`Bloque_Horario_Id`),
+  CONSTRAINT `fk_Bloque_Pie_Bloque` FOREIGN KEY (`Bloque_Horario_Id`) REFERENCES `bloque_horario` (`Bloque_Horario_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Bloque_Pie_Docente` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `chk_Bloque_Pie_Dia` CHECK (`Bloque_Pie_Dia_Semana` IN ('Lunes','Martes','Miércoles','Jueves','Viernes'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `citacion`
@@ -216,6 +250,37 @@ LOCK TABLES `clase_electivo` WRITE;
 INSERT INTO `clase_electivo` VALUES (1,'2026','Miércoles',11111113,2227,'Científica',7),(2,'2026','Miércoles',11111113,2229,'Humanística',6);
 /*!40000 ALTER TABLE `clase_electivo` ENABLE KEYS */;
 UNLOCK TABLES;
+
+--
+-- Table structure for table `codigo_verificacion`
+-- Códigos de verificación de 6 dígitos que envía noreply@colegiojc.cl (utils/codigosVerificacion.js):
+-- Recuperacion (CU14), Cambio de correo (CU19) y Activacion (primer ingreso). Se guarda el hash del
+-- código con su sal, nunca el código; Codigo_Verificacion_Desafio es el hash del desafío de activación.
+--
+
+DROP TABLE IF EXISTS `codigo_verificacion`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `codigo_verificacion` (
+  `Codigo_Verificacion_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Usuario_Id` int unsigned NOT NULL,
+  `Codigo_Verificacion_Proposito` varchar(20) NOT NULL,
+  `Codigo_Verificacion_Correo` varchar(100) NOT NULL,
+  `Codigo_Verificacion_Hash` char(64) NOT NULL,
+  `Codigo_Verificacion_Sal` char(32) NOT NULL,
+  `Codigo_Verificacion_Desafio` char(64) DEFAULT NULL,
+  `Codigo_Verificacion_Intentos` tinyint unsigned NOT NULL DEFAULT 0,
+  `Codigo_Verificacion_Estado` varchar(20) NOT NULL,
+  `Codigo_Verificacion_Fecha_Creacion` datetime NOT NULL,
+  `Codigo_Verificacion_Fecha_Expiracion` datetime NOT NULL,
+  PRIMARY KEY (`Codigo_Verificacion_Id`),
+  UNIQUE KEY `Codigo_Verificacion_Desafio_UNIQUE` (`Codigo_Verificacion_Desafio`),
+  KEY `fk_Codigo_Verificacion_Usuario_idx` (`Usuario_Id`,`Codigo_Verificacion_Proposito`),
+  CONSTRAINT `fk_Codigo_Verificacion_Usuario` FOREIGN KEY (`Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `chk_Codigo_Verificacion_Proposito` CHECK (`Codigo_Verificacion_Proposito` IN ('Recuperacion','Cambio de correo','Activacion')),
+  CONSTRAINT `chk_Codigo_Verificacion_Estado` CHECK (`Codigo_Verificacion_Estado` IN ('Pendiente','Utilizado','Expirado','Bloqueado'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `conversacion`
@@ -628,7 +693,7 @@ CREATE TABLE `incluyeasig` (
 
 LOCK TABLES `incluyeasig` WRITE;
 /*!40000 ALTER TABLE `incluyeasig` DISABLE KEYS */;
-INSERT INTO `incluyeasig` VALUES (22222222,6,'Obligatorio',2222,2222222),(22222223,6,'Obligatorio',2223,2222222),(22222224,4,'Obligatorio',2224,2222222),(22222225,6,'Obligatorio',2222,2222223),(22222226,4,'Obligatorio',2223,2222223),(22222227,6,'Obligatorio',2222,2222224),(22222228,4,'Obligatorio',2225,2222224);
+INSERT INTO `incluyeasig` VALUES (22222222,6,'Obligatorio',2222,2222222),(22222223,6,'Obligatorio',2223,2222222),(22222224,4,'Obligatorio',2232,2222222),(22222225,6,'Obligatorio',2222,2222223),(22222226,4,'Obligatorio',2223,2222223),(22222227,6,'Obligatorio',2231,2222224),(22222228,4,'Obligatorio',2225,2222224);
 /*!40000 ALTER TABLE `incluyeasig` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -666,6 +731,8 @@ UNLOCK TABLES;
 --
 -- Table structure for table `nivel_educativo`
 -- Incremento 4, RF61: Nivel_Educativo_Orden define el nivel siguiente (Pre-Kinder = 1 ... 4to Medio = 14)
+-- Nivel_Educativo_Tramo (calculada desde el orden): Pre-Kinder y Kinder → Kinder; 1ero a 6to Básico
+-- → Básica; 7mo Básico a 4to Medio → Media. Las asignaturas quedan bloqueadas a su tramo.
 --
 
 DROP TABLE IF EXISTS `nivel_educativo`;
@@ -675,6 +742,7 @@ CREATE TABLE `nivel_educativo` (
   `Nivel_Educativo_Id` int unsigned NOT NULL AUTO_INCREMENT,
   `Nivel_Educativo_Nombre` varchar(100) NOT NULL,
   `Nivel_Educativo_Orden` int unsigned NOT NULL,
+  `Nivel_Educativo_Tramo` varchar(10) GENERATED ALWAYS AS (case when `Nivel_Educativo_Orden` <= 2 then 'Kinder' when `Nivel_Educativo_Orden` <= 8 then 'Básica' else 'Media' end) VIRTUAL,
   PRIMARY KEY (`Nivel_Educativo_Id`),
   UNIQUE KEY `Nivel_Educativo_Nombre_UNIQUE` (`Nivel_Educativo_Nombre`),
   UNIQUE KEY `Nivel_Educativo_Orden_UNIQUE` (`Nivel_Educativo_Orden`)
@@ -687,7 +755,7 @@ CREATE TABLE `nivel_educativo` (
 
 LOCK TABLES `nivel_educativo` WRITE;
 /*!40000 ALTER TABLE `nivel_educativo` DISABLE KEYS */;
-INSERT INTO `nivel_educativo` VALUES (24,'1ero Básico',3),(32,'1ero Medio',11),(25,'2do Básico',4),(33,'2do Medio',12),(26,'3ero Básico',5),(34,'3ero Medio',13),(27,'4to Básico',6),(35,'4to Medio',14),(28,'5to Básico',7),(29,'6to Básico',8),(30,'7mo Básico',9),(31,'8vo Básico',10),(23,'Kinder',2),(22,'Pre-Kinder',1);
+INSERT INTO `nivel_educativo` (`Nivel_Educativo_Id`, `Nivel_Educativo_Nombre`, `Nivel_Educativo_Orden`) VALUES (24,'1ero Básico',3),(32,'1ero Medio',11),(25,'2do Básico',4),(33,'2do Medio',12),(26,'3ero Básico',5),(34,'3ero Medio',13),(27,'4to Básico',6),(35,'4to Medio',14),(28,'5to Básico',7),(29,'6to Básico',8),(30,'7mo Básico',9),(31,'8vo Básico',10),(23,'Kinder',2),(22,'Pre-Kinder',1);
 /*!40000 ALTER TABLE `nivel_educativo` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1014,6 +1082,11 @@ UNLOCK TABLES;
 -- Table structure for table `usuario`
 -- Incremento 4, RF61: Apoderado_Sin_Asociaciones_Desde marca el período en que un apoderado quedó
 -- sin estudiantes (inactivo); se elimina en el siguiente cambio de período si sigue así
+-- Usuario_Correo_Verificado: 0 hasta confirmar el correo principal con un código (primer ingreso);
+-- vuelve a 0 si la administración cambia un correo de la cuenta
+-- Docente_Color: color (#RRGGBB) que identifica al docente; se asigna al azar de la paleta básica
+-- Docente_Horas_PIE: horas P.I.E. del docente; se restan de la carga y sobre el resto se aplica la regla
+-- 65/35 (máximo de clases = 65 % de carga − P.I.E., en horas pedagógicas). Ver bloque_pie_docente
 --
 
 DROP TABLE IF EXISTS `usuario`;
@@ -1042,6 +1115,9 @@ CREATE TABLE `usuario` (
   `Apoderado_Correo_Natural` varchar(100) DEFAULT NULL,
   `Docente_Recepcion_Mensajes` tinyint(1) NOT NULL DEFAULT 1,
   `Apoderado_Sin_Asociaciones_Desde` varchar(10) DEFAULT NULL,
+  `Usuario_Correo_Verificado` tinyint(1) NOT NULL DEFAULT 0,
+  `Docente_Color` char(7) DEFAULT NULL,
+  `Docente_Horas_PIE` int unsigned NOT NULL DEFAULT 0,
   PRIMARY KEY (`Usuario_Id`),
   UNIQUE KEY `Usuario_RUT_UNIQUE` (`Usuario_RUT`),
   UNIQUE KEY `Apoderado_Correo_Natural_UNIQUE` (`Apoderado_Correo_Natural`),
@@ -1056,7 +1132,7 @@ CREATE TABLE `usuario` (
 
 LOCK TABLES `usuario` WRITE;
 /*!40000 ALTER TABLE `usuario` DISABLE KEYS */;
-INSERT INTO `usuario` VALUES (1,'5682711-0','961900000','Esperanza Penelope Gonzales Farias',1,'1234',NULL,0,NULL,NULL,NULL,1,'Super Admin','es.gonzales@jacquescousteau.edu',0,NULL,NULL,NULL,NULL,NULL,1,NULL),(2,'9343727-6','979746782','Carlos Vicente Gonzales Muñoz',1,'ilovemilf',NULL,0,NULL,NULL,NULL,1,'Administrador Normal','ca.gonzales@jacquescousteau.edu',0,NULL,NULL,NULL,NULL,NULL,1,NULL),(3,'3483606-k','946789765','María Claudia Morales Rojas',1,'Gato123',NULL,1,38,'Matemáticas','ma.morales@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL),(4,'5738925-7','944706559','Pedro Humberto Fernandez Soto',1,'4532',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Avenida Concha y Toro','134',NULL,'Puente Alto','pedrofernandez453@gmail.com',1,NULL),(5,'3890710-7','912345678','Ana Lucía Torres Vega',1,'Hamster#23',NULL,1,32,'Lenguaje','an.torres@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL),(6,'7135657-4','923456789','Roberto Andrés Silva Pinto',1,'Cotorra-15',NULL,1,40,'Historia','ro.silva@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL),(7,'2258000-0','934567890','Carmen Gloria Díaz Muñoz',1,'Perrito@7',NULL,1,36,'Ciencias','ca.diaz@jacquescousteau.edu',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL),(8,'8636451-4','945678901','Luis Eduardo Ramos Fuentes',1,'Conejo#42',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Calle Los Pinos','456',NULL,'Santiago','luisramos@gmail.com',1,NULL),(9,'9230041-2','956789012','Sandra Patricia Vera Molina',1,'Tortuga-99',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Pasaje Las Rosas','789',NULL,'Maipú','sandravera@gmail.com',1,NULL),(10,'5158743-k','967890123','Jorge Ignacio Campos Reyes',1,'Pinguino@5',NULL,1,38,'Inglés','jo.campos@jacquescousteau.edu',0,NULL,NULL,1,'Avenida Principal','321',NULL,'Las Condes','jorge.campos@gmail.com',1,NULL);
+INSERT INTO `usuario` VALUES (1,'5682711-0','961900000','Esperanza Penelope Gonzales Farias',1,'1234',NULL,0,NULL,NULL,NULL,1,'Super Admin','es.gonzales@colegiojc.cl',0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,NULL,0),(2,'9343727-6','979746782','Carlos Vicente Gonzales Muñoz',1,'ilovemilf',NULL,0,NULL,NULL,NULL,1,'Administrador Normal','ca.gonzales@colegiojc.cl',0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,NULL,0),(3,'3483606-k','946789765','María Claudia Morales Rojas',1,'Gato123',NULL,1,38,'Matemáticas','ma.morales@colegiojc.cl',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,'#DC2626',0),(4,'5738925-7','944706559','Pedro Humberto Fernandez Soto',1,'4532',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Avenida Concha y Toro','134',NULL,'Puente Alto','pedrofernandez453@gmail.com',1,NULL,1,NULL,0),(5,'3890710-7','912345678','Ana Lucía Torres Vega',1,'Hamster#23',NULL,1,32,'Lenguaje','an.torres@colegiojc.cl',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,'#0D9488',0),(6,'7135657-4','923456789','Roberto Andrés Silva Pinto',1,'Cotorra-15',NULL,1,40,'Historia','ro.silva@colegiojc.cl',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,'#C026D3',0),(7,'2258000-0','934567890','Carmen Gloria Díaz Muñoz',1,'Perrito@7',NULL,1,36,'Ciencias','ca.diaz@colegiojc.cl',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,'#65A30D',0),(8,'8636451-4','945678901','Luis Eduardo Ramos Fuentes',1,'Conejo#42',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Calle Los Pinos','456',NULL,'Santiago','luisramos@gmail.com',1,NULL,1,NULL,0),(9,'9230041-2','956789012','Sandra Patricia Vera Molina',1,'Tortuga-99',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Pasaje Las Rosas','789',NULL,'Maipú','sandravera@gmail.com',1,NULL,1,NULL,0),(10,'5158743-k','967890123','Jorge Ignacio Campos Reyes',1,'Pinguino@5',NULL,1,38,'Inglés','jo.campos@colegiojc.cl',0,NULL,NULL,1,'Avenida Principal','321',NULL,'Las Condes','jorge.campos@gmail.com',1,NULL,1,'#4F46E5',0);
 /*!40000 ALTER TABLE `usuario` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

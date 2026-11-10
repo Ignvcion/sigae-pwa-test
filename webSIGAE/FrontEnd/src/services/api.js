@@ -72,6 +72,16 @@ export async function editarPerfilPropio({ correo, telefono, direccion }) {
   return handleResponse(res);
 }
 
+// CU19: confirmar el correo nuevo con el código enviado a esa dirección
+export async function confirmarCorreoPropio(codigo) {
+  const res = await fetch(`${BASE_URL}/usuarios/perfil/correo`, {
+    method : 'PUT',
+    headers: authHeaders(),
+    body   : JSON.stringify({ codigo }),
+  });
+  return handleResponse(res);
+}
+
 // ── CU20: Editar fotografía de perfil mediante carga de archivo ──
 
 export async function actualizarFotoPerfil(archivo) {
@@ -120,7 +130,7 @@ export async function registrarAdmin({ nombre, rut, correo, telefono, password, 
 }
 
 // ── DOCENTE ──────────────────────────────────
-export async function registrarDocente({ nombre, rut, correo, telefono, password, especialidades, cargaHoraria, disponibilidad, estado, calle, numero, depto, comuna }) {
+export async function registrarDocente({ nombre, rut, correo, telefono, password, especialidades, cargaHoraria, horasPIE, disponibilidad, estado, calle, numero, depto, comuna }) {
   const res = await fetch(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
@@ -133,6 +143,7 @@ export async function registrarDocente({ nombre, rut, correo, telefono, password
       Es_Docente                   : 1,
       Docente_Especialidades       : especialidades,
       Docente_Carga_Horaria_Semanal : parseInt(cargaHoraria, 10), // carga horaria semanal
+      Docente_Horas_PIE            : horasPIE === "" || horasPIE == null ? 0 : parseInt(horasPIE, 10), // se restan antes del 65/35
       Docente_Disponibilidad       : { tramos: disponibilidad || [] }, // CU107: tramos desde–hasta por día
       Docente_Correo_Institucional : correo,
       ...columnasDireccionUsuario({ calle, numero, depto, comuna }),
@@ -708,6 +719,22 @@ export async function getCursosHorario() {
 
 export async function getAsignaturasHorario() {
   const res = await fetch(`${BASE_URL}/horarios/asignaturas`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// ── Horas P.I.E. del docente y regla 65/35 ──
+export async function getPIEDocente(docenteId, periodo) {
+  const q = periodo ? `?periodo=${encodeURIComponent(periodo)}` : '';
+  const res = await fetch(`${BASE_URL}/usuarios/${docenteId}/pie${q}`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+export async function guardarPIEDocente(docenteId, { horasPIE, bloques, periodo }) {
+  const res = await fetch(`${BASE_URL}/usuarios/${docenteId}/pie`, {
+    method : 'PUT',
+    headers: authHeaders(),
+    body   : JSON.stringify({ horasPIE, bloques, periodo }),
+  });
   return handleResponse(res);
 }
 

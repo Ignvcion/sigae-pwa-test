@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getEstadoPeriodo, iniciarCierre, descargarRespaldo, iniciarNuevoPeriodo } from "../../services/promocion";
+import { CORREO_RESPALDOS } from "../../config/institucion";
 
 function CierrePeriodo() {
   const { usuario } = useAuth();
@@ -168,8 +169,9 @@ function CierrePeriodo() {
           {esSuperAdmin ? (
             <>
               <p style={{ fontSize: "0.9rem" }}>
-                Descarga el respaldo y súbelo a la cuenta de Google Drive de respaldos. Tiene datos personales de
-                menores: no lo guardes en equipos personales.
+                Descarga el respaldo y súbelo al Google Drive de la cuenta de respaldos{" "}
+                <strong>{CORREO_RESPALDOS}</strong>. Tiene datos personales de menores: no lo guardes en equipos
+                personales.
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
                 <button
@@ -186,7 +188,7 @@ function CierrePeriodo() {
                     disabled={!respaldoDescargado && hayLimpieza}
                     onChange={(e) => setRespaldoGuardado(e.target.checked)}
                   />
-                  Subí el respaldo al Drive
+                  Subí el respaldo al Drive de {CORREO_RESPALDOS}
                 </label>
                 <button
                   className="btn-primary"

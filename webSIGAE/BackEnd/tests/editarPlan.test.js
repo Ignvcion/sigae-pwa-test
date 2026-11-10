@@ -82,6 +82,8 @@ describe('Editar plan educativo', () => {
       .mockResolvedValueOnce([[{ Nivel_Educativo_Nombre: '1ro Básico' }]]) // nivel
       .mockResolvedValueOnce([[]])                                          // sin duplicado
       .mockResolvedValueOnce([[{ Asignatura_Id: 2222 }, { Asignatura_Id: 2225 }]]) // asignaturas existen
+      .mockResolvedValueOnce([[{ nombre: '1ro Básico', tramo: 'Básica' }]]) // tramo del nivel
+      .mockResolvedValueOnce([[]])                                          // ninguna de otro tramo
       .mockResolvedValueOnce([{ affectedRows: 1 }])                         // UPDATE plan
       .mockResolvedValueOnce([[                                             // incluyeasig actual
         { IncluyeAsig_Id: 1, Asignatura_Id: 2222, Asignatura_Nombre: 'Matemáticas' },
@@ -95,15 +97,34 @@ describe('Editar plan educativo', () => {
     await planController.editarPlan(req, res);
 
     const sqls = conn.execute.mock.calls.map((c) => c[0]);
-    expect(sqls[6]).toContain('UPDATE incluyeasig');
-    expect(conn.execute.mock.calls[6][1]).toEqual([5, 'Obligatorio', 1]);
-    expect(sqls[7]).toContain('INSERT INTO incluyeasig');
-    expect(sqls[8]).toContain('DELETE FROM incluyeasig');
-    expect(conn.execute.mock.calls[8][1]).toEqual([2]);
+    expect(sqls[8]).toContain('UPDATE incluyeasig');
+    expect(conn.execute.mock.calls[8][1]).toEqual([5, 'Obligatorio', 1]);
+    expect(sqls[9]).toContain('INSERT INTO incluyeasig');
+    expect(sqls[10]).toContain('DELETE FROM incluyeasig');
+    expect(conn.execute.mock.calls[10][1]).toEqual([2]);
     expect(conn.commit).toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith({
       mensaje: 'Plan educativo de 1ro Básico – 2026 actualizado correctamente',
       advertencias: ['"Lenguaje" ya no está en el plan, pero aún tiene clases programadas en el horario'],
     });
+  });
+
+  test('Rechaza una asignatura de otro tramo (422) sin modificar el plan', async () => {
+    conn.execute
+      .mockResolvedValueOnce([[{ Plan_Educativo_Id: 2222222 }]])
+      .mockResolvedValueOnce([[{ Nivel_Educativo_Nombre: '1ro Básico' }]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ Asignatura_Id: 2222 }, { Asignatura_Id: 2225 }]])
+      .mockResolvedValueOnce([[{ nombre: '1ro Básico', tramo: 'Básica' }]])
+      .mockResolvedValueOnce([[{ id: 2225, nombre: 'Ciencias Naturales', tramo: 'Media' }]]);
+
+    await planController.editarPlan(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(422);
+    expect(res.json.mock.calls[0][0].error).toBe(
+      '1ro Básico es del tramo Básica: la asignatura "Ciencias Naturales" (Media) es de otro tramo y no se puede incluir'
+    );
+    expect(conn.rollback).toHaveBeenCalled();
+    expect(conn.execute.mock.calls.some(([sql]) => /UPDATE plan_educativo/.test(sql))).toBe(false);
   });
 });

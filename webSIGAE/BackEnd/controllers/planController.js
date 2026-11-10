@@ -1,8 +1,13 @@
 const pool = require('../config/db');
 
+const MSG_DUPLICADA = (nombre, tramo) => `Ya existe una asignatura "${nombre}" en el tramo ${tramo}`;
 const MSG_ELECTIVA_EN_PLAN = (nombre) =>
   `${nombre} es una asignatura electiva: solo puede incluirse en el plan de electivos de 3° y 4° medio`;
 const { claseVigente } = require('../utils/clasesEliminadas');
+const { normalizarColor, colorAleatorioAsignatura, MENSAJE_COLOR_INVALIDO } = require('../utils/colores');
+const {
+  normalizarTramo, asignaturasFueraDeTramo, mensajeFueraDeTramo, MENSAJE_TRAMO_INVALIDO, MENSAJE_ELECTIVA_MEDIA,
+} = require('../utils/tramos');
 
 // ── GET /api/planes  ─────────────────────────────────────────────
 const getPlanes = async (req, res) => {
@@ -13,6 +18,7 @@ const getPlanes = async (req, res) => {
         pe.Plan_Educativo_Periodo_Lectivo,
         pe.Nivel_Educativo_Id,
         ne.Nivel_Educativo_Nombre,
+        ne.Nivel_Educativo_Tramo,
         COUNT(ia.IncluyeAsig_Id) AS total_asignaturas,
         SUM(CASE WHEN ia.Tipo = 'Obligatorio'    THEN 1 ELSE 0 END) AS total_obligatorias,
         SUM(CASE WHEN ia.Tipo = 'Complementario' THEN 1 ELSE 0 END) AS total_complementarias,
@@ -21,7 +27,7 @@ const getPlanes = async (req, res) => {
       JOIN nivel_educativo ne ON ne.Nivel_Educativo_Id = pe.Nivel_Educativo_Id
       LEFT JOIN incluyeasig ia ON ia.Plan_Educativo_Id = pe.Plan_Educativo_Id
       GROUP BY pe.Plan_Educativo_Id, pe.Plan_Educativo_Periodo_Lectivo,
-               pe.Nivel_Educativo_Id, ne.Nivel_Educativo_Nombre
+               pe.Nivel_Educativo_Id, ne.Nivel_Educativo_Nombre, ne.Nivel_Educativo_Tramo
       ORDER BY pe.Plan_Educativo_Periodo_Lectivo DESC, ne.Nivel_Educativo_Nombre
     `);
     res.json(rows);
@@ -37,7 +43,7 @@ const getPlanById = async (req, res) => {
   try {
     const [planes] = await pool.execute(`
       SELECT pe.Plan_Educativo_Id, pe.Plan_Educativo_Periodo_Lectivo,
-             pe.Nivel_Educativo_Id, ne.Nivel_Educativo_Nombre
+             pe.Nivel_Educativo_Id, ne.Nivel_Educativo_Nombre, ne.Nivel_Educativo_Tramo
       FROM plan_educativo pe
       JOIN nivel_educativo ne ON ne.Nivel_Educativo_Id = pe.Nivel_Educativo_Id
       WHERE pe.Plan_Educativo_Id = ?
@@ -49,7 +55,7 @@ const getPlanById = async (req, res) => {
 
     const [asignaturas] = await pool.execute(`
       SELECT ia.IncluyeAsig_Id, ia.Horas_Semanales_Requeridas, ia.Tipo,
-             a.Asignatura_Id, a.Asignatura_Nombre, a.Asignatura_Prioridad_Academica
+             a.Asignatura_Id, a.Asignatura_Nombre, a.Asignatura_Tramo
       FROM incluyeasig ia
       JOIN asignatura a ON a.Asignatura_Id = ia.Asignatura_Id
       WHERE ia.Plan_Educativo_Id = ?
@@ -139,6 +145,12 @@ const crearPlan = async (req, res) => {
     if (electiva) {
       await conn.rollback();
       return res.status(422).json({ error: MSG_ELECTIVA_EN_PLAN(electiva.Asignatura_Nombre) });
+    }
+    // Cada asignatura solo va en planes de niveles de su tramo (Kinder, Básica o Media)
+    const tramo = await asignaturasFueraDeTramo(conn, nivel_educativo_id, idsAsig);
+    if (tramo.fuera.length > 0) {
+      await conn.rollback();
+      return res.status(422).json({ error: mensajeFueraDeTramo(tramo.nivel, tramo.fuera) });
     }
 
     const idSet = new Set(idsAsig);
@@ -280,6 +292,13 @@ const clonarPlan = async (req, res) => {
       }
     }
 
+    // El nivel de destino puede ser de otro tramo: sus asignaturas deben ser de ese tramo
+    const tramoDestino = await asignaturasFueraDeTramo(conn, nivel_educativo_id, asignaturasFinales.map(a => a.asignatura_id));
+    if (tramoDestino.fuera.length > 0) {
+      await conn.rollback();
+      return res.status(422).json({ error: mensajeFueraDeTramo(tramoDestino.nivel, tramoDestino.fuera) });
+    }
+
     const [resultPlan] = await conn.execute(
       'INSERT INTO plan_educativo (Plan_Educativo_Periodo_Lectivo, Nivel_Educativo_Id) VALUES (?, ?)',
       [periodo, nivel_educativo_id]
@@ -413,6 +432,12 @@ const editarPlan = async (req, res) => {
       await conn.rollback();
       return res.status(422).json({ error: MSG_ELECTIVA_EN_PLAN(electiva.Asignatura_Nombre) });
     }
+    // Cada asignatura solo va en planes de niveles de su tramo (Kinder, Básica o Media)
+    const tramo = await asignaturasFueraDeTramo(conn, nivel_educativo_id, idsAsig);
+    if (tramo.fuera.length > 0) {
+      await conn.rollback();
+      return res.status(422).json({ error: mensajeFueraDeTramo(tramo.nivel, tramo.fuera) });
+    }
 
     await conn.execute(
       'UPDATE plan_educativo SET Plan_Educativo_Periodo_Lectivo = ?, Nivel_Educativo_Id = ? WHERE Plan_Educativo_Id = ?',
@@ -491,7 +516,7 @@ const getNivelesSinPlan = async (req, res) => {
   }
   try {
     const [rows] = await pool.execute(`
-      SELECT ne.Nivel_Educativo_Id, ne.Nivel_Educativo_Nombre
+      SELECT ne.Nivel_Educativo_Id, ne.Nivel_Educativo_Nombre, ne.Nivel_Educativo_Tramo
       FROM nivel_educativo ne
       WHERE ne.Nivel_Educativo_Id NOT IN (
         SELECT pe.Nivel_Educativo_Id
@@ -515,8 +540,9 @@ const getNivelesSinPlan = async (req, res) => {
 const getAsignaturas = async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      `SELECT Asignatura_Id, Asignatura_Nombre, Asignatura_Prioridad_Academica, Asignatura_Es_Electiva
-       FROM asignatura ORDER BY Asignatura_Nombre`
+      `SELECT Asignatura_Id, Asignatura_Nombre, Asignatura_Tramo, Asignatura_Es_Electiva,
+              Asignatura_Color
+       FROM asignatura ORDER BY FIELD(Asignatura_Tramo, 'Kinder', 'Básica', 'Media'), Asignatura_Nombre`
     );
     res.json(rows);
   } catch (err) {
@@ -527,41 +553,57 @@ const getAsignaturas = async (req, res) => {
 
 // ── POST /api/planes/asignaturas  ── CU 47
 const crearAsignatura = async (req, res) => {
-  const { nombre, prioridad } = req.body;
+  const { nombre } = req.body;
   // CU47 / RF28: la asignatura puede marcarse como electiva de 3° y 4° medio
   const electiva = req.body.electiva === true || req.body.electiva === 1 || req.body.electiva === '1';
 
-  if (!nombre?.trim() || !prioridad) {
-    return res.status(400).json({ error: 'El nombre y la prioridad académica son obligatorios' });
+  if (!nombre?.trim() || !req.body.tramo) {
+    return res.status(400).json({ error: 'El nombre y el tramo son obligatorios' });
   }
-  if (!['Alta', 'Media', 'Baja'].includes(prioridad)) {
-    return res.status(400).json({ error: 'La prioridad debe ser Alta, Media o Baja' });
+  // Tramo (Kinder, Básica o Media): la asignatura solo se usa en niveles de ese tramo
+  const tramo = normalizarTramo(req.body.tramo);
+  if (!tramo) {
+    return res.status(400).json({ error: MENSAJE_TRAMO_INVALIDO });
+  }
+  if (electiva && tramo !== 'Media') {
+    return res.status(400).json({ error: MENSAJE_ELECTIVA_MEDIA });
+  }
+
+  // Color que la identifica en los horarios: el elegido o uno aleatorio de la paleta
+  const colorElegido = req.body.color === undefined || req.body.color === null || req.body.color === ''
+    ? null : normalizarColor(req.body.color);
+  if (colorElegido === null && req.body.color) {
+    return res.status(400).json({ error: MENSAJE_COLOR_INVALIDO });
   }
 
   const nombreTrim = nombre.trim();
 
   try {
+    // El nombre es único dentro del tramo ("Matemática" de Básica y de Media son distintas)
     const [dup] = await pool.execute(
-      'SELECT Asignatura_Id FROM asignatura WHERE LOWER(Asignatura_Nombre) = LOWER(?)',
-      [nombreTrim]
+      'SELECT Asignatura_Id FROM asignatura WHERE LOWER(Asignatura_Nombre) = LOWER(?) AND Asignatura_Tramo = ?',
+      [nombreTrim, tramo]
     );
     if (dup.length > 0) {
-      return res.status(409).json({ error: `Ya existe una asignatura con el nombre "${nombreTrim}"` });
+      return res.status(409).json({ error: MSG_DUPLICADA(nombreTrim, tramo) });
     }
 
+    const color = colorElegido || await colorAleatorioAsignatura(pool);
     const [result] = await pool.execute(
-      `INSERT INTO asignatura (Asignatura_Nombre, Asignatura_Prioridad_Academica, Asignatura_Es_Electiva)
-       VALUES (?, ?, ?)`,
-      [nombreTrim, prioridad, electiva ? 1 : 0]
+      `INSERT INTO asignatura (Asignatura_Nombre, Asignatura_Tramo, Asignatura_Es_Electiva, Asignatura_Color)
+       VALUES (?, ?, ?, ?)`,
+      [nombreTrim, tramo, electiva ? 1 : 0, color]
     );
 
     res.status(201).json({
-      mensaje: `Asignatura${electiva ? ' electiva' : ''} "${nombreTrim}" registrada correctamente`,
+      mensaje: `Asignatura${electiva ? ' electiva' : ''} "${nombreTrim}" (${tramo}) registrada correctamente`,
       asignatura_id: result.insertId,
+      color,
+      tramo,
     });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ error: `Ya existe una asignatura con el nombre "${nombreTrim}"` });
+      return res.status(409).json({ error: MSG_DUPLICADA(nombreTrim, tramo) });
     }
     console.error('crearAsignatura:', err);
     res.status(500).json({ error: 'Error interno del servidor' });
@@ -571,23 +613,31 @@ const crearAsignatura = async (req, res) => {
 // ── PUT /api/planes/asignaturas/:id  ── CU 47
 const editarAsignatura = async (req, res) => {
   const { id } = req.params;
-  const { nombre, prioridad } = req.body;
+  const { nombre } = req.body;
   // CU47: la marca electiva es opcional al editar; si no llega, se mantiene
   const cambiaElectiva = req.body.electiva !== undefined;
   const electiva = req.body.electiva === true || req.body.electiva === 1 || req.body.electiva === '1';
 
-  if (!nombre?.trim() || !prioridad) {
-    return res.status(400).json({ error: 'El nombre y la prioridad académica son obligatorios' });
+  if (!nombre?.trim() || !req.body.tramo) {
+    return res.status(400).json({ error: 'El nombre y el tramo son obligatorios' });
   }
-  if (!['Alta', 'Media', 'Baja'].includes(prioridad)) {
-    return res.status(400).json({ error: 'La prioridad debe ser Alta, Media o Baja' });
+  const tramo = normalizarTramo(req.body.tramo);
+  if (!tramo) {
+    return res.status(400).json({ error: MENSAJE_TRAMO_INVALIDO });
+  }
+
+  // El color es opcional al editar; si no llega, se mantiene
+  const cambiaColor = req.body.color !== undefined;
+  const color = cambiaColor ? normalizarColor(req.body.color) : null;
+  if (cambiaColor && !color) {
+    return res.status(400).json({ error: MENSAJE_COLOR_INVALIDO });
   }
 
   const nombreTrim = nombre.trim();
 
   try {
     const [asig] = await pool.execute(
-      'SELECT Asignatura_Id, Asignatura_Es_Electiva FROM asignatura WHERE Asignatura_Id = ?',
+      'SELECT Asignatura_Id, Asignatura_Es_Electiva, Asignatura_Tramo FROM asignatura WHERE Asignatura_Id = ?',
       [id]
     );
     if (asig.length === 0) {
@@ -596,6 +646,28 @@ const editarAsignatura = async (req, res) => {
 
     // CU47: no se cambia la marca mientras la asignatura se use con su tipo actual
     const eraElectiva = Number(asig[0].Asignatura_Es_Electiva) === 1;
+    if ((cambiaElectiva ? electiva : eraElectiva) && tramo !== 'Media') {
+      return res.status(400).json({ error: MENSAJE_ELECTIVA_MEDIA });
+    }
+
+    // El tramo no se cambia mientras la asignatura se use: sus planes, cursos,
+    // horarios y evaluaciones son de niveles del tramo actual
+    if (tramo !== asig[0].Asignatura_Tramo) {
+      const [[uso]] = await pool.query(
+        `SELECT (SELECT COUNT(*) FROM incluyeasig WHERE Asignatura_Id = ?)
+              + (SELECT COUNT(*) FROM tieneasig WHERE Asignatura_Id = ?)
+              + (SELECT COUNT(*) FROM horario_asignatura WHERE Asignatura_Id = ?)
+              + (SELECT COUNT(*) FROM evaluacion WHERE Asignatura_Id = ?)
+              + (SELECT COUNT(*) FROM plan_electivos_asignatura WHERE Asignatura_Id = ?) AS n`,
+        [id, id, id, id, id]
+      );
+      if (Number(uso?.n) > 0) {
+        return res.status(409).json({
+          error: `La asignatura se usa en planes, cursos u horarios del tramo ${asig[0].Asignatura_Tramo}: `
+            + `no se puede cambiar a ${tramo}. Para el otro tramo, registra una asignatura nueva con el mismo nombre.`,
+        });
+      }
+    }
     if (cambiaElectiva && electiva !== eraElectiva) {
       const [[uso]] = await pool.query(
         eraElectiva
@@ -615,24 +687,24 @@ const editarAsignatura = async (req, res) => {
     }
 
     const [dup] = await pool.execute(
-      'SELECT Asignatura_Id FROM asignatura WHERE LOWER(Asignatura_Nombre) = LOWER(?) AND Asignatura_Id != ?',
-      [nombreTrim, id]
+      'SELECT Asignatura_Id FROM asignatura WHERE LOWER(Asignatura_Nombre) = LOWER(?) AND Asignatura_Tramo = ? AND Asignatura_Id != ?',
+      [nombreTrim, tramo, id]
     );
     if (dup.length > 0) {
-      return res.status(409).json({ error: `Ya existe una asignatura con el nombre "${nombreTrim}"` });
+      return res.status(409).json({ error: MSG_DUPLICADA(nombreTrim, tramo) });
     }
 
     await pool.execute(
       `UPDATE asignatura
-       SET Asignatura_Nombre = ?, Asignatura_Prioridad_Academica = ?, Asignatura_Es_Electiva = ?
+       SET Asignatura_Nombre = ?, Asignatura_Tramo = ?, Asignatura_Es_Electiva = ?${cambiaColor ? ', Asignatura_Color = ?' : ''}
        WHERE Asignatura_Id = ?`,
-      [nombreTrim, prioridad, (cambiaElectiva ? electiva : eraElectiva) ? 1 : 0, id]
+      [nombreTrim, tramo, (cambiaElectiva ? electiva : eraElectiva) ? 1 : 0, ...(cambiaColor ? [color] : []), id]
     );
 
-    res.json({ mensaje: `Asignatura "${nombreTrim}" actualizada correctamente` });
+    res.json({ mensaje: `Asignatura "${nombreTrim}" (${tramo}) actualizada correctamente` });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ error: `Ya existe una asignatura con el nombre "${nombreTrim}"` });
+      return res.status(409).json({ error: MSG_DUPLICADA(nombreTrim, tramo) });
     }
     console.error('editarAsignatura:', err);
     res.status(500).json({ error: 'Error interno del servidor' });

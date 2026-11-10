@@ -26,7 +26,7 @@ describe('Login: un token único por sesión', () => {
       if (/FROM usuario/.test(sql)) {
         return [[{
           Usuario_Id: 7, Usuario_RUT: '11111111-1', Usuario_Contraseña: hash,
-          Usuario_Nombre_Completo: 'Prueba', Usuario_Estado_Cuenta: 1,
+          Usuario_Nombre_Completo: 'Prueba', Usuario_Estado_Cuenta: 1, Usuario_Correo_Verificado: 1,
           Es_Administrador: 1, Administrador_Tipo: 'Administrador', Administrador_Correo_Institucional: 'a@b.cl',
           Es_Docente: 0, Docente_Correo_Institucional: null, Es_Apoderado: 0, Apoderado_Correo_Natural: null,
         }]];
@@ -63,7 +63,7 @@ describe('Login: un token único por sesión', () => {
       if (/FROM usuario/.test(sql)) {
         return [[{
           Usuario_Id: 1500, Usuario_RUT: '12345678-9', Usuario_Contraseña: hash,
-          Usuario_Nombre_Completo: 'Prueba', Usuario_Estado_Cuenta: 1,
+          Usuario_Nombre_Completo: 'Prueba', Usuario_Estado_Cuenta: 1, Usuario_Correo_Verificado: 1,
           Es_Administrador: 1, Administrador_Tipo: 'Super Admin', Administrador_Correo_Institucional: 'a@b.cl',
           Es_Docente: 1, Docente_Correo_Institucional: 'd@b.cl', Es_Apoderado: 1, Apoderado_Correo_Natural: 'p@b.cl',
         }]];

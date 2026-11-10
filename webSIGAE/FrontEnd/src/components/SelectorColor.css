@@ -1,0 +1,154 @@
+/* components/SelectorColor.jsx */
+.selector-color {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selector-color-muestra {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #cbd5e1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.selector-color-muestra:focus-visible,
+.selector-color-celda:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
+}
+
+.selector-color-muestra:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.selector-color-etiqueta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.selector-color-panel {
+  /* La posición (fixed, junto al botón) la calcula SelectorColor.jsx */
+  position: fixed;
+  z-index: 1000;
+  width: 236px;
+  box-sizing: border-box;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+}
+
+.selector-color-titulo {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.selector-color-paleta {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.selector-color-celda {
+  aspect-ratio: 1;
+  width: 100%;
+  padding: 0;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.selector-color-celda[aria-pressed="true"] {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #0f172a;
+}
+
+.selector-color-personalizado {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.selector-color-personalizado input[type="color"] {
+  width: 36px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.selector-color-personalizado input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.selector-color-personalizado input[type="text"].invalido {
+  border-color: #ef4444;
+}
+
+.selector-color-error {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: #dc2626;
+}
+
+.selector-color-acciones {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.selector-color-acciones button {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+}
+
+.selector-color-acciones button:hover {
+  background: #eef2ff;
+}
+
+/* Punto de color junto a un nombre (docente o asignatura) */
+.punto-color {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  vertical-align: middle;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.15);
+}
