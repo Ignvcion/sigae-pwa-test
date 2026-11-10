@@ -32,6 +32,9 @@ Database/import/
 *.csv
 *.xls
 *.xlsx
+*.xlsm
+*.ods
+*.tsv
 
 # ── Archivos subidos por los usuarios (CU20: fotos de perfil) ─
 # En producción viven fuera del repo (UPLOADS_DIR=/var/sigae/uploads).

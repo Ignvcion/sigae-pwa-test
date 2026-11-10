@@ -16,6 +16,7 @@ const {
   direccionDesdeColumnas,
   columnasDireccion,
   CAMPOS_DIRECCION,
+  validarFortalezaContrasena,
 } = require('../middleware/validation');
 const { PERIODO_VIGENTE_SQL } = require('../utils/periodos');
 const { colorAleatorioDocente } = require('../utils/colores');
@@ -667,8 +668,14 @@ const updateUsuario = async (req, res) => {
       otrosDatos.Usuario_Direccion_Depto = null;
     }
 
+    // Una contraseña nueva cumple las mismas reglas que al crear el usuario (8+ caracteres,
+    // una mayúscula y un número). Siempre se guarda hasheada con bcrypt.
     let hash = null;
-    if (Usuario_Contraseña) hash = await bcrypt.hash(Usuario_Contraseña, 10);
+    if (Usuario_Contraseña !== undefined && Usuario_Contraseña !== null && Usuario_Contraseña !== '') {
+      const errorContrasena = validarFortalezaContrasena(String(Usuario_Contraseña));
+      if (errorContrasena) return res.status(400).json({ mensaje: errorContrasena });
+      hash = await bcrypt.hash(String(Usuario_Contraseña), 10);
+    }
 
     const campos  = Object.keys(otrosDatos).map(c => `${c} = ?`);
     const valores = Object.values(otrosDatos);

@@ -56,6 +56,8 @@ describe('config/env: validación del .env de producción', () => {
     ]));
     expect(problemasEntornoProduccion({ ...completo, JWT_SECRET: 'un_secreto_muy_largo_y_seguro' }))
       .toContain('JWT_SECRET es el valor de ejemplo de .env.example');
+    expect(problemasEntornoProduccion({ ...completo, DB_PASSWORD: 'sigae123' }))
+      .toContain('DB_PASSWORD es el valor de desarrollo de .env.example');
   });
 });
 

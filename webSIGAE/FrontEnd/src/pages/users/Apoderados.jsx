@@ -46,30 +46,35 @@ function Apoderados() {
   const [loadingEliminarTodas, setLoadingEliminarTodas]      = useState(false);
   const [avisoEliminarTodas, setAvisoEliminarTodas]          = useState(null);
 
-  useEffect(() => {
-    cargarApoderados({});
-  }, []);
+  // Pide el listado; el estado cambia solo al llegar la respuesta (callbacks), así el efecto
+  // de montaje no provoca renders en cascada. cargarApoderados() además limpia los avisos.
+  const pedirApoderados = (filtros) =>
+    getApoderados(filtros)
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setApoderados(data);
+        } else {
+          // CU32 - Excepción "Sin apoderados registrados"
+          setApoderados(data.apoderados || []);
+          setMensajeInfo(data.mensaje || "No existen apoderados registrados");
+        }
+      })
+      .catch((error) => {
+        // CU32 - Excepción "Interrupción técnica crítica"
+        setErrorCarga(error.message || "Los datos no pudieron ser cargados, reintente más tarde");
+      })
+      .finally(() => setLoading(false));
 
-  const cargarApoderados = async (filtros) => {
+  const cargarApoderados = (filtros) => {
     setLoading(true);
     setErrorCarga("");
     setMensajeInfo("");
-    try {
-      const data = await getApoderados(filtros);
-      if (Array.isArray(data)) {
-        setApoderados(data);
-      } else {
-        // CU32 - Excepción "Sin apoderados registrados"
-        setApoderados(data.apoderados || []);
-        setMensajeInfo(data.mensaje || "No existen apoderados registrados");
-      }
-    } catch (error) {
-      // CU32 - Excepción "Interrupción técnica crítica"
-      setErrorCarga(error.message || "Los datos no pudieron ser cargados, reintente más tarde");
-    } finally {
-      setLoading(false);
-    }
+    return pedirApoderados(filtros);
   };
+
+  useEffect(() => {
+    pedirApoderados({});
+  }, []);
 
   // Estudiantes ya asociados a un apoderado (CU40): como titular o como suplente (RF57)
   const cargarEstudiantesDelApoderado = async (apoderadoId) => {
@@ -94,7 +99,7 @@ function Apoderados() {
       ]);
       setEstudiantesSinApo(sinApo);
       setEstudiantesDelApo(delApo);
-    } catch (error) {
+    } catch {
       setErrorModal("Error al cargar estudiantes");
     } finally {
       setLoadingModal(false);

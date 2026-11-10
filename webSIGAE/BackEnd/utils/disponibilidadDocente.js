@@ -3,7 +3,7 @@
 //
 // Las horas se manejan como texto "HH:MM" y se comparan en minutos.
 const { claseVigente } = require('./clasesEliminadas');
-const { enPeriodoVigente } = require('./periodos');
+const { enPeriodoVigente, PERIODO_VIGENTE_SQL } = require('./periodos');
 
 // Días tal como se guardan en horario_asignatura y horario_atencion (lunes a viernes)
 const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
@@ -51,33 +51,59 @@ function diaSemanaDeFecha(fecha) {
 const seSuperponen = (a, b) => a.inicio < b.fin && b.inicio < a.fin;
 
 /**
- * Clases vigentes del docente en un día de la semana que se superponen con el
- * intervalo [inicio, fin) (en minutos). Las clases eliminadas no cuentan; las
- * suspendidas sí, porque siguen siendo parte de su horario.
- * Devuelve las clases con curso, asignatura y horas para informar el choque.
+ * Todo lo que ocupa al docente en el período vigente: clases regulares (las eliminadas no
+ * cuentan; las suspendidas sí, porque siguen siendo parte de su horario), electivos de 3° y
+ * 4° medio (CU106) y bloques P.I.E. (tabla bloque_pie_docente). Un tramo de atención o una
+ * citación no puede caer sobre ninguno de ellos.
+ *
+ * Opciones: `dia` y/o un intervalo `inicio`/`fin` (en minutos) para filtrar los que chocan.
+ * Devuelve { id, tipo ('clase' | 'electivo' | 'pie'), dia, bloqueId, curso, asignatura,
+ * horaInicio, horaFin }.
  */
-async function buscarChoquesConClases(conn, { docenteId, dia, inicio, fin }) {
-  if (!docenteId || !dia) return [];
+async function ocupacionesDelDocente(conn, docenteId, { dia = null, inicio = null, fin = null } = {}) {
+  if (!docenteId) return [];
+  const filtro = (colDia) => `${dia ? ` AND ${colDia} = ?` : ''}${inicio !== null
+    ? ' AND bh.Bloque_Horario_Hora_Inicio < ? AND bh.Bloque_Horario_Hora_Fin > ?' : ''}`;
+  const extra = [...(dia ? [dia] : []), ...(inicio !== null ? [minutosAHora(fin), minutosAHora(inicio)] : [])];
   const [filas] = await conn.query(
-    `SELECT ha.Horario_Asignatura_Id AS id,
-            c.Curso_Nombre           AS curso,
-            a.Asignatura_Nombre      AS asignatura,
-            bh.Bloque_Horario_Hora_Inicio AS horaInicio,
-            bh.Bloque_Horario_Hora_Fin    AS horaFin
+    `SELECT ha.Horario_Asignatura_Id AS id, 'clase' AS tipo,
+            ha.Horario_Asignatura_Dia_Semana AS dia, ha.Bloque_Horario_Id AS bloqueId,
+            c.Curso_Nombre AS curso, a.Asignatura_Nombre AS asignatura,
+            bh.Bloque_Horario_Hora_Inicio AS horaInicio, bh.Bloque_Horario_Hora_Fin AS horaFin
        FROM horario_asignatura ha
        JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
        LEFT JOIN curso c      ON c.Curso_Id = ha.Curso_Id
        LEFT JOIN asignatura a ON a.Asignatura_Id = ha.Asignatura_Id
-      WHERE ha.Usuario_Id = ?
-        AND ha.Horario_Asignatura_Dia_Semana = ?
-        AND ${claseVigente('ha')}
-        AND ${enPeriodoVigente('ha')}
-        AND bh.Bloque_Horario_Hora_Inicio < ?
-        AND bh.Bloque_Horario_Hora_Fin > ?
-      ORDER BY bh.Bloque_Horario_Hora_Inicio`,
-    [docenteId, dia, minutosAHora(fin), minutosAHora(inicio)]
+      WHERE ha.Usuario_Id = ? AND ${claseVigente('ha')} AND ${enPeriodoVigente('ha')}${filtro('ha.Horario_Asignatura_Dia_Semana')}
+     UNION ALL
+     SELECT ce.Clase_Electivo_Id, 'electivo', ce.Clase_Electivo_Dia_Semana, ce.Bloque_Horario_Id,
+            '3° y 4° medio (electivo)', CONCAT(a.Asignatura_Nombre, ' · ', ce.Clase_Electivo_Ruta),
+            bh.Bloque_Horario_Hora_Inicio, bh.Bloque_Horario_Hora_Fin
+       FROM clase_electivo ce
+       JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ce.Bloque_Horario_Id
+       JOIN asignatura a      ON a.Asignatura_Id = ce.Asignatura_Id
+      WHERE ce.Docente_Usuario_Id = ? AND ce.Clase_Electivo_Periodo_Lectivo = ${PERIODO_VIGENTE_SQL}${filtro('ce.Clase_Electivo_Dia_Semana')}
+     UNION ALL
+     SELECT NULL, 'pie', bp.Bloque_Pie_Dia_Semana, bp.Bloque_Horario_Id,
+            NULL, 'Horas P.I.E.',
+            bh.Bloque_Horario_Hora_Inicio, bh.Bloque_Horario_Hora_Fin
+       FROM bloque_pie_docente bp
+       JOIN bloque_horario bh ON bh.Bloque_Horario_Id = bp.Bloque_Horario_Id
+      WHERE bp.Docente_Usuario_Id = ? AND bp.Bloque_Pie_Periodo_Lectivo = ${PERIODO_VIGENTE_SQL}${filtro('bp.Bloque_Pie_Dia_Semana')}
+     ORDER BY horaInicio`,
+    [docenteId, ...extra, docenteId, ...extra, docenteId, ...extra]
   );
   return filas.map((f) => ({ ...f, horaInicio: hhmm(f.horaInicio), horaFin: hhmm(f.horaFin) }));
+}
+
+/**
+ * Lo que ocupa al docente (clases, electivos y bloques P.I.E.) en un día de la semana y que
+ * se superpone con el intervalo [inicio, fin) (en minutos). Devuelve los elementos con curso,
+ * asignatura y horas para informar el choque.
+ */
+async function buscarChoquesConClases(conn, { docenteId, dia, inicio, fin }) {
+  if (!docenteId || !dia) return [];
+  return ocupacionesDelDocente(conn, docenteId, { dia, inicio, fin });
 }
 
 /** Texto para informar un choque: "1ero Básico A — Matemática (09:15–10:00)" */
@@ -106,6 +132,7 @@ module.exports = {
   parsearTramo,
   diaSemanaDeFecha,
   seSuperponen,
+  ocupacionesDelDocente,
   buscarChoquesConClases,
   buscarClaseEnTramo,
   describirClase,

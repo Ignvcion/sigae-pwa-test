@@ -132,6 +132,25 @@ describe('Pruebas Unitarias - CU89: Solicitud de citación por el apoderado (RF5
       expect(pool.query.mock.calls[1][1].slice(2)).toEqual(['Cancelada', 3, 8]);
     });
 
+    test('descarta tramos que caen sobre un bloque P.I.E. o un electivo del docente', async () => {
+      pool.query
+        .mockResolvedValueOnce([[
+          { id: null, tipo: 'pie', dia: 'Martes', horaInicio: '14:00:00', horaFin: '14:45:00' },
+          { id: 9, tipo: 'electivo', dia: 'Martes', horaInicio: '15:00:00', horaFin: '15:45:00' },
+        ]])
+        .mockResolvedValueOnce([[]]);
+
+      const dias = await controller.calcularDisponibilidad(pool, {
+        docenteId: 3, apoderadoId: 8, bloques: [BLOQUE], desde: { fecha: lunes, minuto: 0 },
+      });
+
+      // La consulta de ocupación incluye clases, electivos y P.I.E.
+      expect(pool.query.mock.calls[0][0]).toContain('FROM bloque_pie_docente');
+      expect(pool.query.mock.calls[0][0]).toContain('FROM clase_electivo');
+      // 14:00–14:30 y 14:30–15:00 tocan el P.I.E. (14:00–14:45); 15:00–15:30 toca el electivo: no queda ningún día
+      expect(dias).toEqual([]);
+    });
+
     test('hoy solo se ofrecen tramos que aún no comienzan', async () => {
       pool.query.mockResolvedValueOnce([[]]).mockResolvedValueOnce([[]]);
 

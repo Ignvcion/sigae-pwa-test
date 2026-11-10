@@ -23,8 +23,8 @@ function RegisterStudent() {
   const [errores, setErrores]         = useState({});
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState(null);
-  const [rutExiste, setRutExiste]     = useState(false);
-  const [verificandoRut, setVerificandoRut] = useState(false);
+  // Resultado de la última verificación, junto al RUT verificado: lo demás se deriva
+  const [rutVerificado, setRutVerificado] = useState({ rut: null, existe: false });
 
   useEffect(() => {
     fetch("/api/cursos", {
@@ -35,24 +35,20 @@ function RegisterStudent() {
       .catch(() => setCursos([]));
   }, []);
 
+  const rutValido = Boolean(formData.rut) && validarRut(formData.rut);
+  const rutExiste = rutValido && rutVerificado.rut === formData.rut && rutVerificado.existe;
+  const verificandoRut = rutValido && rutVerificado.rut !== formData.rut;
+
   useEffect(() => {
-    if (!formData.rut || !validarRut(formData.rut)) {
-      setRutExiste(false);
-      return;
-    }
-    setVerificandoRut(true);
-    const timeout = setTimeout(async () => {
-      try {
-        const data = await verificarRutEstudiante(formData.rut);
-        setRutExiste(data.existe);
-      } catch {
-        setRutExiste(false);
-      } finally {
-        setVerificandoRut(false);
-      }
+    if (!rutValido) return;
+    const rut = formData.rut;
+    const timeout = setTimeout(() => {
+      verificarRutEstudiante(rut)
+        .then((data) => setRutVerificado({ rut, existe: Boolean(data.existe) }))
+        .catch(() => setRutVerificado({ rut, existe: false }));
     }, 400);
     return () => clearTimeout(timeout);
-  }, [formData.rut]);
+  }, [formData.rut, rutValido]);
 
   const validarCampo = (name, value, datos = formData) => {
     if (CAMPOS_DIRECCION.includes(name)) return errorCampoDireccion(name, value, datos);

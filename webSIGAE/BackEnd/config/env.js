@@ -45,6 +45,10 @@ function problemasEntornoProduccion(env = process.env) {
   if (env.JWT_SECRET === 'un_secreto_muy_largo_y_seguro') {
     problemas.push('JWT_SECRET es el valor de ejemplo de .env.example');
   }
+  // Los valores de desarrollo de .env.example nunca sirven en producción
+  if (env.DB_PASSWORD === 'sigae123') {
+    problemas.push('DB_PASSWORD es el valor de desarrollo de .env.example');
+  }
   if (env.UPLOADS_DIR && !path.isAbsolute(env.UPLOADS_DIR)) {
     problemas.push('UPLOADS_DIR debe ser una ruta absoluta');
   }

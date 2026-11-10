@@ -19,34 +19,39 @@ function Usuarios() {
   // { usuario, conEleccion: bool, accion: 'cuenta'|'rol', rolAQuitar: string|null, rolesActivos: string[] }
   const [loadingToggle, setLoadingToggle] = useState(false);
 
-  useEffect(() => {
-    cargarUsuarios("Todos", "Todos");
-  }, []);
-
   // CU29: listado con filtros avanzados por rol y estado de cuenta, resueltos en el backend
-  const cargarUsuarios = async (rol, estado) => {
+  // Pide el listado; el estado cambia solo al llegar la respuesta (callbacks), así el efecto
+  // de montaje no provoca renders en cascada. cargarUsuarios() además limpia los avisos.
+  const pedirUsuarios = (rol, estado) =>
+    getUsuariosPorFiltro({
+      rol: rol === "Todos" ? undefined : rol,
+      estado: estado === "Todos" ? undefined : (estado === "Activo" ? "1" : "0"),
+    })
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setUsuarios(data);
+        } else {
+          // CU29 - Excepción "Sin coincidencias"
+          setUsuarios(data.usuarios || []);
+          setMensajeInfo(data.mensaje || "No se encontraron usuarios con esos filtros");
+        }
+      })
+      .catch((error) => {
+        // CU29 - Excepción "Filtros fuera de privilegios" o "Problema técnico"
+        setErrorCarga(error.message || "Ocurrió un problema técnico");
+      })
+      .finally(() => setLoading(false));
+
+  const cargarUsuarios = (rol, estado) => {
     setLoading(true);
     setErrorCarga("");
     setMensajeInfo("");
-    try {
-      const data = await getUsuariosPorFiltro({
-        rol: rol === "Todos" ? undefined : rol,
-        estado: estado === "Todos" ? undefined : (estado === "Activo" ? "1" : "0"),
-      });
-      if (Array.isArray(data)) {
-        setUsuarios(data);
-      } else {
-        // CU29 - Excepción "Sin coincidencias"
-        setUsuarios(data.usuarios || []);
-        setMensajeInfo(data.mensaje || "No se encontraron usuarios con esos filtros");
-      }
-    } catch (error) {
-      // CU29 - Excepción "Filtros fuera de privilegios" o "Problema técnico"
-      setErrorCarga(error.message || "Ocurrió un problema técnico");
-    } finally {
-      setLoading(false);
-    }
+    return pedirUsuarios(rol, estado);
   };
+
+  useEffect(() => {
+    pedirUsuarios("Todos", "Todos");
+  }, []);
 
   const aplicarFiltros = () => cargarUsuarios(filtroRol, filtroEstado);
 

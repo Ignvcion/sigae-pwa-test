@@ -171,7 +171,6 @@ function GestionRoles() {
 
   const [busqueda, setBusqueda]                 = useState("");
   const [usuarios, setUsuarios]                 = useState([]);
-  const [resultados, setResultados]             = useState([]);
   const [seleccionado, setSeleccionado]         = useState(null);
   const [rolNuevo, setRolNuevo]                 = useState("");
   const [datosRol, setDatosRol]                 = useState({});
@@ -184,48 +183,37 @@ function GestionRoles() {
   const [loadingGestion, setLoadingGestion]     = useState(false);
   const [msgGestion, setMsgGestion]             = useState({ tipo: "", texto: "" });
 
-  /* Carga inicial */
-  useEffect(() => {
-    cargarUsuarios();
-  }, []);
+  /* Filtro de búsqueda: se deriva de lo escrito y de la lista (máx. 8 coincidencias) */
+  const textoBusqueda = normalizarTexto(busqueda.trim());
+  const resultados = textoBusqueda
+    ? usuarios
+      .filter(u =>
+        normalizarTexto(u.Usuario_Nombre_Completo || "").includes(textoBusqueda) ||
+        normalizarTexto(u.Usuario_RUT || "").includes(textoBusqueda)
+      )
+      .slice(0, 8)
+    : [];
 
-  /* Filtro de búsqueda */
-  useEffect(() => {
-    if (!busqueda.trim()) { setResultados([]); return; }
-    const texto = normalizarTexto(busqueda);
-    setResultados(
-      usuarios
-        .filter(u =>
-          normalizarTexto(u.Usuario_Nombre_Completo || "").includes(texto) ||
-          normalizarTexto(u.Usuario_RUT || "").includes(texto)
-        )
-        .slice(0, 8)
-    );
-  }, [busqueda, usuarios]);
-
-  const cargarUsuarios = async () => {
-    try {
-      const res = await apiFetch("/api/usuarios");
-      if (!res) return;
-      const data = await res.json();
-      const lista = Array.isArray(data) ? data : [];
-      setUsuarios(lista);
-      // Si venimos desde un formulario de registro con id en la URL, preseleccionar
-      if (idParam) {
-        const u = lista.find(u => u.Usuario_Id === Number(idParam));
-        if (u) elegirUsuario(u);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingPage(false);
-    }
-  };
+  // El estado cambia solo al llegar la respuesta (callbacks), así puede llamarse desde el efecto.
+  const cargarUsuarios = () =>
+    apiFetch("/api/usuarios")
+      .then(async (res) => {
+        if (!res) return;
+        const data = await res.json();
+        const lista = Array.isArray(data) ? data : [];
+        setUsuarios(lista);
+        // Si venimos desde un formulario de registro con id en la URL, preseleccionar
+        if (idParam) {
+          const u = lista.find(u => u.Usuario_Id === Number(idParam));
+          if (u) elegirUsuario(u);
+        }
+      })
+      .catch((e) => console.error(e))
+      .finally(() => setLoadingPage(false));
 
   const elegirUsuario = (u) => {
     setSeleccionado(u);
     setBusqueda("");
-    setResultados([]);
     setRolNuevo("");
     setDatosRol({});
     setErrores({});
@@ -233,6 +221,12 @@ function GestionRoles() {
     setMsgError("");
     setMsgGestion({ tipo: "", texto: "" });
   };
+
+  /* Carga inicial */
+  useEffect(() => {
+    cargarUsuarios();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- carga una sola vez al montar
+  }, []);
 
   const refreshSeleccionado = async () => {
     try {

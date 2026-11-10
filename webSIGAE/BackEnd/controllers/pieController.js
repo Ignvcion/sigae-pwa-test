@@ -6,6 +6,7 @@
 const pool = require('../config/db');
 const { obtenerPeriodos } = require('../utils/periodos');
 const { calcularCargaLectiva, clasesLectivas } = require('../utils/cargaLectiva');
+const { aMinutos, hhmm, seSuperponen } = require('../utils/disponibilidadDocente');
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 
@@ -14,12 +15,38 @@ const esAdmin = (user) => (user?.roles || []).includes('Administrador');
 /** Período pedido (vigente o siguiente) o error. */
 async function resolverPeriodo(db, pedido) {
   const { vigente, siguiente } = await obtenerPeriodos(db);
-  if (!pedido) return { periodo: vigente };
+  if (!pedido) return { periodo: vigente, vigente };
   const p = String(pedido);
   if (p !== String(vigente) && p !== String(siguiente || '')) {
     return { error: `El período debe ser el vigente (${vigente})${siguiente ? ` o el siguiente (${siguiente})` : ''}` };
   }
-  return { periodo: p };
+  return { periodo: p, vigente };
+}
+
+/**
+ * Primer tramo de atención de apoderados (RF55) del docente que se superpone con alguno de los
+ * bloques P.I.E. indicados, o null. La atención es semanal y sin período: solo se compara
+ * cuando los bloques P.I.E. son del período vigente.
+ */
+async function atencionEnBloquesPIE(db, docenteId, bloques) {
+  const ids = [...new Set(bloques.map((b) => Number(b.bloqueId)))];
+  const [horas] = await db.query(
+    `SELECT Bloque_Horario_Id AS id, Bloque_Horario_Hora_Inicio AS inicio, Bloque_Horario_Hora_Fin AS fin
+       FROM bloque_horario WHERE Bloque_Horario_Id IN (?)`,
+    [ids]
+  );
+  const [atencion] = await db.query(
+    `SELECT Horario_Atencion_Dia_Semana AS dia, Horario_Atencion_Hora_Inicio AS inicio, Horario_Atencion_Hora_Fin AS fin
+       FROM horario_atencion WHERE Docente_Usuario_Id = ?`,
+    [docenteId]
+  );
+  const horaDe = new Map(horas.map((h) => [Number(h.id), { inicio: aMinutos(h.inicio), fin: aMinutos(h.fin) }]));
+  for (const b of bloques) {
+    const hb = horaDe.get(Number(b.bloqueId));
+    const choque = hb && atencion.find((a) => a.dia === b.dia && seSuperponen(hb, { inicio: aMinutos(a.inicio), fin: aMinutos(a.fin) }));
+    if (choque) return { dia: b.dia, inicio: hhmm(choque.inicio), fin: hhmm(choque.fin) };
+  }
+  return null;
 }
 
 async function buscarDocente(db, id) {
@@ -122,7 +149,7 @@ const guardarPIE = async (req, res) => {
         mensaje: `Las horas P.I.E. (${horas}) no pueden superar la carga horaria semanal (${docente.Docente_Carga_Horaria_Semanal} h)`,
       });
     }
-    const { periodo, error } = await resolverPeriodo(pool, periodoPedido);
+    const { periodo, vigente, error } = await resolverPeriodo(pool, periodoPedido);
     if (error) return res.status(400).json({ mensaje: error });
 
     if (bloques.length > 0) {
@@ -140,6 +167,15 @@ const guardarPIE = async (req, res) => {
       const choque = resumen.ocupados.find((o) => claves.has(`${o.dia}|${Number(o.bloqueId)}`));
       if (choque) {
         return res.status(409).json({ mensaje: `El ${choque.dia} el docente ya tiene clase en ese bloque (${choque.descripcion})` });
+      }
+      // No pueden coincidir con su horario de atención de apoderados (período vigente)
+      if (String(periodo) === String(vigente)) {
+        const atencion = await atencionEnBloquesPIE(pool, id, bloques);
+        if (atencion) {
+          return res.status(409).json({
+            mensaje: `El ${atencion.dia} el docente tiene atención de apoderados de ${atencion.inicio} a ${atencion.fin} que se superpone con ese bloque P.I.E.: ajusta primero su horario de atención`,
+          });
+        }
       }
     }
 

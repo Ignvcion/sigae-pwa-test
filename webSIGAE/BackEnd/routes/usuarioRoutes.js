@@ -5,6 +5,7 @@ const router = express.Router();
 const usuarioController = require('../controllers/usuarioController');
 const pie = require('../controllers/pieController');
 const uploadFotoPerfil = require('../middleware/uploadFotoPerfil');
+const { esImagenValida } = require('../middleware/uploadFotoPerfil');
 const { codigoLimiter } = require('../middleware/rateLimiter');
 
 const {
@@ -33,6 +34,10 @@ router.put('/perfil/foto', verifyToken, (req, res, next) => {
   uploadFotoPerfil(req, res, (err) => {
     // CU20 - Excepción "Formato o tamaño inválido": rechazado por el middleware antes de tocar la BD
     if (err) {
+      return res.status(400).json({ mensaje: 'El archivo debe ser una imagen (JPG, PNG o WEBP) de máximo 5MB' });
+    }
+    // El contenido debe ser realmente una imagen (no basta el tipo que declara el cliente)
+    if (req.file && !esImagenValida(req.file.path, req.file.mimetype)) {
       return res.status(400).json({ mensaje: 'El archivo debe ser una imagen (JPG, PNG o WEBP) de máximo 5MB' });
     }
     next();

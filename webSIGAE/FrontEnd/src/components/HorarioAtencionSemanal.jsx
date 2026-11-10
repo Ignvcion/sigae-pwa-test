@@ -63,7 +63,7 @@ function HorarioAtencionSemanal({ onGuardado }) {
       if (i < aMin(limites.minimo) || f > aMin(limites.maximo)) avisos.push(`${t.dia} ${t.hora_inicio}–${t.hora_fin}: debe estar entre las ${limites.minimo} y las ${limites.maximo}`);
       else if (citasEnTramo(i, f) === 0) avisos.push(`${t.dia} ${t.hora_inicio}–${t.hora_fin}: no incluye ninguna citación de 30 minutos (en punto o y media)`);
       const choque = clases.find((c) => c.dia === t.dia && aMin(c.hora_inicio) < f && i < aMin(c.hora_fin));
-      if (choque) avisos.push(`${t.dia} ${t.hora_inicio}–${t.hora_fin}: se superpone con tu clase de ${choque.asignatura} (${choque.curso}, ${choque.hora_inicio}–${choque.hora_fin})`);
+      if (choque) avisos.push(`${t.dia} ${t.hora_inicio}–${t.hora_fin}: se superpone con ${choque.tipo === "pie" ? "tus horas P.I.E." : `tu clase de ${choque.asignatura} (${choque.curso})`} (${choque.hora_inicio}–${choque.hora_fin})`);
       if (conDisponibilidad && !cubre(dispPorDia.get(t.dia), t.hora_inicio, t.hora_fin)) avisos.push(`${t.dia} ${t.hora_inicio}–${t.hora_fin}: queda fuera de tu disponibilidad laboral`);
     }
   }
@@ -96,7 +96,13 @@ function HorarioAtencionSemanal({ onGuardado }) {
   const celda = (d, b) => {
     const enCelda = clasesPorCelda.get(`${d}|${b.Bloque_Horario_Id}`) || [];
     if (enCelda.length > 0) {
-      return { estado: "clase", texto: "Clase", titulo: enCelda.map((c) => `${c.asignatura} · ${c.curso}`).join("\n") };
+      // Clase regular, electivo o bloque P.I.E.: ninguno admite atención de apoderados
+      const soloPIE = enCelda.every((c) => c.tipo === "pie");
+      return {
+        estado: "clase",
+        texto: soloPIE ? "P.I.E." : "Clase",
+        titulo: enCelda.map((c) => [c.asignatura, c.curso].filter(Boolean).join(" · ")).join("\n"),
+      };
     }
     if (cubre(atencionPorDia.get(d), b.hora_inicio, b.hora_fin)) return { estado: "atencion", texto: "Atención", titulo: "Atención de apoderados" };
     const dentroDisp = !conDisponibilidad || cubre(dispPorDia.get(d), b.hora_inicio, b.hora_fin);

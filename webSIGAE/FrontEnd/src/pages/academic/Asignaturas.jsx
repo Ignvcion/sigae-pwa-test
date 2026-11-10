@@ -134,22 +134,25 @@ function Asignaturas() {
   const esSuperAdmin = usuario?.administradorTipo === "Super Admin";
   const esAdmin = esSuperAdmin || usuario?.roles?.includes("Administrador");
 
-  const cargar = async () => {
+  // Pide las asignaturas y actualiza el estado solo al llegar la respuesta (en callbacks),
+  // así puede llamarse desde el efecto de montaje. `cargando` parte en true; recargar()
+  // lo vuelve a encender antes de pedir de nuevo.
+  const cargar = () =>
+    fetch("/api/planes/asignaturas", { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        const data = await res.json();
+        if (res.ok) setAsignaturas(data);
+        else setError(data.error || "Error al cargar asignaturas");
+      })
+      .catch(() => setError("Error al conectar con el servidor"))
+      .finally(() => setCargando(false));
+
+  const recargar = () => {
     setCargando(true);
-    try {
-      const res = await fetch("/api/planes/asignaturas", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (res.ok) setAsignaturas(data);
-      else setError(data.error || "Error al cargar asignaturas");
-    } catch {
-      setError("Error al conectar con el servidor");
-    } finally {
-      setCargando(false);
-    }
+    return cargar();
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- carga una sola vez al montar
   useEffect(() => { cargar(); }, []);
 
   const mostrarExito = (msg) => {
@@ -174,7 +177,7 @@ function Asignaturas() {
       fijarColor("asignaturas", data.asignatura_id, data.color);
       mostrarExito(data.mensaje);
       setMostrarForm(false);
-      cargar();
+      recargar();
     } catch {
       setError("Error al conectar con el servidor");
     } finally {
@@ -199,7 +202,7 @@ function Asignaturas() {
       fijarColor("asignaturas", editando.id, color);
       mostrarExito(data.mensaje);
       setEditando(null);
-      cargar();
+      recargar();
     } catch {
       setError("Error al conectar con el servidor");
     } finally {

@@ -21,30 +21,35 @@ function Administradores() {
   const [msgErrorForm, setMsgErrorForm] = useState("");
   const [msgExitoForm, setMsgExitoForm] = useState("");
 
-  useEffect(() => {
-    cargarAdministradores();
-  }, []);
+  // Pide el listado; el estado cambia solo al llegar la respuesta (callbacks), así el efecto
+  // de montaje no provoca renders en cascada. cargarAdministradores() además limpia los avisos.
+  const pedirAdministradores = () =>
+    getAdministradores()
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setAdministradores(data);
+        } else {
+          // Excepción 1: sin administradores registrados
+          setAdministradores(data.administradores || []);
+          setMensajeInfo(data.mensaje || "No existen administradores registrados.");
+        }
+      })
+      .catch((error) => {
+        // Excepción 2: interrupción técnica con la base de datos
+        setErrorCarga(error.message || "La información no pudo ser encontrada");
+      })
+      .finally(() => setLoading(false));
 
-  const cargarAdministradores = async () => {
+  const cargarAdministradores = () => {
     setLoading(true);
     setErrorCarga("");
     setMensajeInfo("");
-    try {
-      const data = await getAdministradores();
-      if (Array.isArray(data)) {
-        setAdministradores(data);
-      } else {
-        // Excepción 1: sin administradores registrados
-        setAdministradores(data.administradores || []);
-        setMensajeInfo(data.mensaje || "No existen administradores registrados.");
-      }
-    } catch (error) {
-      // Excepción 2: interrupción técnica con la base de datos
-      setErrorCarga(error.message || "La información no pudo ser encontrada");
-    } finally {
-      setLoading(false);
-    }
+    return pedirAdministradores();
   };
+
+  useEffect(() => {
+    pedirAdministradores();
+  }, []);
 
   const abrirEdicion = (admin) => {
     setEditando(admin);

@@ -35,7 +35,6 @@ import BuscarUsuarios from "../pages/users/BuscarUsuarios";
 import Perfil from "../pages/users/Perfil";
 
 /* NUEVOS COMPONENTES */
-import ListaEstudiantesApoderado from "../components/ListaEstudiantesApoderado";
 
 /* ACADEMIC */
 
@@ -63,7 +62,6 @@ import CalendarioEvaluaciones from "../pages/communications/CalendarioEvaluacion
 
 /* REPORTS */
 
-import Reportes from "../pages/reports/Reportes";
 
 /* LAYOUT */
 
@@ -391,15 +389,6 @@ function AppRouter() {
             element={
               <RoleRoute roles={["Administrador"]}>
                 <Electivos />
-              </RoleRoute>
-            }
-          />
-
-          <Route
-            path="/reportes"
-            element={
-              <RoleRoute roles={["Administrador"]}>
-                <Reportes />
               </RoleRoute>
             }
           />

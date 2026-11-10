@@ -150,25 +150,24 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
   const [exito, setExito] = useState("");
   const [mostrarModal, setMostrarModal] = useState(false);
 
-  const cargar = async () => {
+  // Pide las asignaturas del curso; el estado cambia solo al llegar la respuesta.
+  const pedir = () =>
+    fetch(`/api/cursos/${curso.Curso_Id}/asignaturas`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) setError(data.error || "Error al cargar");
+        else setAsignadas(data);
+      })
+      .catch(() => setError("Error al conectar con el servidor"))
+      .finally(() => setCargando(false));
+
+  const cargar = () => {
     setCargando(true);
-    try {
-      const res = await fetch(`/api/cursos/${curso.Curso_Id}/asignaturas`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!res.ok) setError(data.error || "Error al cargar");
-      else setAsignadas(data);
-    } catch {
-      setError("Error al conectar con el servidor");
-    } finally {
-      setCargando(false);
-    }
+    return pedir();
   };
 
-  useEffect(() => {
-    cargar();
-  }, [curso.Curso_Id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- se recarga solo al cambiar de curso
+  useEffect(() => { pedir(); }, [curso.Curso_Id]);
 
   const handleExito = (msg) => {
     setExito(msg);
@@ -266,27 +265,24 @@ function Cursos() {
 
   const token = localStorage.getItem("token");
 
-  const cargarDatos = async () => {
-    try {
-      const [resCursos, resNiveles] = await Promise.all([
-        fetch("/api/cursos", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/cursos/niveles", { headers: { Authorization: `Bearer ${token}` } }),
-      ]);
-      const lista = await resCursos.json();
-      setCursos(lista);
-      setNiveles(await resNiveles.json());
-      // Si hay un curso abierto, se refresca (p. ej. tras cambiar el profesor jefe)
-      setCursoSeleccionado((actual) => (actual ? lista.find((c) => c.Curso_Id === actual.Curso_Id) || null : actual));
-    } catch {
-      setError("Error al cargar los datos");
-    } finally {
-      setCargando(false);
-    }
-  };
+  // El estado cambia solo al llegar la respuesta (callbacks), así puede llamarse desde el efecto.
+  const cargarDatos = () =>
+    Promise.all([
+      fetch("/api/cursos", { headers: { Authorization: `Bearer ${token}` } }),
+      fetch("/api/cursos/niveles", { headers: { Authorization: `Bearer ${token}` } }),
+    ])
+      .then(async ([resCursos, resNiveles]) => {
+        const lista = await resCursos.json();
+        setCursos(lista);
+        setNiveles(await resNiveles.json());
+        // Si hay un curso abierto, se refresca (p. ej. tras cambiar el profesor jefe)
+        setCursoSeleccionado((actual) => (actual ? lista.find((c) => c.Curso_Id === actual.Curso_Id) || null : actual));
+      })
+      .catch(() => setError("Error al cargar los datos"))
+      .finally(() => setCargando(false));
 
-  useEffect(() => {
-    cargarDatos();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- carga una sola vez al montar
+  useEffect(() => { cargarDatos(); }, []);
 
   // Durante el cierre se pueden crear cursos del período siguiente
   useEffect(() => {
