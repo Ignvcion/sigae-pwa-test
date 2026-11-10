@@ -98,7 +98,10 @@ describe('Pruebas Unitarias - CU87/CU88: Horario de atención de apoderados (RF5
 
     await controller.crearBloqueAtencion(req, res);
 
-    expect(pool.query.mock.calls[0][1]).toEqual([3, 'Lunes', '16:00', '15:00']);
+    // La consulta de choques repite sus parámetros para clases, electivos y bloques P.I.E.
+    expect(pool.query.mock.calls[0][0]).toContain('FROM clase_electivo');
+    expect(pool.query.mock.calls[0][0]).toContain('FROM bloque_pie_docente');
+    expect(pool.query.mock.calls[0][1]).toEqual(Array(3).fill([3, 'Lunes', '16:00', '15:00']).flat());
     expect(pool.query.mock.calls[4][0]).toContain('INSERT INTO horario_atencion');
     expect(pool.query.mock.calls[4][1]).toEqual(['Lunes', '15:00', '16:00', 3]);
     expect(res.status).toHaveBeenCalledWith(201);

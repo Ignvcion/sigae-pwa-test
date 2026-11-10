@@ -217,7 +217,7 @@ describe('Pruebas Unitarias - CU74–CU79: Módulo de Citaciones', () => {
     const [sql, params] = pool.query.mock.calls[2];
     expect(sql).toContain('FROM horario_asignatura');
     expect(params[0]).toBe(3);
-    expect(params.slice(2)).toEqual(['10:00', '09:30']);
+    expect(params.slice(2, 4)).toEqual(['10:00', '09:30']);
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json.mock.calls[0][0].mensaje).toBe(
       'El tramo seleccionado coincide con una clase del docente: 1ero Básico A — Matemática (09:15–10:00)'

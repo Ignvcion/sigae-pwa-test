@@ -145,6 +145,22 @@ describe('PUT /api/usuarios/:id/pie (administración)', () => {
     expect(pool.getConnection).not.toHaveBeenCalled();
   });
 
+  test('Un bloque P.I.E. no puede coincidir con el horario de atención de apoderados del docente', async () => {
+    pool.query = porPatron([
+      [/FROM usuario WHERE Usuario_Id = \?/, DOCENTE],
+      [/FROM parametro_institucional/, PERIODOS],
+      [/SELECT Bloque_Horario_Id FROM bloque_horario/, [[{ Bloque_Horario_Id: 11 }]]],
+      [/FROM bloque_horario WHERE Bloque_Horario_Id IN/, [[{ id: 11, inicio: '09:15:00', fin: '10:00:00' }]]],
+      [/FROM horario_atencion/, [[{ dia: 'Lunes', inicio: '09:00:00', fin: '10:30:00' }]]],
+    ]);
+    const res = await guardar({ horasPIE: 3, bloques: [{ dia: 'Lunes', bloqueId: 11 }] });
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json.mock.calls[0][0].mensaje).toBe(
+      'El Lunes el docente tiene atención de apoderados de 09:00 a 10:30 que se superpone con ese bloque P.I.E.: ajusta primero su horario de atención'
+    );
+    expect(pool.getConnection).not.toHaveBeenCalled();
+  });
+
   test('Guarda horas y bloques del período en una transacción y avisa si ya supera el nuevo máximo', async () => {
     pool.query = porPatron([
       [/FROM usuario WHERE Usuario_Id = \?/, DOCENTE],

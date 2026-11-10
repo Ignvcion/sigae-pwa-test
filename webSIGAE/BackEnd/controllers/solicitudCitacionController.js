@@ -5,13 +5,13 @@
 // queda "Pendiente de confirmación" hasta que el docente la acepta (CU75).
 const pool = require('../config/db');
 const { claseVigente } = require('../utils/clasesEliminadas');
-const { enPeriodoVigente } = require('../utils/periodos');
 const {
   aMinutos,
   parsearTramo,
   diaSemanaDeFecha,
   seSuperponen,
   buscarClaseEnTramo,
+  ocupacionesDelDocente,
 } = require('../utils/disponibilidadDocente');
 const { obtenerBloques } = require('./horarioAtencionController');
 const { condicionApoderadoAsociado, rolApoderadoSQL } = require('../utils/apoderadosEstudiante');
@@ -181,14 +181,8 @@ async function calcularDisponibilidad(conn, { docenteId, apoderadoId, bloques, d
     fechas.push(aISO(d));
   }
 
-  const [clases] = await conn.query(
-    `SELECT ha.Horario_Asignatura_Dia_Semana AS dia,
-            bh.Bloque_Horario_Hora_Inicio AS horaInicio, bh.Bloque_Horario_Hora_Fin AS horaFin
-       FROM horario_asignatura ha
-       JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
-      WHERE ha.Usuario_Id = ? AND ${claseVigente('ha')} AND ${enPeriodoVigente('ha')}`,
-    [docenteId]
-  );
+  // Clases, electivos y bloques P.I.E. del docente: ninguna citación puede caer sobre ellos
+  const clases = await ocupacionesDelDocente(conn, docenteId);
   const [ocupadas] = await conn.query(
     `SELECT DATE_FORMAT(Citacion_Fecha, '%Y-%m-%d') AS fecha, Citacion_Tramo_Horario AS tramo
        FROM citacion

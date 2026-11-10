@@ -13,7 +13,7 @@ const pool = require('../config/db');
 const { obtenerPeriodos } = require('../utils/periodos');
 const { normalizarTramos, unirTramos, cabeEnTramos, aHora } = require('../utils/disponibilidadLaboral');
 const {
-  bloquesDeJornada, clasesDelDocente, tramosGuardados,
+  bloquesDeJornada, tramosGuardados,
 } = require('./disponibilidadLaboralController');
 const {
   DIAS_SEMANA,
@@ -24,6 +24,7 @@ const {
   diaSemanaDeFecha,
   seSuperponen,
   buscarChoquesConClases,
+  ocupacionesDelDocente,
   describirClase,
 } = require('../utils/disponibilidadDocente');
 
@@ -357,7 +358,17 @@ const getSemanaAtencion = async (req, res) => {
       })),
       disponibilidadLaboral: disponibilidad.map((t) => ({ dia: t.dia, hora_inicio: aHora(t.inicio), hora_fin: aHora(t.fin) })),
       bloques: await bloquesDeJornada(pool),
-      clases: await clasesDelDocente(pool, docenteId, vigente),
+      // Clases, electivos y bloques P.I.E.: ninguno admite atención de apoderados
+      clases: (await ocupacionesDelDocente(pool, docenteId)).map((o) => ({
+        Horario_Asignatura_Id: o.id,
+        tipo: o.tipo,
+        dia: o.dia,
+        Bloque_Horario_Id: o.bloqueId,
+        hora_inicio: o.horaInicio,
+        hora_fin: o.horaFin,
+        curso: o.curso,
+        asignatura: o.asignatura,
+      })),
     });
   } catch (error) {
     console.error('getSemanaAtencion:', error);
