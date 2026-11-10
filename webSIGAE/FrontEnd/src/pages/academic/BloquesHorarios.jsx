@@ -266,9 +266,13 @@ function TabParametros({ onJornadaCambiada }) {
           body: JSON.stringify(form),
         });
         const dataImp = await resImp.json();
-        if (!resImp.ok) throw new Error(dataImp.error);
-        if (dataImp.bloques.length > 0) {
-          setImpacto(dataImp);
+        if (!resImp.ok) throw new Error(dataImp.error || "Error al verificar impacto de jornada");
+        const bloquesAfectados = Array.isArray(dataImp?.bloques) ? dataImp.bloques : [];
+        if (bloquesAfectados.length > 0) {
+          setImpacto({
+            clases: dataImp?.clases || 0,
+            bloques: bloquesAfectados,
+          });
           return;
         }
       }
@@ -377,9 +381,9 @@ function TabParametros({ onJornadaCambiada }) {
         {impacto && (
           <div style={{ background: "#fefce8", border: "1px solid #fde047", borderLeft: "5px solid #eab308",
             borderRadius: 8, padding: "0.8rem 1rem", marginTop: "1rem", color: "#713f12" }}>
-            <strong>⚠ La nueva jornada deja {impacto.bloques.length} bloque(s) fuera de horario</strong>
+            <strong>⚠ La nueva jornada deja {(impacto.bloques || []).length} bloque(s) fuera de horario</strong>
             <ul style={{ margin: "0.4rem 0 0.4rem 1rem", padding: 0, fontSize: "0.85rem" }}>
-              {impacto.bloques.map((b) => (
+              {(impacto.bloques || []).map((b) => (
                 <li key={b.Bloque_Horario_Id}>
                   {hhmm(b.Bloque_Horario_Hora_Inicio)}–{hhmm(b.Bloque_Horario_Hora_Fin)} · {b.Bloque_Horario_Jornada} · {b.Bloque_Horario_Tipo}
                   {" — "}{b.Clases > 0 ? `${b.Clases} clase(s)` : "sin clases"}

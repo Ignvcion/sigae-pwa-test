@@ -405,6 +405,18 @@ const SEED_ASIGNATURAS = [
 let STORE_ASIGNATURAS = loadStore("SIGAE_ASIGNATURAS", SEED_ASIGNATURAS);
 
 // 4.1 Catálogo de Niveles y Planes Educativos
+const SEED_PARAMETROS = {
+  Parametro_Institucional_Id: 1,
+  Parametro_Institucional_Nombre_Colegio: "Colegio Jacques Cousteau",
+  nombre_colegio: "Colegio Jacques Cousteau",
+  Parametro_Institucional_Inicio_Jornada: "08:00:00",
+  Parametro_Institucional_Fin_Jornada: "16:00:00",
+  Parametro_Institucional_Duracion_Bloque: 45,
+  Parametro_Institucional_Duracion_Recreo: 15,
+  Parametro_Institucional_Bloques_Maximos_Diarios: 8,
+};
+let STORE_PARAMETROS = loadStore("SIGAE_PARAMETROS", SEED_PARAMETROS);
+
 const NIVELES_EDUCATIVOS = [
   { Nivel_Educativo_Id: 1, Nivel_Educativo_Nombre: "1° Básico" },
   { Nivel_Educativo_Id: 2, Nivel_Educativo_Nombre: "2° Básico" },
@@ -1592,6 +1604,39 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   // 1. MUTACIONES (POST, PUT, PATCH, DELETE) CON PERSISTENCIA LOCAL
   // ═════════════════════════════════════════════════════════════════════════
   if (m === "POST") {
+    // Impacto de nueva jornada en bloques horarios (/api/bloques/parametros/impacto)
+    if (p.includes("/parametros/impacto")) {
+      const inicio = b?.Parametro_Institucional_Inicio_Jornada;
+      const fin = b?.Parametro_Institucional_Fin_Jornada;
+      if (!inicio || !fin || inicio >= fin) {
+        return { error: "El inicio de jornada debe ser anterior al fin", status: 400 };
+      }
+      const bloquesFuera = STORE_BLOQUES.filter(bh => {
+        const hIni = bh.Bloque_Horario_Hora_Inicio || bh.hora_inicio || "08:00:00";
+        const hFin = bh.Bloque_Horario_Hora_Fin || bh.hora_fin || "08:45:00";
+        return (hIni < inicio || hFin > fin);
+      }).map(bh => {
+        const bId = Number(bh.Bloque_Horario_Id || bh.id);
+        const clases = STORE_HORARIOS.filter(h =>
+          Number(h.Bloque_Horario_Id) === bId &&
+          h.estado !== "Eliminado" &&
+          h.eliminado !== 1
+        ).length;
+        return {
+          Bloque_Horario_Id: bId,
+          Bloque_Horario_Hora_Inicio: bh.Bloque_Horario_Hora_Inicio || bh.hora_inicio,
+          Bloque_Horario_Hora_Fin: bh.Bloque_Horario_Hora_Fin || bh.hora_fin,
+          Bloque_Horario_Jornada: bh.Bloque_Horario_Jornada || "Mañana",
+          Bloque_Horario_Tipo: bh.Bloque_Horario_Tipo || "Clase",
+          Clases: clases,
+        };
+      });
+      return {
+        clases: bloquesFuera.reduce((acc, x) => acc + x.Clases, 0),
+        bloques: bloquesFuera,
+        status: 200,
+      };
+    }
     // Autenticación / Login (/api/auth/login)
     if (p.includes("/auth/login") || p.includes("/login")) {
       const qRut = (b?.rut || "").trim().toLowerCase();
@@ -2101,6 +2146,19 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   }
 
   if (m === "PUT" || m === "PATCH") {
+    // Actualizar parámetros institucionales (/api/bloques/parametros)
+    if (p.includes("/parametros")) {
+      STORE_PARAMETROS = {
+        ...STORE_PARAMETROS,
+        Parametro_Institucional_Inicio_Jornada: b?.Parametro_Institucional_Inicio_Jornada || STORE_PARAMETROS.Parametro_Institucional_Inicio_Jornada,
+        Parametro_Institucional_Fin_Jornada: b?.Parametro_Institucional_Fin_Jornada || STORE_PARAMETROS.Parametro_Institucional_Fin_Jornada,
+        Parametro_Institucional_Duracion_Bloque: Number(b?.Parametro_Institucional_Duracion_Bloque) || STORE_PARAMETROS.Parametro_Institucional_Duracion_Bloque,
+        Parametro_Institucional_Duracion_Recreo: Number(b?.Parametro_Institucional_Duracion_Recreo) || STORE_PARAMETROS.Parametro_Institucional_Duracion_Recreo,
+        Parametro_Institucional_Bloques_Maximos_Diarios: Number(b?.Parametro_Institucional_Bloques_Maximos_Diarios) || STORE_PARAMETROS.Parametro_Institucional_Bloques_Maximos_Diarios,
+      };
+      saveStore("SIGAE_PARAMETROS", STORE_PARAMETROS);
+      return { ok: true, status: 200, mensaje: "Parámetros actualizados correctamente" };
+    }
     // Designar profesor jefe de un curso (/api/cursos/:id/profesor-jefe)
     if (p.includes("/cursos/") && p.includes("/profesor-jefe") && reqId) {
       const docId = Number(b?.docenteId || b?.docente_id || b?.Profesor_Jefe_Id || b?.usuario_id);
@@ -2393,7 +2451,7 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   }
 
   // Bloques horarios institucionales
-  if (p.includes("/bloques") && !p.includes("/bloques-libres")) {
+  if (p.includes("/bloques") && !p.includes("/bloques-libres") && !p.includes("/parametros") && !p.includes("/eventos")) {
     return STORE_BLOQUES;
   }
 
@@ -2679,18 +2737,9 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     };
   }
 
-  // Parámetros institucionales
+  // Parámetros institucionales (/api/bloques/parametros)
   if (p.includes("/parametros")) {
-    return {
-      Parametro_Institucional_Id: 1,
-      Parametro_Institucional_Nombre_Colegio: "Colegio Jacques Cousteau",
-      nombre_colegio: "Colegio Jacques Cousteau",
-      Parametro_Institucional_Inicio_Jornada: "08:00:00",
-      Parametro_Institucional_Fin_Jornada: "16:00:00",
-      Parametro_Institucional_Duracion_Bloque: 45,
-      Parametro_Institucional_Duracion_Recreo: 15,
-      Parametro_Institucional_Bloques_Maximos_Diarios: 8,
-    };
+    return STORE_PARAMETROS;
   }
 
   // Cursos y asignaturas asignadas a un docente (CU42)
