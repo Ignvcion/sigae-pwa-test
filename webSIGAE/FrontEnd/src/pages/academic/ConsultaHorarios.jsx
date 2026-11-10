@@ -119,7 +119,7 @@ function ConsultaHorarios() {
     setMensajeFiltro("");
     try {
       const data = await filtrarHorarios(filtros);
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         setHorarios(data);
       } else {
         // Excepción 2: sin resultados coincidentes
@@ -196,6 +196,19 @@ function ConsultaHorarios() {
     </div>
   );
 
+  // Asegurar catálogo único y ordenado de asignaturas (evita duplicados en selector)
+  const asignaturasUnicas = useMemo(() => {
+    const map = new Map();
+    (opciones.asignaturas || []).forEach((a) => {
+      const id = a.Asignatura_Id || a.id || a.asignatura_id;
+      const nombre = a.Asignatura_Nombre || a.nombre || a.asignatura;
+      if (id && nombre && !map.has(Number(id))) {
+        map.set(Number(id), { id: Number(id), nombre });
+      }
+    });
+    return Array.from(map.values()).sort((x, y) => x.nombre.localeCompare(y.nombre, "es"));
+  }, [opciones.asignaturas]);
+
   const opcionesDocentes = opciones.docentes.map((d) => (
     <option key={d.Usuario_Id} value={d.Usuario_Id}>{d.Usuario_Nombre_Completo}</option>
   ));
@@ -249,8 +262,8 @@ function ConsultaHorarios() {
                 "Asignatura",
                 filtros.asignatura_id,
                 cambiarFiltro("asignatura_id"),
-                opciones.asignaturas.map((a) => (
-                  <option key={a.Asignatura_Id} value={a.Asignatura_Id}>{a.Asignatura_Nombre}</option>
+                asignaturasUnicas.map((a) => (
+                  <option key={a.id} value={a.id}>{a.nombre}</option>
                 )),
                 "Todas las asignaturas"
               )}
@@ -296,15 +309,15 @@ function ConsultaHorarios() {
                       <th>Asignatura</th>
                       <th>Docente</th>
                       <th>Estado</th>
-                      <th></th>
+                      <th>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {horarios.map((h) => (
                       <tr key={h.Horario_Asignatura_Id}>
-                        <td>{h.dia}</td>
-                        <td>{hhmm(h.horaInicio)} - {hhmm(h.horaFin)}</td>
-                        <td>{h.jornada}</td>
+                        <td style={{ fontWeight: 600 }}>{h.dia}</td>
+                        <td style={{ whiteSpace: "nowrap" }}>{hhmm(h.horaInicio || h.hora_inicio)} - {hhmm(h.horaFin || h.hora_fin)}</td>
+                        <td>{h.jornada || "Mañana"}</td>
                         <td>{h.curso}</td>
                         <td>{h.asignatura}</td>
                         <td>{h.docente}</td>

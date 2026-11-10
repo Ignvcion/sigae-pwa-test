@@ -829,15 +829,154 @@ const SEED_HORARIOS = [
     hora_inicio: "08:00:00",
     hora_fin: "08:45:00",
     dia: "Viernes",
+    jornada: "Mañana",
     estado: "Activo",
     Horario_Estado: "Activo",
     eliminado: 0,
     observaciones: ["Clase regular de Lenguaje y Comunicación."]
   },
+  {
+    Horario_Asignatura_Id: 14,
+    Curso_Id: 6,
+    curso: "6° Básico A",
+    Curso_Nombre: "6° Básico A",
+    Asignatura_Id: 4,
+    asignatura: "Historia y Geografía",
+    Asignatura_Nombre: "Historia y Geografía",
+    Usuario_Id: 8,
+    docente: "Gonzalo Andres Ramos Herrera",
+    Docente_Nombre: "Gonzalo Andres Ramos Herrera",
+    Bloque_Horario_Id: 1,
+    horaInicio: "08:00:00",
+    horaFin: "08:45:00",
+    hora_inicio: "08:00:00",
+    hora_fin: "08:45:00",
+    dia: "Lunes",
+    jornada: "Mañana",
+    estado: "Activo",
+    Horario_Estado: "Activo",
+    eliminado: 0,
+    observaciones: ["Clase regular de Historia y Geografía."]
+  },
+  {
+    Horario_Asignatura_Id: 15,
+    Curso_Id: 6,
+    curso: "6° Básico A",
+    Curso_Nombre: "6° Básico A",
+    Asignatura_Id: 4,
+    asignatura: "Historia y Geografía",
+    Asignatura_Nombre: "Historia y Geografía",
+    Usuario_Id: 8,
+    docente: "Gonzalo Andres Ramos Herrera",
+    Docente_Nombre: "Gonzalo Andres Ramos Herrera",
+    Bloque_Horario_Id: 2,
+    horaInicio: "08:45:00",
+    horaFin: "09:30:00",
+    hora_inicio: "08:45:00",
+    hora_fin: "09:30:00",
+    dia: "Lunes",
+    jornada: "Mañana",
+    estado: "Activo",
+    Horario_Estado: "Activo",
+    eliminado: 0,
+    observaciones: ["Clase regular de Historia y Geografía."]
+  },
+  {
+    Horario_Asignatura_Id: 16,
+    Curso_Id: 6,
+    curso: "6° Básico A",
+    Curso_Nombre: "6° Básico A",
+    Asignatura_Id: 1,
+    asignatura: "Lenguaje y Comunicación",
+    Asignatura_Nombre: "Lenguaje y Comunicación",
+    Usuario_Id: 5,
+    docente: "Ana Torres",
+    Docente_Nombre: "Ana Torres",
+    Bloque_Horario_Id: 4,
+    horaInicio: "09:45:00",
+    horaFin: "10:30:00",
+    hora_inicio: "09:45:00",
+    hora_fin: "10:30:00",
+    dia: "Martes",
+    jornada: "Mañana",
+    estado: "Activo",
+    Horario_Estado: "Activo",
+    eliminado: 0,
+    observaciones: ["Clase regular de Lenguaje y Comunicación."]
+  },
+  {
+    Horario_Asignatura_Id: 17,
+    Curso_Id: 6,
+    curso: "6° Básico A",
+    Curso_Nombre: "6° Básico A",
+    Asignatura_Id: 2,
+    asignatura: "Matemáticas",
+    Asignatura_Nombre: "Matemáticas",
+    Usuario_Id: 3,
+    docente: "María Morales",
+    Docente_Nombre: "María Morales",
+    Bloque_Horario_Id: 1,
+    horaInicio: "08:00:00",
+    horaFin: "08:45:00",
+    hora_inicio: "08:00:00",
+    hora_fin: "08:45:00",
+    dia: "Miércoles",
+    jornada: "Mañana",
+    estado: "Activo",
+    Horario_Estado: "Activo",
+    eliminado: 0,
+    observaciones: ["Clase regular de Matemáticas."]
+  },
+  {
+    Horario_Asignatura_Id: 18,
+    Curso_Id: 6,
+    curso: "6° Básico A",
+    Curso_Nombre: "6° Básico A",
+    Asignatura_Id: 4,
+    asignatura: "Historia y Geografía",
+    Asignatura_Nombre: "Historia y Geografía",
+    Usuario_Id: 8,
+    docente: "Gonzalo Andres Ramos Herrera",
+    Docente_Nombre: "Gonzalo Andres Ramos Herrera",
+    Bloque_Horario_Id: 5,
+    horaInicio: "10:30:00",
+    horaFin: "11:15:00",
+    hora_inicio: "10:30:00",
+    hora_fin: "11:15:00",
+    dia: "Jueves",
+    jornada: "Mañana",
+    estado: "Activo",
+    Horario_Estado: "Activo",
+    eliminado: 0,
+    observaciones: ["Clase regular de Historia y Geografía."]
+  },
+  {
+    Horario_Asignatura_Id: 19,
+    Curso_Id: 6,
+    curso: "6° Básico A",
+    Curso_Nombre: "6° Básico A",
+    Asignatura_Id: 3,
+    asignatura: "Ciencias Naturales",
+    Asignatura_Nombre: "Ciencias Naturales",
+    Usuario_Id: 6,
+    docente: "Roberto Silva",
+    Docente_Nombre: "Roberto Silva",
+    Bloque_Horario_Id: 4,
+    horaInicio: "09:45:00",
+    horaFin: "10:30:00",
+    hora_inicio: "09:45:00",
+    hora_fin: "10:30:00",
+    dia: "Viernes",
+    jornada: "Mañana",
+    estado: "Activo",
+    Horario_Estado: "Activo",
+    eliminado: 0,
+    observaciones: ["Clase regular de Ciencias Naturales."]
+  },
 ];
 
 let STORE_HORARIOS = loadStore("SIGAE_HORARIOS", SEED_HORARIOS);
-if (!Array.isArray(STORE_HORARIOS) || STORE_HORARIOS.length < SEED_HORARIOS.length || !STORE_HORARIOS[0]?.horaInicio) {
+if (!Array.isArray(STORE_HORARIOS) || STORE_HORARIOS.length < SEED_HORARIOS.length || !STORE_HORARIOS[0]?.horaInicio || !STORE_HORARIOS.some(h => Number(h.Curso_Id) === 6)) {
   STORE_HORARIOS = SEED_HORARIOS;
   saveStore("SIGAE_HORARIOS", STORE_HORARIOS);
 }
@@ -2647,8 +2786,134 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     });
   }
 
+  // Catálogo de asignaturas institucional para filtros de horarios (/api/horarios/asignaturas)
+  if (p.includes("/horarios/asignaturas") && !p.includes("/asignaturas-curso")) {
+    return STORE_ASIGNATURAS.map(a => ({
+      Asignatura_Id: a.Asignatura_Id,
+      Asignatura_Nombre: a.Asignatura_Nombre,
+      Asignatura_Prioridad_Academica: a.Asignatura_Prioridad_Academica || "Media"
+    }));
+  }
+
+  // CU68: Filtrar horarios reactivamente (/api/horarios/filtrar)
+  if (p.includes("/horarios/filtrar")) {
+    try {
+      const u = new URL(urlStr, "http://localhost");
+      const docenteId = u.searchParams.get("docente_id");
+      const cursoId = u.searchParams.get("curso_id");
+      const nivelId = u.searchParams.get("nivel_educativo_id");
+      const asigId = u.searchParams.get("asignatura_id");
+      const jornada = u.searchParams.get("jornada");
+      const diaSemana = u.searchParams.get("dia_semana");
+      const estado = u.searchParams.get("estado") || "Activo";
+
+      const matching = STORE_HORARIOS.filter(h => {
+        if (h.estado === "Eliminado" || h.eliminado === 1) return false;
+        if (estado && estado !== "Todos" && h.estado !== estado && h.Horario_Estado !== estado) return false;
+        if (docenteId && Number(h.Usuario_Id) !== Number(docenteId) && Number(h.docente_id) !== Number(docenteId)) return false;
+        if (cursoId && Number(h.Curso_Id) !== Number(cursoId)) return false;
+        if (nivelId) {
+          const cursoObj = STORE_CURSOS.find(c => Number(c.Curso_Id) === Number(h.Curso_Id));
+          const nivelActual = cursoObj?.Nivel_Educativo_Id || cursoObj?.Nivel_Id || h.Nivel_Educativo_Id || h.Curso_Id;
+          if (Number(nivelActual) !== Number(nivelId)) return false;
+        }
+        if (asigId && Number(h.Asignatura_Id) !== Number(asigId)) return false;
+        if (jornada) {
+          const jH = h.jornada || (Number(h.Bloque_Horario_Id) > 6 ? "Tarde" : "Mañana");
+          if (jH.toLowerCase() !== jornada.toLowerCase()) return false;
+        }
+        if (diaSemana && (h.dia || h.Horario_Asignatura_Dia_Semana) !== diaSemana) return false;
+        return true;
+      });
+
+      if (matching.length === 0) {
+        return {
+          mensaje: "No se encontraron horarios coincidentes con los filtros seleccionados",
+          horarios: []
+        };
+      }
+
+      return matching.map(h => {
+        const c = STORE_CURSOS.find(x => Number(x.Curso_Id) === Number(h.Curso_Id));
+        const blk = STORE_BLOQUES.find(b => Number(b.Bloque_Horario_Id) === Number(h.Bloque_Horario_Id));
+        return {
+          Horario_Asignatura_Id: h.Horario_Asignatura_Id,
+          dia: h.dia || h.Horario_Asignatura_Dia_Semana,
+          estado: h.estado || h.Horario_Estado || "Activo",
+          cursoId: h.Curso_Id,
+          curso: h.curso || c?.Curso_Nombre || "1° Básico A",
+          seccion: c?.Curso_Seccion || "A",
+          nivelEducativoId: c?.Nivel_Educativo_Id || h.Nivel_Educativo_Id || 1,
+          nivelEducativo: c?.Nivel_Educativo_Nombre || (h.Curso_Id + "° Básico"),
+          bloqueId: h.Bloque_Horario_Id,
+          horaInicio: h.horaInicio || blk?.Bloque_Horario_Hora_Inicio || "08:00:00",
+          horaFin: h.horaFin || blk?.Bloque_Horario_Hora_Fin || "08:45:00",
+          hora_inicio: h.horaInicio || blk?.Bloque_Horario_Hora_Inicio || "08:00:00",
+          hora_fin: h.horaFin || blk?.Bloque_Horario_Hora_Fin || "08:45:00",
+          jornada: h.jornada || blk?.Bloque_Horario_Jornada || "Mañana",
+          tipoBloque: blk?.Bloque_Horario_Tipo || "Clase",
+          asignaturaId: h.Asignatura_Id,
+          asignatura: h.asignatura || h.Asignatura_Nombre,
+          docenteId: h.Usuario_Id,
+          docente: h.docente || h.Docente_Nombre || "Docente",
+        };
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  // CU67: Disponibilidad de bloques libres (/api/horarios/bloques-libres)
+  if (p.includes("/horarios/bloques-libres")) {
+    try {
+      const u = new URL(urlStr, "http://localhost");
+      const cursoId = u.searchParams.get("curso_id");
+      const docenteId = u.searchParams.get("docente_id");
+      const diaSemana = u.searchParams.get("dia_semana");
+      const jornada = u.searchParams.get("jornada");
+
+      const diasAEvaluar = diaSemana ? [diaSemana] : ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+      const bloquesClase = STORE_BLOQUES.filter(b => b.Bloque_Horario_Tipo !== "Recreo" && (!jornada || b.Bloque_Horario_Jornada === jornada));
+
+      const libres = [];
+      for (const d of diasAEvaluar) {
+        for (const b of bloquesClase) {
+          const bId = Number(b.Bloque_Horario_Id);
+          const ocupado = STORE_HORARIOS.some(h => {
+            if (h.estado === "Eliminado" || h.eliminado === 1) return false;
+            if (h.dia !== d && h.Horario_Asignatura_Dia_Semana !== d) return false;
+            if (Number(h.Bloque_Horario_Id) !== bId) return false;
+            if (cursoId && Number(h.Curso_Id) === Number(cursoId)) return true;
+            if (docenteId && (Number(h.Usuario_Id) === Number(docenteId) || Number(h.docente_id) === Number(docenteId))) return true;
+            if (!cursoId && !docenteId) return true;
+            return false;
+          });
+          if (!ocupado) {
+            libres.push({
+              bloqueId: bId,
+              dia: d,
+              horaInicio: b.Bloque_Horario_Hora_Inicio,
+              horaFin: b.Bloque_Horario_Hora_Fin,
+              jornada: b.Bloque_Horario_Jornada,
+              tipo: b.Bloque_Horario_Tipo,
+            });
+          }
+        }
+      }
+      if (libres.length === 0) {
+        return {
+          mensaje: "No existen bloques libres disponibles para los criterios indicados",
+          bloques: []
+        };
+      }
+      return libres;
+    } catch {
+      return [];
+    }
+  }
+
   // Horarios de curso (/api/horarios?curso_id=X&incluir_eliminadas=1)
-  if (p.includes("/horarios") && !p.includes("/exportar") && !p.includes("/resumen-cursos") && !p.includes("/asignaturas-curso")) {
+  if (p.includes("/horarios") && !p.includes("/exportar") && !p.includes("/resumen-cursos") && !p.includes("/asignaturas-curso") && !p.includes("/asignaturas") && !p.includes("/filtrar") && !p.includes("/bloques-libres")) {
     let filtered = [...STORE_HORARIOS];
     try {
       const u = new URL(urlStr, "http://localhost");
