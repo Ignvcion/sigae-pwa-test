@@ -1169,6 +1169,24 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   // 1. MUTACIONES (POST, PUT, PATCH, DELETE) CON PERSISTENCIA LOCAL
   // ═════════════════════════════════════════════════════════════════════════
   if (m === "POST") {
+    // Autenticación / Login (/api/auth/login)
+    if (p.includes("/auth/login") || p.includes("/login")) {
+      const qRut = (b?.rut || "").trim().toLowerCase();
+      const matchU = STORE_USUARIOS.find(u => (u.Usuario_RUT || "").toLowerCase() === qRut) || STORE_USUARIOS[0];
+      const rol = matchU.Es_Administrador ? "Administrador" : matchU.Es_Docente ? "Docente" : "Apoderado";
+      return {
+        ok: true,
+        user: {
+          id: matchU.Usuario_Id,
+          nombre: matchU.Usuario_Nombre_Completo,
+          rut: matchU.Usuario_RUT,
+          correo: matchU.Usuario_Correo || matchU.Administrador_Correo_Institucional || matchU.Docente_Correo_Institucional,
+          roles: [rol],
+          administradorTipo: matchU.Administrador_Tipo || (matchU.Es_Administrador ? "Regular" : null),
+        },
+        token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZXhwIjoxOTI0OTA1NjAwfQ.mock"
+      };
+    }
     // Búsqueda de usuarios (acepta POST /api/usuarios/buscar)
     if (p.includes("/usuarios/buscar")) {
       const qRut = (b?.rut || "").trim().toLowerCase();
