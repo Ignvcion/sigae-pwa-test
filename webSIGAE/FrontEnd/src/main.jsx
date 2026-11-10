@@ -404,6 +404,85 @@ const SEED_ASIGNATURAS = [
 
 let STORE_ASIGNATURAS = loadStore("SIGAE_ASIGNATURAS", SEED_ASIGNATURAS);
 
+// 4.1 Catálogo de Niveles y Planes Educativos
+const NIVELES_EDUCATIVOS = [
+  { Nivel_Educativo_Id: 1, Nivel_Educativo_Nombre: "1° Básico" },
+  { Nivel_Educativo_Id: 2, Nivel_Educativo_Nombre: "2° Básico" },
+  { Nivel_Educativo_Id: 3, Nivel_Educativo_Nombre: "3° Básico" },
+  { Nivel_Educativo_Id: 4, Nivel_Educativo_Nombre: "4° Básico" },
+  { Nivel_Educativo_Id: 5, Nivel_Educativo_Nombre: "5° Básico" },
+  { Nivel_Educativo_Id: 6, Nivel_Educativo_Nombre: "6° Básico" },
+];
+
+function normalizarPlan(plan) {
+  const asigs = Array.isArray(plan.asignaturas) ? plan.asignaturas : [];
+  let totalOblig = 0;
+  let totalCompl = 0;
+  let totalHoras = 0;
+
+  const asigsNormalizadas = asigs.map((a, idx) => {
+    const asigInfo = STORE_ASIGNATURAS.find(as => as.Asignatura_Id === (a.Asignatura_Id || a.asignatura_id)) || {};
+    const nombre = a.Asignatura_Nombre || asigInfo.Asignatura_Nombre || "Asignatura";
+    const prioridad = a.Asignatura_Prioridad_Academica || asigInfo.Asignatura_Prioridad_Academica || "Media";
+    const tipo = a.Tipo || a.tipo || a.Plan_Asignatura_Tipo || "Obligatorio";
+    const horas = Number(a.Horas_Semanales_Requeridas ?? a.horas_semanales ?? a.Plan_Asignatura_Horas_Semanales ?? a.horas ?? 2);
+
+    if (tipo === "Obligatorio" || tipo === "Obligatoria") totalOblig++;
+    else totalCompl++;
+    totalHoras += horas;
+
+    return {
+      IncluyeAsig_Id: a.IncluyeAsig_Id || idx + 1,
+      Asignatura_Id: a.Asignatura_Id || a.asignatura_id || idx + 1,
+      Asignatura_Nombre: nombre,
+      Asignatura_Prioridad_Academica: prioridad,
+      Tipo: tipo,
+      tipo: tipo,
+      Plan_Asignatura_Tipo: tipo,
+      Horas_Semanales_Requeridas: horas,
+      horas_semanales: horas,
+      Plan_Asignatura_Horas_Semanales: horas,
+      horas: horas,
+    };
+  });
+
+  const nivelInfo = NIVELES_EDUCATIVOS.find(n => n.Nivel_Educativo_Id === Number(plan.Nivel_Educativo_Id || plan.nivel_educativo_id)) || {};
+  const periodo = String(plan.Plan_Educativo_Periodo_Lectivo || plan.periodo_lectivo || plan.nuevo_periodo_lectivo || "2026");
+
+  return {
+    Plan_Educativo_Id: Number(plan.Plan_Educativo_Id || plan.id || nextId()),
+    Plan_Educativo_Nombre: plan.Plan_Educativo_Nombre || `Plan ${nivelInfo.Nivel_Educativo_Nombre || "Nivel"} ${periodo}`,
+    Nivel_Educativo_Id: Number(plan.Nivel_Educativo_Id || plan.nivel_educativo_id || 1),
+    Nivel_Educativo_Nombre: plan.Nivel_Educativo_Nombre || nivelInfo.Nivel_Educativo_Nombre || "1° Básico",
+    Plan_Educativo_Periodo_Lectivo: periodo,
+    periodo_lectivo: periodo,
+    total_obligatorias: totalOblig,
+    total_complementarias: totalCompl,
+    total_horas_semanales: totalHoras,
+    total_asignaturas: asigsNormalizadas.length,
+    asignaturas: asigsNormalizadas,
+  };
+}
+
+const SEED_PLANES = [
+  normalizarPlan({
+    Plan_Educativo_Id: 1,
+    Plan_Educativo_Nombre: "Plan 1° Básico 2026",
+    Nivel_Educativo_Id: 1,
+    Nivel_Educativo_Nombre: "1° Básico",
+    Plan_Educativo_Periodo_Lectivo: "2026",
+    asignaturas: [
+      { Asignatura_Id: 1, Asignatura_Nombre: "Lenguaje y Comunicación", Horas_Semanales_Requeridas: 8, Asignatura_Prioridad_Academica: "Alta", Tipo: "Obligatorio" },
+      { Asignatura_Id: 2, Asignatura_Nombre: "Matemáticas", Horas_Semanales_Requeridas: 8, Asignatura_Prioridad_Academica: "Alta", Tipo: "Obligatorio" },
+      { Asignatura_Id: 3, Asignatura_Nombre: "Ciencias Naturales", Horas_Semanales_Requeridas: 4, Asignatura_Prioridad_Academica: "Media", Tipo: "Obligatorio" },
+      { Asignatura_Id: 4, Asignatura_Nombre: "Historia y Geografía", Horas_Semanales_Requeridas: 4, Asignatura_Prioridad_Academica: "Media", Tipo: "Obligatorio" },
+    ]
+  })
+];
+
+let STORE_PLANES = loadStore("SIGAE_PLANES", SEED_PLANES).map(normalizarPlan);
+saveStore("SIGAE_PLANES", STORE_PLANES);
+
 // 5. Citaciones
 const SEED_CITACIONES = [
   {
@@ -1414,6 +1493,33 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
       return { ok: true, status: 200, id: nueva.Asignatura_Id, mensaje: "Asignatura registrada correctamente" };
     }
 
+    // Clonar Plan Educativo
+    if (p.includes("/planes/clonar")) {
+      const nuevoPlan = normalizarPlan({
+        Plan_Educativo_Id: nextId(),
+        plan_origen_id: b?.plan_origen_id,
+        nuevo_periodo_lectivo: b?.nuevo_periodo_lectivo || "2027",
+        nivel_educativo_id: b?.nivel_educativo_id,
+        asignaturas: b?.asignaturas || [],
+      });
+      STORE_PLANES.unshift(nuevoPlan);
+      saveStore("SIGAE_PLANES", STORE_PLANES);
+      return { ok: true, status: 201, id: nuevoPlan.Plan_Educativo_Id, mensaje: "Plan educativo clonado correctamente" };
+    }
+
+    // Crear Plan Educativo
+    if (p.includes("/planes") && !p.includes("/asignaturas") && !p.includes("/clonar")) {
+      const nuevoPlan = normalizarPlan({
+        Plan_Educativo_Id: nextId(),
+        nivel_educativo_id: b?.nivel_educativo_id,
+        periodo_lectivo: b?.periodo_lectivo || "2026",
+        asignaturas: b?.asignaturas || [],
+      });
+      STORE_PLANES.unshift(nuevoPlan);
+      saveStore("SIGAE_PLANES", STORE_PLANES);
+      return { ok: true, status: 201, id: nuevoPlan.Plan_Educativo_Id, mensaje: "Plan educativo creado correctamente" };
+    }
+
     // Crear Clase en Horario
     if (p.includes("/horarios")) {
       const nuevaClase = {
@@ -1692,6 +1798,11 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
       }
       return { ok: true, status: 200, mensaje: "Clase eliminada" };
     }
+    if (p.includes("/planes") && reqId) {
+      STORE_PLANES = STORE_PLANES.filter(pl => Number(pl.Plan_Educativo_Id) !== Number(reqId));
+      saveStore("SIGAE_PLANES", STORE_PLANES);
+      return { ok: true, status: 200, mensaje: "Plan educativo eliminado correctamente" };
+    }
     return { ok: true, status: 200, mensaje: "Eliminado con éxito" };
   }
 
@@ -1863,6 +1974,24 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
       saveStore("SIGAE_HORARIOS", STORE_HORARIOS);
       return { ok: true, status: 200, mensaje: "Clase restaurada exitosamente" };
     }
+
+    // Editar Plan Educativo (/api/planes/:id)
+    if (p.includes("/planes") && !p.includes("/asignaturas") && reqId) {
+      const targetId = Number(reqId);
+      STORE_PLANES = STORE_PLANES.map(pl => {
+        if (Number(pl.Plan_Educativo_Id) === targetId) {
+          return normalizarPlan({
+            ...pl,
+            nivel_educativo_id: b?.nivel_educativo_id !== undefined ? b.nivel_educativo_id : pl.Nivel_Educativo_Id,
+            periodo_lectivo: b?.periodo_lectivo || pl.Plan_Educativo_Periodo_Lectivo,
+            asignaturas: b?.asignaturas || pl.asignaturas,
+          });
+        }
+        return pl;
+      });
+      saveStore("SIGAE_PLANES", STORE_PLANES);
+      return { ok: true, status: 200, mensaje: "Plan educativo actualizado exitosamente", advertencias: [] };
+    }
   }
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -1955,28 +2084,34 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     return STORE_BLOQUES;
   }
 
-  // Asignaturas de planes educativos
+  // Asignaturas de planes educativos (/api/planes/asignaturas)
   if (p.includes("/planes/asignaturas")) {
     return STORE_ASIGNATURAS;
   }
 
-  // Planes educativos
-  if (p.includes("/planes")) {
-    return [
-      {
-        Plan_Educativo_Id: 1,
-        Plan_Educativo_Nombre: "Plan General Básica 2026",
-        Nivel_Educativo_Id: 1,
-        Nivel_Educativo_Nombre: "1° Básico",
-        horas_semanales_requeridas: 38,
-        asignaturas: [
-          { Asignatura_Id: 1, Asignatura_Nombre: "Lenguaje y Comunicación", Horas_Semanales: 8, Prioridad_Academica: "Alta", Asignatura_Tipo: "Obligatoria" },
-          { Asignatura_Id: 2, Asignatura_Nombre: "Matemáticas", Horas_Semanales: 8, Prioridad_Academica: "Alta", Asignatura_Tipo: "Obligatoria" },
-          { Asignatura_Id: 3, Asignatura_Nombre: "Ciencias Naturales", Horas_Semanales: 4, Prioridad_Academica: "Media", Asignatura_Tipo: "Obligatoria" },
-          { Asignatura_Id: 4, Asignatura_Nombre: "Historia y Geografía", Horas_Semanales: 4, Prioridad_Academica: "Media", Asignatura_Tipo: "Obligatoria" },
-        ]
-      }
-    ];
+  // Niveles sin plan para un periodo específico (/api/planes/niveles-sin-plan?periodo=...)
+  if (p.includes("/planes/niveles-sin-plan")) {
+    try {
+      const urlObj = new URL(urlStr, "http://localhost");
+      const periodoQ = (urlObj.searchParams.get("periodo") || "2026").trim();
+      const nivelesConPlan = STORE_PLANES
+        .filter(pl => String(pl.Plan_Educativo_Periodo_Lectivo) === periodoQ)
+        .map(pl => Number(pl.Nivel_Educativo_Id));
+      return NIVELES_EDUCATIVOS.filter(n => !nivelesConPlan.includes(n.Nivel_Educativo_Id));
+    } catch {
+      return NIVELES_EDUCATIVOS;
+    }
+  }
+
+  // Detalle de Plan individual por ID (/api/planes/:id)
+  if (p.includes("/planes/") && reqId && !p.includes("/asignaturas") && !p.includes("/niveles")) {
+    const plan = STORE_PLANES.find(pl => Number(pl.Plan_Educativo_Id) === Number(reqId));
+    return plan || STORE_PLANES[0] || null;
+  }
+
+  // Listado general de Planes educativos (/api/planes)
+  if (p.includes("/planes") && !p.includes("/asignaturas") && !p.includes("/niveles")) {
+    return STORE_PLANES;
   }
 
   // Verificar si RUT de estudiante ya existe (/api/estudiantes/verificar-rut?rut=...)

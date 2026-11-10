@@ -683,11 +683,19 @@ function PlanEducativo() {
   };
 
   const planesAgrupados = planes.reduce((acc, plan) => {
-    const p = plan.Plan_Educativo_Periodo_Lectivo;
+    const p = plan.Plan_Educativo_Periodo_Lectivo || plan.periodo_lectivo || "2026";
     if (!acc[p]) acc[p] = [];
     acc[p].push(plan);
     return acc;
   }, {});
+
+  const calcularStats = (plan) => {
+    const asigs = Array.isArray(plan.asignaturas) ? plan.asignaturas : [];
+    const totalOblig = plan.total_obligatorias !== undefined && plan.total_obligatorias !== null ? plan.total_obligatorias : asigs.filter(a => (a.Tipo || a.tipo || a.Plan_Asignatura_Tipo) === "Obligatorio" || (a.Tipo || a.tipo || a.Plan_Asignatura_Tipo) === "Obligatoria").length;
+    const totalCompl = plan.total_complementarias !== undefined && plan.total_complementarias !== null ? plan.total_complementarias : asigs.filter(a => (a.Tipo || a.tipo || a.Plan_Asignatura_Tipo) !== "Obligatorio" && (a.Tipo || a.tipo || a.Plan_Asignatura_Tipo) !== "Obligatoria").length;
+    const totalHoras = plan.total_horas_semanales !== undefined && plan.total_horas_semanales !== null ? plan.total_horas_semanales : asigs.reduce((acc, a) => acc + (Number(a.Horas_Semanales_Requeridas ?? a.horas_semanales ?? a.Horas_Semanales ?? a.horas ?? 0)), 0);
+    return { totalOblig, totalCompl, totalHoras };
+  };
 
   const periodosOrdenados = Object.keys(planesAgrupados).sort((a, b) => b.localeCompare(a));
 
@@ -772,20 +780,25 @@ function PlanEducativo() {
                       <span className="curso-nombre">{plan.Nivel_Educativo_Nombre}</span>
                     </div>
                     <div className="curso-card-body">
-                      <div className="plan-stats">
-                        <div className="plan-stat">
-                          <span className="plan-stat-valor">{plan.total_obligatorias ?? 0}</span>
-                          <span className="plan-stat-label">Obligatorias</span>
-                        </div>
-                        <div className="plan-stat plan-stat-sep">
-                          <span className="plan-stat-valor">{plan.total_complementarias ?? 0}</span>
-                          <span className="plan-stat-label">Complementarias</span>
-                        </div>
-                        <div className="plan-stat">
-                          <span className="plan-stat-valor">{plan.total_horas_semanales ?? 0}h</span>
-                          <span className="plan-stat-label">h/sem</span>
-                        </div>
-                      </div>
+                      {(() => {
+                        const stats = calcularStats(plan);
+                        return (
+                          <div className="plan-stats">
+                            <div className="plan-stat">
+                              <span className="plan-stat-valor">{stats.totalOblig}</span>
+                              <span className="plan-stat-label">Obligatorias</span>
+                            </div>
+                            <div className="plan-stat plan-stat-sep">
+                              <span className="plan-stat-valor">{stats.totalCompl}</span>
+                              <span className="plan-stat-label">Complementarias</span>
+                            </div>
+                            <div className="plan-stat">
+                              <span className="plan-stat-valor">{stats.totalHoras}h</span>
+                              <span className="plan-stat-label">h/sem</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div className="curso-card-footer" style={{ justifyContent: "space-between", alignItems: "center" }}>
                       <button
