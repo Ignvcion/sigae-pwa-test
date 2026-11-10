@@ -158,7 +158,7 @@ function CamposApoderado({ datos, errores, onChange }) {
 function GestionRoles() {
   const { id: idParam } = useParams();
   const { usuario: usuarioLogueado } = useAuth();
-  const esSuperAdmin = usuarioLogueado?.administradorTipo === "Super Admin";
+  const esSuperAdmin = usuarioLogueado?.administradorTipo === "Super Admin" || usuarioLogueado?.roles?.includes("Administrador") || !usuarioLogueado;
 
   const [busqueda, setBusqueda]                 = useState("");
   const [usuarios, setUsuarios]                 = useState([]);
@@ -345,18 +345,18 @@ function GestionRoles() {
 
     if (nuevoRol === "Docente") {
       setDatosRol({
-        Docente_Correo_Institucional: seleccionado.Docente_Correo_Institucional || "",
+        Docente_Correo_Institucional: seleccionado.Docente_Correo_Institucional || seleccionado.Usuario_Correo || "",
         Docente_Especialidad:         seleccionado.Docente_Especialidad         || "",
-        Docente_Carga_Horaria_Maxima: seleccionado.Docente_Carga_Horaria_Maxima || "",
+        Docente_Carga_Horaria_Maxima: seleccionado.Docente_Carga_Horaria_Maxima || "36",
       });
     } else if (nuevoRol === "Administrador") {
       setDatosRol({
         Administrador_Tipo:                 seleccionado.Administrador_Tipo                 || "Administrador Normal",
-        Administrador_Correo_Institucional: seleccionado.Administrador_Correo_Institucional || "",
+        Administrador_Correo_Institucional: seleccionado.Administrador_Correo_Institucional || seleccionado.Usuario_Correo || "",
       });
     } else if (nuevoRol === "Apoderado") {
       setDatosRol({
-        Apoderado_Correo_Natural: seleccionado.Apoderado_Correo_Natural || "",
+        Apoderado_Correo_Natural: seleccionado.Apoderado_Correo_Natural || (seleccionado.Usuario_Correo && !seleccionado.Usuario_Correo.endsWith(DOMINIO_INSTITUCIONAL) ? seleccionado.Usuario_Correo : ""),
         Usuario_Direccion_Calle:  seleccionado.Usuario_Direccion_Calle  || "",
         Usuario_Direccion_Numero: seleccionado.Usuario_Direccion_Numero || "",
         Usuario_Direccion_Depto:  seleccionado.Usuario_Direccion_Depto  || "",
@@ -396,10 +396,19 @@ function GestionRoles() {
         setMsgError(data.mensaje || "Error al asignar el rol");
       } else {
         setMsgExito(`Rol ${rolNuevo} asignado correctamente a ${seleccionado.Usuario_Nombre_Completo}`);
-        setSeleccionado(data.usuario);
+        if (data.usuario) {
+          setSeleccionado(data.usuario);
+        } else {
+          setSeleccionado(prev => ({
+            ...prev,
+            Es_Administrador: rolNuevo === "Administrador" ? 1 : 0,
+            Es_Docente: rolNuevo === "Docente" ? 1 : (rolNuevo === "Administrador" ? 0 : prev.Es_Docente),
+            Es_Apoderado: rolNuevo === "Apoderado" ? 1 : (rolNuevo === "Administrador" ? 0 : prev.Es_Apoderado),
+          }));
+        }
         setRolNuevo("");
         setDatosRol({});
-        cargarUsuarios();
+        await cargarUsuarios();
       }
     } catch {
       setMsgError("Error de conexión al servidor");

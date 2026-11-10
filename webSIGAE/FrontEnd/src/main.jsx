@@ -185,93 +185,62 @@ let STORE_USUARIOS = loadStore("SIGAE_USUARIOS", SEED_USUARIOS).map(u => {
   };
 });
 
-// Reclasificación y saneamiento inteligente de cuentas creadas durante pruebas
+// Reclasificación, consolidación y saneamiento inteligente de cuentas
 let storeUsuariosModificado = false;
 
-// 1. Manejo específico para las cuentas de prueba de Ignacio mora
-// (Cuenta 1 = Administrador, Cuenta 2 = Apoderado, Cuenta 3 = Docente)
-const ignacioMatches = STORE_USUARIOS.filter(u =>
-  (u.Usuario_RUT && String(u.Usuario_RUT).replace(/[\.\-\s]/g, "") === "16730793") ||
-  (u.Usuario_Nombre_Completo && String(u.Usuario_Nombre_Completo).trim().toLowerCase().includes("ignacio mora"))
+// 1. Purga total de cuentas corruptas o temporales generadas por bugs previos
+const cantAntes = STORE_USUARIOS.length;
+STORE_USUARIOS = STORE_USUARIOS.filter(u =>
+  u.Usuario_Nombre_Completo !== "Administrador Nuevo" &&
+  u.Usuario_RUT !== "12345678-5" &&
+  u.Usuario_Correo !== "admin.nuevo@jacquescousteau.edu" &&
+  u.Administrador_Correo_Institucional !== "admin.nuevo@jacquescousteau.edu"
 );
-
-if (ignacioMatches.length >= 2) {
+if (STORE_USUARIOS.length !== cantAntes) {
   storeUsuariosModificado = true;
-  // Cuenta 1: Administrador
-  const adminAcc = ignacioMatches[0];
-  adminAcc.Es_Administrador = 1;
-  adminAcc.Es_Docente = 0;
-  adminAcc.Es_Apoderado = 0;
-  adminAcc.Administrador_Tipo = adminAcc.Administrador_Tipo || "Administrador Normal";
-  adminAcc.Administrador_Correo_Institucional = adminAcc.Administrador_Correo_Institucional || adminAcc.Usuario_Correo || "ignacioelpro@jacquescousteau.edu";
-  adminAcc.Usuario_Correo = adminAcc.Administrador_Correo_Institucional;
-
-  // Cuenta 2: Apoderado
-  const apoAcc = ignacioMatches[1];
-  apoAcc.Es_Administrador = 0;
-  apoAcc.Es_Docente = 0;
-  apoAcc.Es_Apoderado = 1;
-  apoAcc.Administrador_Tipo = null;
-  apoAcc.Administrador_Correo_Institucional = null;
-  apoAcc.Docente_Correo_Institucional = null;
-  apoAcc.Apoderado_Correo_Natural = apoAcc.Apoderado_Correo_Natural || "ignacio.mora.apoderado@email.cl";
-  apoAcc.Usuario_Correo = apoAcc.Apoderado_Correo_Natural;
-
-  // Cuenta 3 (y subsiguientes): Docente
-  if (ignacioMatches.length >= 3) {
-    const docAcc = ignacioMatches[2];
-    docAcc.Es_Administrador = 0;
-    docAcc.Es_Docente = 1;
-    docAcc.Es_Apoderado = 0;
-    docAcc.Administrador_Tipo = null;
-    docAcc.Administrador_Correo_Institucional = null;
-    docAcc.Docente_Correo_Institucional = docAcc.Docente_Correo_Institucional || "i.mora@jacquescousteau.edu";
-    docAcc.Docente_Especialidad = docAcc.Docente_Especialidad || "Historia y Geografía";
-    docAcc.Docente_Carga_Horaria_Maxima = docAcc.Docente_Carga_Horaria_Maxima || 36;
-    docAcc.Usuario_Correo = docAcc.Docente_Correo_Institucional;
-  }
 }
 
-// 2. Corregir cualquier usuario que tenga campos o correos de docente/apoderado pero haya quedado como admin por el bug previo
-STORE_USUARIOS = STORE_USUARIOS.map(u => {
-  if (u.Administrador_Correo_Institucional === "admin.nuevo@jacquescousteau.edu" || u.Usuario_Correo === "admin.nuevo@jacquescousteau.edu") {
-    storeUsuariosModificado = true;
-    return {
-      ...u,
-      Es_Administrador: 0,
-      Es_Docente: 0,
-      Es_Apoderado: 1,
-      Administrador_Tipo: null,
-      Administrador_Correo_Institucional: null,
-      Apoderado_Correo_Natural: "ignacio.mora.apoderado@email.cl",
-      Usuario_Correo: "ignacio.mora.apoderado@email.cl",
-    };
+// 2. Consolidación inteligente de cuentas por RUT (un único usuario por RUT en el sistema)
+const usuariosPorRut = new Map();
+const usuariosUnicos = [];
+
+for (const u of STORE_USUARIOS) {
+  const normRut = (u.Usuario_RUT || "").replace(/[\.\-\s]/g, "").toUpperCase();
+  if (!normRut) {
+    usuariosUnicos.push(u);
+    continue;
   }
-  if (u.Docente_Especialidad && u.Es_Administrador && !u.Es_Docente) {
+  if (!usuariosPorRut.has(normRut)) {
+    const copia = { ...u };
+    usuariosPorRut.set(normRut, copia);
+    usuariosUnicos.push(copia);
+  } else {
+    // Si ya existía una cuenta previa con ese RUT, unificar datos y roles en la cuenta principal
+    const principal = usuariosPorRut.get(normRut);
     storeUsuariosModificado = true;
-    return {
-      ...u,
-      Es_Administrador: 0,
-      Es_Docente: 1,
-      Es_Apoderado: 0,
-      Administrador_Tipo: null,
-      Administrador_Correo_Institucional: null,
-      Docente_Correo_Institucional: u.Docente_Correo_Institucional || u.Usuario_Correo || "docente@jacquescousteau.edu",
-    };
+    if (u.Es_Administrador) {
+      principal.Es_Administrador = 1;
+      principal.Administrador_Tipo = principal.Administrador_Tipo || u.Administrador_Tipo || "Administrador Normal";
+      principal.Administrador_Correo_Institucional = principal.Administrador_Correo_Institucional || u.Administrador_Correo_Institucional;
+    }
+    if (u.Es_Docente) {
+      principal.Es_Docente = 1;
+      principal.Docente_Correo_Institucional = principal.Docente_Correo_Institucional || u.Docente_Correo_Institucional;
+      principal.Docente_Especialidad = principal.Docente_Especialidad || u.Docente_Especialidad;
+      principal.Docente_Carga_Horaria_Maxima = principal.Docente_Carga_Horaria_Maxima || u.Docente_Carga_Horaria_Maxima;
+    }
+    if (u.Es_Apoderado) {
+      principal.Es_Apoderado = 1;
+      principal.Apoderado_Correo_Natural = principal.Apoderado_Correo_Natural || u.Apoderado_Correo_Natural;
+    }
+    principal.Usuario_Direccion_Calle = principal.Usuario_Direccion_Calle || u.Usuario_Direccion_Calle;
+    principal.Usuario_Direccion_Numero = principal.Usuario_Direccion_Numero || u.Usuario_Direccion_Numero;
+    principal.Usuario_Direccion_Depto = principal.Usuario_Direccion_Depto || u.Usuario_Direccion_Depto;
+    principal.Usuario_Direccion_Comuna = principal.Usuario_Direccion_Comuna || u.Usuario_Direccion_Comuna;
+    principal.Usuario_Telefono = principal.Usuario_Telefono || u.Usuario_Telefono;
   }
-  if (u.Apoderado_Correo_Natural && u.Es_Administrador && !u.Es_Apoderado && !u.Docente_Especialidad) {
-    storeUsuariosModificado = true;
-    return {
-      ...u,
-      Es_Administrador: 0,
-      Es_Docente: 0,
-      Es_Apoderado: 1,
-      Administrador_Tipo: null,
-      Administrador_Correo_Institucional: null,
-    };
-  }
-  return u;
-});
+}
+STORE_USUARIOS = usuariosUnicos;
 
 if (storeUsuariosModificado) {
   saveStore("SIGAE_USUARIOS", STORE_USUARIOS);
@@ -1529,41 +1498,65 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     }
 
     // Asignar rol a usuario existente (/api/usuarios/:id/asignar-rol)
-    if (p.includes("/usuarios/") && p.includes("/asignar-rol") && reqId) {
+    if (p.includes("asignar-rol")) {
+      const mId = urlStr.match(/\/usuarios\/(\d+)\/asignar-rol/i);
+      const targetId = mId ? Number(mId[1]) : reqId;
       let usuarioActualizado = null;
-      STORE_USUARIOS = STORE_USUARIOS.map(u => {
-        if (Number(u.Usuario_Id) === Number(reqId)) {
-          const rol = b?.rol;
-          const isDoc = rol === "Docente";
-          const isApo = rol === "Apoderado";
-          const isAdm = rol === "Administrador";
+      if (targetId) {
+        STORE_USUARIOS = STORE_USUARIOS.map(u => {
+          if (Number(u.Usuario_Id) === Number(targetId)) {
+            const rol = b?.rol;
+            const isDoc = rol === "Docente";
+            const isApo = rol === "Apoderado";
+            const isAdm = rol === "Administrador";
 
-          usuarioActualizado = {
-            ...u,
-            Es_Docente: isDoc ? 1 : u.Es_Docente,
-            Es_Apoderado: isApo ? 1 : u.Es_Apoderado,
-            Es_Administrador: isAdm ? 1 : u.Es_Administrador,
-            Docente_Correo_Institucional: isDoc ? (b?.Docente_Correo_Institucional || u.Docente_Correo_Institucional || u.Usuario_Correo) : u.Docente_Correo_Institucional,
-            Docente_Especialidad: isDoc ? (b?.Docente_Especialidad || u.Docente_Especialidad || "General") : u.Docente_Especialidad,
-            Docente_Carga_Horaria_Maxima: isDoc ? (Number(b?.Docente_Carga_Horaria_Maxima) || u.Docente_Carga_Horaria_Maxima || 36) : u.Docente_Carga_Horaria_Maxima,
-            Apoderado_Correo_Natural: isApo ? (b?.Apoderado_Correo_Natural || u.Apoderado_Correo_Natural || u.Usuario_Correo) : u.Apoderado_Correo_Natural,
-            Administrador_Correo_Institucional: isAdm ? (b?.Administrador_Correo_Institucional || u.Administrador_Correo_Institucional || u.Usuario_Correo) : u.Administrador_Correo_Institucional,
-            Administrador_Tipo: isAdm ? (b?.Administrador_Tipo || u.Administrador_Tipo || "Administrador Normal") : u.Administrador_Tipo,
-            Usuario_Direccion_Calle: b?.Usuario_Direccion_Calle || u.Usuario_Direccion_Calle,
-            Usuario_Direccion_Numero: b?.Usuario_Direccion_Numero || u.Usuario_Direccion_Numero,
-            Usuario_Direccion_Depto: b?.Usuario_Direccion_Depto ?? u.Usuario_Direccion_Depto,
-            Usuario_Direccion_Comuna: b?.Usuario_Direccion_Comuna || u.Usuario_Direccion_Comuna,
-          };
-          return usuarioActualizado;
-        }
-        return u;
-      });
-      saveStore("SIGAE_USUARIOS", STORE_USUARIOS);
+            usuarioActualizado = {
+              ...u,
+              Es_Docente: isDoc ? 1 : (isAdm ? 0 : u.Es_Docente),
+              Es_Apoderado: isApo ? 1 : (isAdm ? 0 : u.Es_Apoderado),
+              Es_Administrador: isAdm ? 1 : ((isDoc || isApo) ? 0 : u.Es_Administrador),
+              Docente_Correo_Institucional: isDoc ? (b?.Docente_Correo_Institucional || u.Docente_Correo_Institucional || u.Usuario_Correo) : u.Docente_Correo_Institucional,
+              Docente_Especialidad: isDoc ? (b?.Docente_Especialidad || u.Docente_Especialidad || "General") : u.Docente_Especialidad,
+              Docente_Carga_Horaria_Maxima: isDoc ? (Number(b?.Docente_Carga_Horaria_Maxima) || u.Docente_Carga_Horaria_Maxima || 36) : u.Docente_Carga_Horaria_Maxima,
+              Apoderado_Correo_Natural: isApo ? (b?.Apoderado_Correo_Natural || u.Apoderado_Correo_Natural || u.Usuario_Correo) : u.Apoderado_Correo_Natural,
+              Administrador_Correo_Institucional: isAdm ? (b?.Administrador_Correo_Institucional || u.Administrador_Correo_Institucional || u.Usuario_Correo) : u.Administrador_Correo_Institucional,
+              Administrador_Tipo: isAdm ? (b?.Administrador_Tipo || u.Administrador_Tipo || "Administrador Normal") : (isDoc || isApo ? null : u.Administrador_Tipo),
+              Usuario_Correo: isAdm
+                ? (b?.Administrador_Correo_Institucional || u.Administrador_Correo_Institucional || u.Usuario_Correo)
+                : isDoc
+                ? (b?.Docente_Correo_Institucional || u.Docente_Correo_Institucional || u.Usuario_Correo)
+                : (b?.Apoderado_Correo_Natural || u.Apoderado_Correo_Natural || u.Usuario_Correo),
+              Usuario_Direccion_Calle: b?.Usuario_Direccion_Calle || u.Usuario_Direccion_Calle,
+              Usuario_Direccion_Numero: b?.Usuario_Direccion_Numero || u.Usuario_Direccion_Numero,
+              Usuario_Direccion_Depto: b?.Usuario_Direccion_Depto ?? u.Usuario_Direccion_Depto,
+              Usuario_Direccion_Comuna: b?.Usuario_Direccion_Comuna || u.Usuario_Direccion_Comuna,
+            };
+            return usuarioActualizado;
+          }
+          return u;
+        });
+        saveStore("SIGAE_USUARIOS", STORE_USUARIOS);
+      }
       return { ok: true, status: 200, mensaje: `Rol ${b?.rol} asignado exitosamente`, usuario: usuarioActualizado };
     }
 
     // Registrar Usuario (Administrador / Docente / Apoderado)
-    if ((p.includes("/usuarios/administradores") || p.includes("/usuarios/docentes") || p.includes("/usuarios/apoderados") || p.includes("/usuarios")) && !p.includes("/asignar-rol")) {
+    if ((p.includes("/usuarios/administradores") || p.includes("/usuarios/docentes") || p.includes("/usuarios/apoderados") || p.endsWith("/usuarios") || p.includes("/usuarios?")) && !p.includes("asignar-rol") && !p.includes("/buscar") && !p.includes("/roles") && !p.includes("/estado") && !reqId) {
+      const rawRut = (b?.Usuario_RUT || b?.rut || "").trim();
+      const normRut = rawRut.replace(/[\.\-\s]/g, "").toUpperCase();
+      if (normRut) {
+        const existing = STORE_USUARIOS.find(u => (u.Usuario_RUT || "").replace(/[\.\-\s]/g, "").toUpperCase() === normRut);
+        if (existing) {
+          return {
+            ok: false,
+            status: 409,
+            requiereAsignacionRol: true,
+            usuarioId: existing.Usuario_Id,
+            mensaje: `El usuario con RUT ${rawRut} ya está registrado en el sistema. Asigne el nuevo rol desde Gestión de Roles.`,
+          };
+        }
+      }
+
       let isAdm = false;
       let isDoc = false;
       let isApo = false;
@@ -1583,6 +1576,13 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
         isAdm = true;
       }
 
+      const nombre = (b?.Usuario_Nombre_Completo || b?.nombre || "").trim();
+      if (!nombre) {
+        return { ok: false, status: 400, mensaje: "El nombre completo es obligatorio." };
+      }
+
+      const rut = rawRut || "11111111-1";
+
       const correo = (
         (isApo && b?.Apoderado_Correo_Natural) ||
         (isDoc && b?.Docente_Correo_Institucional) ||
@@ -1592,11 +1592,9 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
         b?.Apoderado_Correo_Natural ||
         b?.Docente_Correo_Institucional ||
         b?.Administrador_Correo_Institucional ||
-        (isAdm ? "admin.nuevo@jacquescousteau.edu" : isDoc ? "docente.nuevo@jacquescousteau.edu" : "apoderado.nuevo@email.cl")
+        (isAdm ? "admin@jacquescousteau.edu" : isDoc ? "docente@jacquescousteau.edu" : "apoderado@email.cl")
       ).trim();
 
-      const nombre = b?.Usuario_Nombre_Completo || b?.nombre || (isAdm ? "Administrador Nuevo" : isDoc ? "Docente Nuevo" : "Apoderado Nuevo");
-      const rut = b?.Usuario_RUT || b?.rut || "12345678-5";
       const telefono = b?.Usuario_Telefono || b?.telefono || "+56 9 1122 3344";
       const calle = b?.Usuario_Direccion_Calle || b?.calle || "";
       const numero = b?.Usuario_Direccion_Numero || b?.numero || "";
@@ -1742,22 +1740,26 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     }
 
     // Actualizar / Desactivar roles de usuario existente (/api/usuarios/:id/roles)
-    if (p.includes("/usuarios/") && p.includes("/roles") && reqId) {
+    if (p.includes("/roles")) {
+      const mId = urlStr.match(/\/usuarios\/(\d+)\/roles/i);
+      const targetId = mId ? Number(mId[1]) : reqId;
       let usuarioActualizado = null;
-      STORE_USUARIOS = STORE_USUARIOS.map(u => {
-        if (Number(u.Usuario_Id) === Number(reqId)) {
-          usuarioActualizado = {
-            ...u,
-            Es_Administrador: b?.Es_Administrador !== undefined ? Number(b.Es_Administrador) : u.Es_Administrador,
-            Es_Docente: b?.Es_Docente !== undefined ? Number(b.Es_Docente) : u.Es_Docente,
-            Es_Apoderado: b?.Es_Apoderado !== undefined ? Number(b.Es_Apoderado) : u.Es_Apoderado,
-            Administrador_Tipo: b?.Administrador_Tipo !== undefined ? b.Administrador_Tipo : u.Administrador_Tipo,
-          };
-          return usuarioActualizado;
-        }
-        return u;
-      });
-      saveStore("SIGAE_USUARIOS", STORE_USUARIOS);
+      if (targetId) {
+        STORE_USUARIOS = STORE_USUARIOS.map(u => {
+          if (Number(u.Usuario_Id) === Number(targetId)) {
+            usuarioActualizado = {
+              ...u,
+              Es_Administrador: b?.Es_Administrador !== undefined ? Number(b.Es_Administrador) : u.Es_Administrador,
+              Es_Docente: b?.Es_Docente !== undefined ? Number(b.Es_Docente) : u.Es_Docente,
+              Es_Apoderado: b?.Es_Apoderado !== undefined ? Number(b.Es_Apoderado) : u.Es_Apoderado,
+              Administrador_Tipo: b?.Administrador_Tipo !== undefined ? b.Administrador_Tipo : u.Administrador_Tipo,
+            };
+            return usuarioActualizado;
+          }
+          return u;
+        });
+        saveStore("SIGAE_USUARIOS", STORE_USUARIOS);
+      }
       return { ok: true, status: 200, mensaje: "Roles actualizados exitosamente", usuario: usuarioActualizado };
     }
 
