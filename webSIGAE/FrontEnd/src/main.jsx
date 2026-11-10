@@ -2146,6 +2146,93 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   }
 
   if (m === "PUT" || m === "PATCH") {
+    // Cancelar citación (CU76)
+    if (p.includes("/citaciones") && p.includes("/cancelar") && reqId) {
+      const motivo = b?.Citacion_Motivo_Cancelacion || b?.motivo || "Cancelada por usuario";
+      let citacionModificada = null;
+      STORE_CITACIONES = STORE_CITACIONES.map(c => {
+        if (Number(c.Citacion_Id) === Number(reqId)) {
+          const hist = Array.isArray(c.historial) ? [...c.historial] : [];
+          hist.push({
+            Historial_Id: nextId(),
+            Historial_Fecha_Registro: new Date().toISOString().slice(0, 10),
+            Historial_Hora_Registro: new Date().toTimeString().slice(0, 8),
+            Accion: "Cancelación de citación",
+            Historial_Descripcion_Cambio: `Cancelación de citación. Motivo: ${motivo}`,
+          });
+          citacionModificada = {
+            ...c,
+            Citacion_Estado: "Cancelada",
+            Citacion_Motivo_Cancelacion: motivo,
+            historial: hist,
+          };
+          return citacionModificada;
+        }
+        return c;
+      });
+      saveStore("SIGAE_CITACIONES", STORE_CITACIONES);
+      return { ok: true, status: 200, mensaje: "Citación cancelada correctamente", citacion: citacionModificada };
+    }
+
+    // Confirmar citación (CU75)
+    if (p.includes("/citaciones") && p.includes("/confirmar") && reqId) {
+      let citacionConfirmada = null;
+      STORE_CITACIONES = STORE_CITACIONES.map(c => {
+        if (Number(c.Citacion_Id) === Number(reqId)) {
+          const hist = Array.isArray(c.historial) ? [...c.historial] : [];
+          hist.push({
+            Historial_Id: nextId(),
+            Historial_Fecha_Registro: new Date().toISOString().slice(0, 10),
+            Historial_Hora_Registro: new Date().toTimeString().slice(0, 8),
+            Accion: "Confirmación de citación",
+            Historial_Descripcion_Cambio: "Asistencia confirmada por la contraparte",
+          });
+          citacionConfirmada = {
+            ...c,
+            Citacion_Estado: "Confirmada",
+            Citacion_Fecha_Confirmacion: new Date().toISOString().slice(0, 10),
+            historial: hist,
+          };
+          return citacionConfirmada;
+        }
+        return c;
+      });
+      saveStore("SIGAE_CITACIONES", STORE_CITACIONES);
+      return { ok: true, status: 200, mensaje: "Citación confirmada correctamente. Se notificó el cambio de estado a la contraparte.", citacion: citacionConfirmada };
+    }
+
+    // Reprogramar citación (CU77)
+    if (p.includes("/citaciones") && p.includes("/reprogramar") && reqId) {
+      const nuevaFecha = b?.Citacion_Fecha || b?.fecha || "2026-11-20";
+      const nuevoTramo = b?.Citacion_Tramo_Horario || b?.tramo || "10:00 - 10:45";
+      const tramoParts = nuevoTramo.split(" - ");
+      let citacionReprog = null;
+      STORE_CITACIONES = STORE_CITACIONES.map(c => {
+        if (Number(c.Citacion_Id) === Number(reqId)) {
+          const hist = Array.isArray(c.historial) ? [...c.historial] : [];
+          hist.push({
+            Historial_Id: nextId(),
+            Historial_Fecha_Registro: new Date().toISOString().slice(0, 10),
+            Historial_Hora_Registro: new Date().toTimeString().slice(0, 8),
+            Accion: "Reprogramación de citación",
+            Historial_Descripcion_Cambio: `Nueva fecha: ${nuevaFecha}, tramo: ${nuevoTramo}`,
+          });
+          citacionReprog = {
+            ...c,
+            Citacion_Fecha: nuevaFecha,
+            Citacion_Tramo_Horario: nuevoTramo,
+            Citacion_Hora_Inicio: tramoParts[0] || c.Citacion_Hora_Inicio,
+            Citacion_Hora_Fin: tramoParts[1] || c.Citacion_Hora_Fin,
+            Citacion_Estado: "Pendiente",
+            historial: hist,
+          };
+          return citacionReprog;
+        }
+        return c;
+      });
+      saveStore("SIGAE_CITACIONES", STORE_CITACIONES);
+      return { ok: true, status: 200, mensaje: "Citación reprogramada correctamente. Quedó pendiente de confirmación.", citacion: citacionReprog };
+    }
     // Actualizar parámetros institucionales (/api/bloques/parametros)
     if (p.includes("/parametros")) {
       STORE_PARAMETROS = {
@@ -2423,7 +2510,7 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
 
   // Citación individual por ID
   if (p.includes("/citaciones/") && reqId && !p.includes("/estudiante")) {
-    const found = STORE_CITACIONES.find(c => c.Citacion_Id === reqId) || STORE_CITACIONES[0];
+    const found = STORE_CITACIONES.find(c => Number(c.Citacion_Id) === Number(reqId)) || STORE_CITACIONES[0];
     return {
       ...found,
       historial: found.historial || [
