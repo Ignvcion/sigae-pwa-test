@@ -1805,11 +1805,11 @@ function VistaCalendarioBloques({ bloques, onEditar, onEliminar, eliminando, pre
   const [hovered, setHovered] = useState(null);
 
   const todosStarts = [
-    ...bloques.map(b => toMin(b.Bloque_Horario_Hora_Inicio)),
+    ...(bloques || []).map(b => toMin(b.Bloque_Horario_Hora_Inicio)),
     ...(preview ? [toMin(preview.hora_inicio)] : []),
   ];
   const todosEnds = [
-    ...bloques.map(b => toMin(b.Bloque_Horario_Hora_Fin)),
+    ...(bloques || []).map(b => toMin(b.Bloque_Horario_Hora_Fin)),
     ...(preview ? [toMin(preview.hora_fin)] : []),
   ];
 

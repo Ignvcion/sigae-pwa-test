@@ -558,6 +558,19 @@ let STORE_CITACIONES = loadStore("SIGAE_CITACIONES", SEED_CITACIONES).map(c => (
   Citacion_Tramo_Horario: c.Citacion_Tramo_Horario || (c.Citacion_Hora_Inicio && c.Citacion_Hora_Fin ? `${c.Citacion_Hora_Inicio.slice(0, 5)} - ${c.Citacion_Hora_Fin.slice(0, 5)}` : (c.Citacion_Hora_Inicio ? c.Citacion_Hora_Inicio.slice(0, 5) : ""))
 }));
 
+// 5b. Horarios de Atención a Apoderados (RF55 / CU87–CU88, RF56 / CU89)
+const SEED_HORARIOS_ATENCION = [
+  { Horario_Atencion_Id: 1, Usuario_Id: 3, Horario_Atencion_Dia_Semana: "Martes", Horario_Atencion_Hora_Inicio: "10:00:00", Horario_Atencion_Hora_Fin: "11:30:00" },
+  { Horario_Atencion_Id: 2, Usuario_Id: 3, Horario_Atencion_Dia_Semana: "Jueves", Horario_Atencion_Hora_Inicio: "15:00:00", Horario_Atencion_Hora_Fin: "16:30:00" },
+  { Horario_Atencion_Id: 3, Usuario_Id: 5, Horario_Atencion_Dia_Semana: "Miércoles", Horario_Atencion_Hora_Inicio: "11:30:00", Horario_Atencion_Hora_Fin: "13:00:00" },
+  { Horario_Atencion_Id: 4, Usuario_Id: 5, Horario_Atencion_Dia_Semana: "Viernes", Horario_Atencion_Hora_Inicio: "10:00:00", Horario_Atencion_Hora_Fin: "11:30:00" },
+  { Horario_Atencion_Id: 5, Usuario_Id: 6, Horario_Atencion_Dia_Semana: "Lunes", Horario_Atencion_Hora_Inicio: "14:00:00", Horario_Atencion_Hora_Fin: "15:30:00" },
+  { Horario_Atencion_Id: 6, Usuario_Id: 8, Horario_Atencion_Dia_Semana: "Miércoles", Horario_Atencion_Hora_Inicio: "09:30:00", Horario_Atencion_Hora_Fin: "11:00:00" },
+];
+
+let STORE_HORARIOS_ATENCION = loadStore("SIGAE_HORARIOS_ATENCION", SEED_HORARIOS_ATENCION);
+saveStore("SIGAE_HORARIOS_ATENCION", STORE_HORARIOS_ATENCION);
+
 // 6. Horarios de Curso y Docentes
 const SEED_HORARIOS = [
   {
@@ -1668,29 +1681,64 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
       });
     }
 
-    // Crear Citación
+    // Crear Citación / Solicitud de Citación (CU74 / CU89)
     if (p.includes("/citaciones")) {
+      const estId = Number(b?.Estudiante_Id || b?.estudianteId) || 1;
+      const docId = Number(b?.Docente_Usuario_Id || b?.docenteId) || 3;
+      const est = STORE_ESTUDIANTES.find(e => Number(e.Estudiante_Id) === estId);
+      const doc = STORE_USUARIOS.find(u => Number(u.Usuario_Id) === docId);
+      const tramoStr = b?.Citacion_Tramo_Horario || b?.tramo || "10:00 - 10:45";
+      const partes = tramoStr.split(" - ");
+      const hIni = partes[0] ? (partes[0].length === 5 ? `${partes[0]}:00` : partes[0]) : "10:00:00";
+      const hFin = partes[1] ? (partes[1].length === 5 ? `${partes[1]}:00` : partes[1]) : "10:45:00";
+
       const nueva = {
         Citacion_Id: nextId(),
-        Citacion_Fecha: b?.fecha || b?.Citacion_Fecha || "2026-11-20",
-        Citacion_Hora_Inicio: (b?.tramo || b?.Citacion_Tramo_Horario || "10:00 - 10:45").split(" - ")[0] || "10:00:00",
-        Citacion_Hora_Fin: (b?.tramo || b?.Citacion_Tramo_Horario || "10:00 - 10:45").split(" - ")[1] || "10:45:00",
-        Citacion_Tramo_Horario: b?.tramo || b?.Citacion_Tramo_Horario || "10:00 - 10:45",
+        Citacion_Fecha: b?.Citacion_Fecha || b?.fecha || "2026-11-20",
+        Citacion_Hora_Inicio: hIni,
+        Citacion_Hora_Fin: hFin,
+        Citacion_Tramo_Horario: tramoStr,
         Citacion_Estado: "Pendiente",
-        Citacion_Motivo: b?.motivo || b?.Citacion_Motivo || "Entrevista con apoderado",
-        Citacion_Modalidad: b?.modalidad || b?.Citacion_Modalidad || "Presencial",
-        Estudiante_Id: Number(b?.estudianteId || b?.Estudiante_Id) || 1,
-        Estudiante_Nombre_Completo: Number(b?.estudianteId || b?.Estudiante_Id) === 2 ? "Sofia Valentina Gonzalez Morales" : "Lucas Mateo Fernandez Vera",
-        Curso_Nombre: Number(b?.estudianteId || b?.Estudiante_Id) === 2 ? "2° Básico A" : "1° Básico A",
-        Docente_Nombre: "María Morales",
-        Apoderado_Nombre: "Pedro Fernandez",
+        Citacion_Motivo: b?.Citacion_Motivo || b?.motivo || "Entrevista con apoderado",
+        Citacion_Modalidad: b?.Citacion_Modalidad || b?.modalidad || "Presencial",
+        Estudiante_Id: estId,
+        Docente_Usuario_Id: docId,
+        Estudiante_Nombre_Completo: est?.Estudiante_Nombre_Completo || (estId === 2 ? "Sofia Valentina Gonzalez Morales" : "Lucas Mateo Fernandez Vera"),
+        Curso_Nombre: est?.Curso_Nombre || (estId === 2 ? "2° Básico A" : "1° Básico A"),
+        Docente_Nombre: doc?.Usuario_Nombre_Completo || "María Morales",
+        Apoderado_Nombre: est?.Apoderado_Nombre || "Pedro Fernandez",
         historial: [
-          { Historial_Id: nextId(), Historial_Fecha_Registro: new Date().toISOString().slice(0, 10), Historial_Hora_Registro: "10:00:00", Accion: "Citación creada por docente", Historial_Descripcion_Cambio: "Citación agendada inicialmente en estado Pendiente" }
+          {
+            Historial_Id: nextId(),
+            Historial_Fecha_Registro: new Date().toISOString().slice(0, 10),
+            Historial_Hora_Registro: new Date().toTimeString().slice(0, 8),
+            Accion: p.includes("/solicitud") ? "Solicitud registrada" : "Citación creada por docente",
+            Historial_Descripcion_Cambio: p.includes("/solicitud") ? "Solicitud enviada por el apoderado, pendiente de confirmación por el docente" : "Citación agendada inicialmente en estado Pendiente"
+          }
         ]
       };
       STORE_CITACIONES.unshift(nueva);
       saveStore("SIGAE_CITACIONES", STORE_CITACIONES);
-      return { ok: true, status: 200, id: nueva.Citacion_Id, mensaje: "Citación creada, pendiente de confirmación" };
+      return {
+        ok: true,
+        status: 200,
+        id: nueva.Citacion_Id,
+        mensaje: p.includes("/solicitud") ? "Solicitud registrada con éxito. Queda pendiente hasta que el docente la confirme." : "Citación creada, pendiente de confirmación"
+      };
+    }
+
+    // Crear bloque de horario de atención docente (CU87)
+    if (p.includes("/horario-atencion")) {
+      const nuevoBloqueAtencion = {
+        Horario_Atencion_Id: nextId(),
+        Usuario_Id: Number(b?.Usuario_Id) || 3,
+        Horario_Atencion_Dia_Semana: b?.Horario_Atencion_Dia_Semana || b?.dia || "Martes",
+        Horario_Atencion_Hora_Inicio: b?.Horario_Atencion_Hora_Inicio || b?.horaInicio || "10:00:00",
+        Horario_Atencion_Hora_Fin: b?.Horario_Atencion_Hora_Fin || b?.horaFin || "11:30:00",
+      };
+      STORE_HORARIOS_ATENCION.push(nuevoBloqueAtencion);
+      saveStore("SIGAE_HORARIOS_ATENCION", STORE_HORARIOS_ATENCION);
+      return { ok: true, status: 200, id: nuevoBloqueAtencion.Horario_Atencion_Id, mensaje: "Bloque de atención registrado exitosamente" };
     }
 
     // Crear Evento Institucional
@@ -2118,6 +2166,11 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
       saveStore("SIGAE_EVENTOS", STORE_EVENTOS);
       return { ok: true, status: 200, mensaje: "Evento eliminado correctamente" };
     }
+    if (p.includes("/horario-atencion")) {
+      if (reqId) STORE_HORARIOS_ATENCION = STORE_HORARIOS_ATENCION.filter(h => Number(h.Horario_Atencion_Id) !== Number(reqId));
+      saveStore("SIGAE_HORARIOS_ATENCION", STORE_HORARIOS_ATENCION);
+      return { ok: true, status: 200, mensaje: "Bloque de atención eliminado correctamente" };
+    }
     if (p.includes("/bloques")) {
       if (reqId) STORE_BLOQUES = STORE_BLOQUES.filter(blk => blk.Bloque_Horario_Id !== reqId);
       saveStore("SIGAE_BLOQUES", STORE_BLOQUES);
@@ -2233,6 +2286,23 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
       saveStore("SIGAE_CITACIONES", STORE_CITACIONES);
       return { ok: true, status: 200, mensaje: "Citación reprogramada correctamente. Quedó pendiente de confirmación.", citacion: citacionReprog };
     }
+    // Modificar bloque de atención docente (CU88)
+    if (p.includes("/horario-atencion") && reqId) {
+      STORE_HORARIOS_ATENCION = STORE_HORARIOS_ATENCION.map(h => {
+        if (Number(h.Horario_Atencion_Id) === Number(reqId)) {
+          return {
+            ...h,
+            Horario_Atencion_Dia_Semana: b?.Horario_Atencion_Dia_Semana || b?.dia || h.Horario_Atencion_Dia_Semana,
+            Horario_Atencion_Hora_Inicio: b?.Horario_Atencion_Hora_Inicio || b?.horaInicio || h.Horario_Atencion_Hora_Inicio,
+            Horario_Atencion_Hora_Fin: b?.Horario_Atencion_Hora_Fin || b?.horaFin || h.Horario_Atencion_Hora_Fin,
+          };
+        }
+        return h;
+      });
+      saveStore("SIGAE_HORARIOS_ATENCION", STORE_HORARIOS_ATENCION);
+      return { ok: true, status: 200, mensaje: "Bloque de atención actualizado correctamente" };
+    }
+
     // Actualizar parámetros institucionales (/api/bloques/parametros)
     if (p.includes("/parametros")) {
       STORE_PARAMETROS = {
@@ -2519,6 +2589,104 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     };
   }
 
+  // Solicitud de citaciones del apoderado: estudiantes asociados (RF56 / CU89)
+  if (p.includes("/citaciones/solicitud/estudiantes")) {
+    return {
+      estudiantes: STORE_ESTUDIANTES.map(e => ({
+        Estudiante_Id: e.Estudiante_Id,
+        Estudiante_Nombre_Completo: e.Estudiante_Nombre_Completo,
+        Curso_Nombre: e.Curso_Nombre,
+        Rol_Apoderado: "Titular"
+      }))
+    };
+  }
+
+  // Solicitud de citaciones del apoderado: docentes del estudiante (RF56 / CU89)
+  if (p.includes("/citaciones/solicitud/estudiante/") && p.includes("/docentes")) {
+    return {
+      docentes: STORE_USUARIOS.filter(u => u.Es_Docente).map(d => ({
+        Usuario_Id: d.Usuario_Id,
+        Usuario_Nombre_Completo: d.Usuario_Nombre_Completo,
+        Docente_Correo_Institucional: d.Docente_Correo_Institucional || d.Usuario_Correo,
+        Docente_Especialidad: d.Docente_Especialidad || "General",
+        Tiene_Horario_Atencion: STORE_HORARIOS_ATENCION.some(h => Number(h.Usuario_Id) === Number(d.Usuario_Id)),
+        Asignaturas: d.Docente_Especialidad || "General"
+      }))
+    };
+  }
+
+  // Solicitud de citaciones del apoderado: tramos libres de horario de atención (RF56 / CU89)
+  if (p.includes("/citaciones/solicitud/disponibilidad")) {
+    try {
+      const urlObj = new URL(urlStr, "http://localhost");
+      const docenteId = Number(urlObj.searchParams.get("docenteId") || 3);
+      const bloquesDocente = STORE_HORARIOS_ATENCION.filter(b => Number(b.Usuario_Id) === docenteId);
+      if (!bloquesDocente.length) {
+        return { dias: [], mensaje: "El docente no tiene horario de atención configurado" };
+      }
+
+      const diasSemanaMap = { 1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes" };
+      const hoy = new Date();
+      const diasDisponibles = [];
+
+      for (let i = 1; i <= 14; i++) {
+        const d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + i);
+        const dayOfWeek = d.getDay();
+        const diaNombre = diasSemanaMap[dayOfWeek];
+        if (!diaNombre) continue;
+
+        const atencionDia = bloquesDocente.filter(b => b.Horario_Atencion_Dia_Semana === diaNombre);
+        if (!atencionDia.length) continue;
+
+        const pad = (n) => String(n).padStart(2, "0");
+        const fechaStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+        const tramos = [];
+        atencionDia.forEach(b => {
+          const toMin = (hhmm) => {
+            const [h, m] = (hhmm || "00:00").split(":").map(Number);
+            return h * 60 + m;
+          };
+          const toHHMM = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+          const ini = toMin(b.Horario_Atencion_Hora_Inicio);
+          const fin = toMin(b.Horario_Atencion_Hora_Fin);
+          for (let cur = ini; cur + 45 <= fin; cur += 45) {
+            const tramoLabel = `${toHHMM(cur)} - ${toHHMM(cur + 45)}`;
+            const ocupado = STORE_CITACIONES.some(c =>
+              Number(c.Docente_Usuario_Id) === docenteId &&
+              c.Citacion_Fecha === fechaStr &&
+              c.Citacion_Tramo_Horario === tramoLabel &&
+              c.Citacion_Estado !== "Cancelada"
+            );
+            if (!ocupado) {
+              tramos.push(tramoLabel);
+            }
+          }
+        });
+
+        if (tramos.length > 0) {
+          diasDisponibles.push({
+            fecha: fechaStr,
+            dia: diaNombre,
+            tramos
+          });
+        }
+      }
+
+      return {
+        dias: diasDisponibles,
+        mensaje: diasDisponibles.length ? "" : "El docente no tiene bloques disponibles en los próximos días"
+      };
+    } catch {
+      return { dias: [], mensaje: "Error al consultar disponibilidad" };
+    }
+  }
+
+  // Horario de atención a apoderados (/api/horario-atencion)
+  if (p.includes("/horario-atencion") && !reqId) {
+    return STORE_HORARIOS_ATENCION;
+  }
+
   // Citaciones lista general (agenda para docente, apoderado o administrador)
   if (p.includes("/citaciones") && !p.includes("/solicitud") && !p.includes("/contactos")) {
     return STORE_CITACIONES;
@@ -2635,8 +2803,12 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     };
   }
 
-  // Administradores
+  // Administradores (lista o individual)
   if (p.includes("/usuarios/administradores")) {
+    if (reqId) {
+      const matchAdmin = STORE_USUARIOS.find((u) => Number(u.Usuario_Id) === Number(reqId) && u.Es_Administrador);
+      return matchAdmin || STORE_USUARIOS.find((u) => u.Es_Administrador) || null;
+    }
     return STORE_USUARIOS.filter(u => u.Es_Administrador);
   }
 
@@ -2691,6 +2863,34 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
       }
     } catch {}
     return lista;
+  }
+
+  // Estudiantes de un curso para profesor jefe (/api/estudiantes/curso/:id/mis-estudiantes)
+  if (p.includes("/estudiantes/curso/") && p.includes("/mis-estudiantes")) {
+    const m = urlStr.match(/\/estudiantes\/curso\/(\d+)\/mis-estudiantes/i);
+    const cId = m ? Number(m[1]) : 1;
+    return STORE_ESTUDIANTES.filter(e => Number(e.Curso_Id) === cId).map(normalizarEstudiante);
+  }
+
+  // Todas las vinculaciones de un apoderado (/api/estudiantes/apoderado/:id/todas)
+  if (p.includes("/estudiantes/apoderado/") && p.includes("/todas")) {
+    const m = urlStr.match(/\/estudiantes\/apoderado\/(\d+)\/todas/i);
+    const aId = m ? Number(m[1]) : 4;
+    return STORE_ESTUDIANTES.filter(e => Number(e.Apoderado_Usuario_Id) === aId).map(normalizarEstudiante);
+  }
+
+  // Apoderados vinculados a un estudiante (/api/estudiantes/:id/apoderados)
+  if (p.includes("/estudiantes/") && p.includes("/apoderados") && reqId) {
+    const est = STORE_ESTUDIANTES.find(e => Number(e.Estudiante_Id) === Number(reqId));
+    const apo = STORE_USUARIOS.find(u => Number(u.Usuario_Id) === Number(est?.Apoderado_Usuario_Id));
+    if (apo) {
+      return [{
+        ...apo,
+        Rol_Apoderado: "Titular",
+        Apoderado_Correo_Natural: apo.Usuario_Correo
+      }];
+    }
+    return [];
   }
 
   // Estudiantes general con filtros curso y estado
@@ -3135,6 +3335,40 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
       Usuario_Direccion_Depto: u.Usuario_Direccion_Depto || "",
       Usuario_Direccion_Comuna: u.Usuario_Direccion_Comuna || "La Florida",
     };
+  }
+
+  // Perfil de usuario autenticado (/api/usuarios/perfil)
+  if (p.includes("/usuarios/perfil") && !p.includes("/foto")) {
+    const u = STORE_USUARIOS.find(usr => usr.Usuario_Id === 1) || STORE_USUARIOS[0];
+    return {
+      ...u,
+      Usuario_Foto_Perfil: u.Usuario_Foto_Perfil || null,
+      Administrador_Correo_Institucional: u.Administrador_Correo_Institucional || (u.Es_Administrador ? u.Usuario_Correo : null),
+      Docente_Correo_Institucional: u.Docente_Correo_Institucional || (u.Es_Docente ? u.Usuario_Correo : null),
+      Apoderado_Correo_Natural: u.Apoderado_Correo_Natural || (u.Es_Apoderado ? u.Usuario_Correo : null),
+      Docente_Especialidad: u.Docente_Especialidad || (u.Es_Docente ? "General" : null),
+      Docente_Carga_Horaria_Maxima: u.Docente_Carga_Horaria_Maxima || (u.Es_Docente ? 36 : null),
+      Usuario_Direccion_Calle: u.Usuario_Direccion_Calle || "Av. Las Perdices",
+      Usuario_Direccion_Numero: u.Usuario_Direccion_Numero || "100",
+      Usuario_Direccion_Depto: u.Usuario_Direccion_Depto || "",
+      Usuario_Direccion_Comuna: u.Usuario_Direccion_Comuna || "La Florida",
+    };
+  }
+
+  // Búsqueda rápida de usuarios (/api/usuarios/buscar?criterio=...)
+  if (p.includes("/usuarios/buscar")) {
+    try {
+      const u = new URL(urlStr, "http://localhost");
+      const crit = (u.searchParams.get("criterio") || u.searchParams.get("q") || "").trim().toLowerCase();
+      if (!crit) return STORE_USUARIOS;
+      return STORE_USUARIOS.filter(usr =>
+        (usr.Usuario_Nombre_Completo || "").toLowerCase().includes(crit) ||
+        (usr.Usuario_RUT || "").toLowerCase().includes(crit) ||
+        (usr.Usuario_Correo || usr.Administrador_Correo_Institucional || usr.Docente_Correo_Institucional || usr.Apoderado_Correo_Natural || "").toLowerCase().includes(crit)
+      );
+    } catch {
+      return STORE_USUARIOS;
+    }
   }
 
   // Lista general de Usuarios con filtros

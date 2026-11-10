@@ -230,7 +230,7 @@ function HorarioAtencionPanel({ bloques, cargando, error, onCambio }) {
         <div className="atencion-confirmacion" role="alertdialog">
           <p><strong>{confirmacion.mensaje}</strong></p>
           <ul className="cit-lista-pendientes">
-            {confirmacion.citaciones.map((c) => (
+            {(confirmacion.citaciones || []).map((c) => (
               <li key={c.Citacion_Id} className="cit-pendiente-item">
                 <span>
                   <strong>{formatearFecha(c.Citacion_Fecha, { corta: true })}</strong> · {c.Citacion_Tramo_Horario}

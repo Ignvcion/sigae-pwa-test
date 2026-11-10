@@ -324,7 +324,7 @@ function FormEditarPlan({ planId, onExito, onCancelar }) {
         setNivelId(String(plan.Nivel_Educativo_Id));
         setPeriodo(plan.Plan_Educativo_Periodo_Lectivo);
         setAsignaturas(
-          plan.asignaturas.map((a) => ({
+          (plan.asignaturas || []).map((a) => ({
             Asignatura_Id                 : a.Asignatura_Id,
             Asignatura_Nombre             : a.Asignatura_Nombre,
             Asignatura_Prioridad_Academica: a.Asignatura_Prioridad_Academica,
@@ -491,7 +491,7 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
         const data = await res.json();
         if (!res.ok) { setError(data.error); return; }
         setAsignaturas(
-          data.asignaturas.map((a) => ({
+          (data.asignaturas || []).map((a) => ({
             Asignatura_Id                 : a.Asignatura_Id,
             Asignatura_Nombre             : a.Asignatura_Nombre,
             Asignatura_Prioridad_Academica: a.Asignatura_Prioridad_Academica,

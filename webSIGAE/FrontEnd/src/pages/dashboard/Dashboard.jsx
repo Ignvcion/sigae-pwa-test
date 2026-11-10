@@ -268,7 +268,7 @@ function ResumenComunicaciones({ rol }) {
 }
 
 /* ── Asignaturas por curso (Docente) ─────────────── */
-const bloquesActivos = (a) => a.bloques.filter((b) => b.estado === "Activo").length;
+const bloquesActivos = (a) => (a?.bloques || []).filter((b) => b.estado === "Activo").length;
 const formatearBloques = (n) => `${n} ${n === 1 ? "bloque" : "bloques"}`;
 
 // Cada tarjeta abre Mis Cursos solo si esa vista está habilitada
@@ -331,7 +331,7 @@ function AsignaturasPorCurso({ docenteId }) {
               </div>
               <div style={{ fontSize: "0.8rem", color: "#6b7280", marginBottom: "0.6rem" }}>{c.nivel}</div>
               <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-                {c.asignaturas.map((a) => (
+                {(c.asignaturas || []).map((a) => (
                   <li key={a.asignaturaId} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: "0.88rem" }}>
                     <span style={{ color: a.estadoVigencia === "Activo" ? "#334155" : "#9ca3af" }}>
                       {a.asignatura}

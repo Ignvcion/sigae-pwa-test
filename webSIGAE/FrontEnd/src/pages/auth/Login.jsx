@@ -62,7 +62,7 @@ function Login() {
 
       const { user, token } = await res.json();
       login(user, token);
-      if (user.roles.length > 1) navigate("/seleccionar-rol");
+      if ((user?.roles || []).length > 1) navigate("/seleccionar-rol");
       else navigate("/dashboard");
 
     } catch {
@@ -106,7 +106,7 @@ function Login() {
         const mockUser = CUENTAS_PRUEBA[clave];
         const mockToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicnV0IjoiNTY4MjcxMS0wIiwicm9sZXMiOlsiQWRtaW5pc3RyYWRvciJdLCJhZG1pbmlzdHJhZG9yVGlwbyI6IlN1cGVyIEFkbWluIiwiZXhwIjoxOTI0OTA1NjAwfQ.mock";
         login(mockUser, mockToken);
-        if (mockUser.roles.length > 1) navigate("/seleccionar-rol");
+        if ((mockUser?.roles || []).length > 1) navigate("/seleccionar-rol");
         else navigate("/dashboard");
         return;
       }

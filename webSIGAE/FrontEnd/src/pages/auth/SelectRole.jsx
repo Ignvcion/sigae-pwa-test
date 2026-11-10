@@ -46,7 +46,7 @@ function SelectRole() {
 
         <div className="roles-container">
 
-          {usuario.roles.map((rol) => {
+          {(usuario?.roles || []).map((rol) => {
 
             const info = INFO_ROLES[rol] || { icono: "👤", detalle: "" };
 

@@ -209,13 +209,13 @@ function ConsultaHorarios() {
     return Array.from(map.values()).sort((x, y) => x.nombre.localeCompare(y.nombre, "es"));
   }, [opciones.asignaturas]);
 
-  const opcionesDocentes = opciones.docentes.map((d) => (
+  const opcionesDocentes = (opciones.docentes || []).map((d) => (
     <option key={d.Usuario_Id} value={d.Usuario_Id}>{d.Usuario_Nombre_Completo}</option>
   ));
-  const opcionesCursos = opciones.cursos.map((c) => (
+  const opcionesCursos = (opciones.cursos || []).map((c) => (
     <option key={c.Curso_Id} value={c.Curso_Id}>{c.Curso_Nombre}</option>
   ));
-  const opcionesJornadas = opciones.jornadas.map((j) => <option key={j} value={j}>{j}</option>);
+  const opcionesJornadas = (opciones.jornadas || []).map((j) => <option key={j} value={j}>{j}</option>);
   const opcionesDias = DIAS.map((d) => <option key={d} value={d}>{d}</option>);
 
   return (
@@ -253,7 +253,7 @@ function ConsultaHorarios() {
                 "Nivel educativo general",
                 filtros.nivel_educativo_id,
                 cambiarFiltro("nivel_educativo_id"),
-                opciones.niveles.map((n) => (
+                (opciones.niveles || []).map((n) => (
                   <option key={n.Nivel_Educativo_Id || n.Nivel_Id} value={n.Nivel_Educativo_Id || n.Nivel_Id}>{n.Nivel_Educativo_Nombre || n.Nivel_Nombre}</option>
                 )),
                 "Todos los niveles"

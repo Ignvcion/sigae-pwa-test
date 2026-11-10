@@ -329,7 +329,7 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh, onSelectCur
                   {vistaData === "loading" ? "Cargando..." : vistaAbierta ? "▲ Ocultar vista rápida" : "▼ Vista rápida"}
                 </button>
 
-                {vistaAbierta && (
+                {vistaAbierta && vistaData && vistaData !== "loading" && Array.isArray(vistaData.horarios) && (
                   <>
                     <MiniGrid bloques={bloques} horarios={vistaData.horarios.filter(h => !esEliminada(h))} colorMap={vistaData.colorMap} />
                     <ClasesEliminadasMini clases={vistaData.horarios.filter(esEliminada)} />

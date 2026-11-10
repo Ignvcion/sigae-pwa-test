@@ -127,11 +127,11 @@ export default function HorarioSemanal({ clases }) {
   const claves = [...new Set(clases.map((c) => String(c.colorKey ?? c.titulo)))].sort();
   const colorDe = (c) => COLORES[claves.indexOf(String(c.colorKey ?? c.titulo)) % COLORES.length];
 
-  const idsEnTope = new Set(detectarTopes(clases).flatMap((t) => t.clases.map((c) => c.id)));
+  const idsEnTope = new Set(detectarTopes(clases).flatMap((t) => (t.clases || []).map((c) => c.id)));
 
   const leyenda = claves.map((k) => {
     const ejemplo = clases.find((c) => String(c.colorKey ?? c.titulo) === k);
-    return { clave: k, nombre: ejemplo.titulo, color: colorDe(ejemplo) };
+    return { clave: k, nombre: ejemplo?.titulo || k, color: ejemplo ? colorDe(ejemplo) : "#2563eb" };
   });
 
   return (

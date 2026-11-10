@@ -42,7 +42,7 @@ function SituacionFinal() {
           setCursos(lista.filter((c) => c.Curso_Periodo_Lectivo === vigente));
         } else {
           const d = await getMisJefaturas();
-          if (d) setCursos(d.cursos.filter((c) => c.Curso_Periodo_Lectivo === d.periodoVigente));
+          if (d) setCursos((d.cursos || []).filter((c) => c.Curso_Periodo_Lectivo === d.periodoVigente));
         }
       } catch (e) {
         setError(e.message);
@@ -53,7 +53,7 @@ function SituacionFinal() {
   const aplicarDatos = (d) => {
     if (!d) return;
     setDatos(d);
-    setValores(Object.fromEntries(d.estudiantes.filter((e) => e.situacion).map((e) => [e.Estudiante_Id, e.situacion.valor])));
+    setValores(Object.fromEntries((d.estudiantes || []).filter((e) => e.situacion).map((e) => [e.Estudiante_Id, e.situacion.valor])));
     setSeleccion({});
     setPrevia(null);
   };
@@ -91,7 +91,7 @@ function SituacionFinal() {
       const r = await registrarSituaciones(cursoId, situaciones, confirmar);
       if (r) {
         setExito(r.faltantes?.length
-          ? `${r.mensaje}: ${r.faltantes.map((f) => f.Estudiante_Nombre_Completo).join(", ")}`
+          ? `${r.mensaje}: ${(r.faltantes || []).map((f) => f.Estudiante_Nombre_Completo).join(", ")}`
           : r.mensaje);
         await cargar();
       }
@@ -220,7 +220,7 @@ function SituacionFinal() {
                 </tr>
               </thead>
               <tbody>
-                {datos.estudiantes.map((e) => {
+                {(datos?.estudiantes || []).map((e) => {
                   const aplicada = e.situacion?.estado === "Aplicado";
                   const registrada = e.situacion?.estado === "Registrado";
                   return (
@@ -247,7 +247,7 @@ function SituacionFinal() {
                             onChange={(ev) => setValores((v) => ({ ...v, [e.Estudiante_Id]: ev.target.value }))}
                           >
                             <option value="">—</option>
-                            {datos.valoresPermitidos.map((v) => <option key={v} value={v}>{v}</option>)}
+                            {(datos?.valoresPermitidos || []).map((v) => <option key={v} value={v}>{v}</option>)}
                           </select>
                         )}
                       </td>
@@ -300,12 +300,12 @@ function SituacionFinal() {
                   <p><strong>{previa.validas.length}</strong> fila(s) válida(s), <strong>{previa.rechazadas.length}</strong> rechazada(s).</p>
                   {previa.rechazadas.length > 0 && (
                     <ul>
-                      {previa.rechazadas.map((f) => <li key={`r${f.fila}`}>Fila {f.fila} ({f.rut || "sin RUT"}): {f.motivo}</li>)}
+                      {(previa?.rechazadas || []).map((f) => <li key={`r${f.fila}`}>Fila {f.fila} ({f.rut || "sin RUT"}): {f.motivo}</li>)}
                     </ul>
                   )}
                   {previa.advertencias.length > 0 && (
                     <ul>
-                      {previa.advertencias.map((a) => <li key={`a${a.fila}`}>Fila {a.fila}: {a.mensaje}</li>)}
+                      {(previa?.advertencias || []).map((a) => <li key={`a${a.fila}`}>Fila {a.fila}: {a.mensaje}</li>)}
                     </ul>
                   )}
                   {previa.validas.length > 0 && (

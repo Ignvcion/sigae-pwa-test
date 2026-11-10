@@ -6,7 +6,7 @@ import { hhmm } from "../../utils/horarios";
 
 const DIA_ABR = { Lunes: "Lun", Martes: "Mar", "Miércoles": "Mié", Jueves: "Jue", Viernes: "Vie" };
 
-const bloquesActivos = (clase) => clase.bloques.filter((b) => b.estado === "Activo").length;
+const bloquesActivos = (clase) => (clase?.bloques || []).filter((b) => b.estado === "Activo").length;
 const formatearBloques = (n) => `${n} ${n === 1 ? "bloque" : "bloques"}/sem`;
 
 // Clases que imparte el docente agrupadas por curso, para la columna izquierda
@@ -47,7 +47,7 @@ function TarjetaClase({ clase, seleccionada, onClick }) {
         )}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-        {clase.bloques.map((b, i) => (
+        {(clase?.bloques || []).map((b, i) => (
           <span
             key={i}
             style={{
@@ -167,7 +167,7 @@ function MisCursos() {
                   <span style={{ fontWeight: 400, color: "#6b7280", fontSize: "0.82rem" }}> · {c.nivel}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                  {c.clases.map((clase) => (
+                  {(c?.clases || []).map((clase) => (
                     <TarjetaClase
                       key={`${clase.cursoId}-${clase.asignaturaId}`}
                       clase={clase}

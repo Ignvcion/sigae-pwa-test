@@ -225,15 +225,15 @@ function SolicitarCitacionModal({ onClose, onSolicitada }) {
                 <label>Tramos disponibles{docenteSel ? ` de ${docenteSel.Usuario_Nombre_Completo}` : ""}</label>
                 {cargandoDisponibilidad ? (
                   <p className="empty-state-text">Consultando disponibilidad...</p>
-                ) : dias.length === 0 ? (
+                ) : (!dias || dias.length === 0) ? (
                   <div className="cit-nota">{msgDisponibilidad}</div>
                 ) : (
                   <div className="sol-disponibilidad">
-                    {dias.map((d) => (
+                    {(dias || []).map((d) => (
                       <div key={d.fecha} className="sol-dia">
                         <div className="sol-dia-fecha">{formatearFecha(d.fecha, { corta: true })} · {d.dia}</div>
                         <div className="sol-tramos">
-                          {d.tramos.map((t) => {
+                          {(d.tramos || []).map((t) => {
                             const elegido = form.fecha === d.fecha && form.tramo === t;
                             return (
                               <button
