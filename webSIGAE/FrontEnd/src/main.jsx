@@ -2393,7 +2393,7 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   }
 
   // Bloques horarios institucionales
-  if (p.includes("/bloques")) {
+  if (p.includes("/bloques") && !p.includes("/bloques-libres")) {
     return STORE_BLOQUES;
   }
 
@@ -2869,17 +2869,60 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
       const u = new URL(urlStr, "http://localhost");
       const cursoId = u.searchParams.get("curso_id");
       const docenteId = u.searchParams.get("docente_id");
-      const diaSemana = u.searchParams.get("dia_semana");
+      const diaSemanaParam = u.searchParams.get("dia_semana");
       const jornada = u.searchParams.get("jornada");
+      const fechaParam = u.searchParams.get("fecha");
 
-      const diasAEvaluar = diaSemana ? [diaSemana] : ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+      const DIAS_POR_INDICE = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+      const DIAS_SEMANA_VALIDOS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+
+      let diasAEvaluar = [];
+      const fechasMap = {};
+
+      if (fechaParam && /^\d{4}-\d{2}-\d{2}$/.test(fechaParam)) {
+        const [y, m, d] = fechaParam.split("-").map(Number);
+        const dt = new Date(y, m - 1, d);
+        const diaNombre = DIAS_POR_INDICE[dt.getDay()];
+        if (DIAS_SEMANA_VALIDOS.includes(diaNombre)) {
+          diasAEvaluar = [diaNombre];
+          fechasMap[diaNombre] = fechaParam;
+        } else {
+          return {
+            mensaje: "La fecha seleccionada no corresponde a un día hábil (Lunes a Viernes).",
+            bloques: []
+          };
+        }
+      } else if (diaSemanaParam && DIAS_SEMANA_VALIDOS.includes(diaSemanaParam)) {
+        diasAEvaluar = [diaSemanaParam];
+      } else {
+        diasAEvaluar = [...DIAS_SEMANA_VALIDOS];
+      }
+
+      // Si no se proporcionó fecha puntual, asignamos la fecha próxima de ocurrencia
+      const hoy = new Date();
+      DIAS_SEMANA_VALIDOS.forEach((d) => {
+        if (!fechasMap[d]) {
+          for (let i = 0; i < 7; i++) {
+            const dt = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + i);
+            if (DIAS_POR_INDICE[dt.getDay()] === d) {
+              const pad = (n) => String(n).padStart(2, "0");
+              fechasMap[d] = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+              break;
+            }
+          }
+        }
+      });
+
       const bloquesClase = STORE_BLOQUES.filter(b => b.Bloque_Horario_Tipo !== "Recreo" && (!jornada || b.Bloque_Horario_Jornada === jornada));
 
       const libres = [];
       for (const d of diasAEvaluar) {
         for (const b of bloquesClase) {
           const bId = Number(b.Bloque_Horario_Id);
-          const ocupado = STORE_HORARIOS.some(h => {
+          const fechaEval = fechasMap[d];
+
+          // 1. Revisar si hay clase programada en ese bloque
+          const ocupadoPorClase = STORE_HORARIOS.some(h => {
             if (h.estado === "Eliminado" || h.eliminado === 1) return false;
             if (h.dia !== d && h.Horario_Asignatura_Dia_Semana !== d) return false;
             if (Number(h.Bloque_Horario_Id) !== bId) return false;
@@ -2888,10 +2931,19 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
             if (!cursoId && !docenteId) return true;
             return false;
           });
-          if (!ocupado) {
+
+          // 2. Revisar si hay evento institucional que afecte el bloque en esa fecha
+          const ocupadoPorEvento = (STORE_EVENTOS || []).some(ev => {
+            if (ev.Evento_Institucional_Fecha !== fechaEval) return false;
+            const bloquesAfectados = Array.isArray(ev.bloques) ? ev.bloques.map(x => Number(x.Bloque_Horario_Id || x.id)) : [];
+            return bloquesAfectados.includes(bId);
+          });
+
+          if (!ocupadoPorClase && !ocupadoPorEvento) {
             libres.push({
               bloqueId: bId,
               dia: d,
+              fecha: fechaEval || "",
               horaInicio: b.Bloque_Horario_Hora_Inicio,
               horaFin: b.Bloque_Horario_Hora_Fin,
               jornada: b.Bloque_Horario_Jornada,
@@ -2900,6 +2952,7 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
           }
         }
       }
+
       if (libres.length === 0) {
         return {
           mensaje: "No existen bloques libres disponibles para los criterios indicados",

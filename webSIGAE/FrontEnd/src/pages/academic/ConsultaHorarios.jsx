@@ -150,7 +150,7 @@ function ConsultaHorarios() {
     setMensajeLibres("");
     try {
       const data = await getBloquesLibres(criteriosLibres);
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         setBloquesLibres(data);
       } else {
         // CU67 Excepción 1: no existen bloques libres
@@ -385,7 +385,11 @@ function ConsultaHorarios() {
           )}
 
           {libresPorDia.length > 0 && (
-            <div style={{ overflowX: "auto" }}>
+            <>
+              <p style={{ color: "#065f46", fontSize: "0.88rem", fontWeight: 700, margin: "0.75rem 0 0.5rem" }}>
+                ✓ {bloquesLibres.length} bloque(s) libre(s) disponible(s)
+              </p>
+              <div style={{ overflowX: "auto" }}>
               <table className="tabla-usuarios">
                 <thead>
                   <tr>
@@ -427,6 +431,7 @@ function ConsultaHorarios() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </>
       )}
