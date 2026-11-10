@@ -84,14 +84,14 @@ function MiHorario() {
   };
 
   const clases = horario.map((h, idx) => ({
-    id: h.id ?? idx,
-    dia: h.dia,
-    horaInicio: h.horaInicio,
-    horaFin: h.horaFin,
-    titulo: h.asignatura,
-    lineas: [h.curso],
-    colorKey: h.asignaturaId ?? h.asignatura,
-    estado: h.estado,
+    id: h.id ?? h.Horario_Asignatura_Id ?? idx,
+    dia: h.dia || h.Horario_Dia_Semana,
+    horaInicio: h.horaInicio || h.hora_inicio || h.Horario_Hora_Inicio || "08:00:00",
+    horaFin: h.horaFin || h.hora_fin || h.Horario_Hora_Fin || "08:45:00",
+    titulo: h.asignatura || h.Asignatura_Nombre,
+    lineas: [h.curso || h.Curso_Nombre],
+    colorKey: h.asignaturaId ?? h.Asignatura_Id ?? h.asignatura ?? h.Asignatura_Nombre,
+    estado: h.estado || h.Horario_Estado || "Activo",
     pendiente: Boolean(Number(h.pendiente)),
   }));
   const topes = detectarTopes(clases);

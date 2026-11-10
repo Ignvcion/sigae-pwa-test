@@ -104,16 +104,18 @@ export default function HorarioSemanal({ clases }) {
 
   if (!clases.length) return null;
 
-  const inicios = clases.map((c) => aMinutos(c.horaInicio));
-  const fines = clases.map((c) => aMinutos(c.horaFin));
+  const inicios = clases.map((c) => aMinutos(c.horaInicio)).filter((m) => m > 0);
+  const fines = clases.map((c) => aMinutos(c.horaFin)).filter((m) => m > 0);
+  const minIni = inicios.length ? Math.min(...inicios) : 480;
+  const maxFin = fines.length ? Math.max(...fines) : 960;
   // Sin parámetros (o mientras cargan) se usa el rango de las clases, redondeado a la hora
   const rangoMin = jornada
-    ? Math.min(jornada.inicio, ...inicios)
-    : Math.floor(Math.min(...inicios) / 60) * 60;
+    ? Math.min(jornada.inicio, minIni)
+    : Math.floor(minIni / 60) * 60;
   const rangoMax = jornada
-    ? Math.max(jornada.fin, ...fines)
-    : Math.ceil(Math.max(...fines) / 60) * 60;
-  const totalPx = (rangoMax - rangoMin) * PX_POR_MIN;
+    ? Math.max(jornada.fin, maxFin)
+    : Math.ceil(maxFin / 60) * 60;
+  const totalPx = Math.max((rangoMax - rangoMin) * PX_POR_MIN, 360);
   const horas = marcasDelRango(rangoMin, rangoMax, 60);
   const mediasHoras = marcasDelRango(rangoMin, rangoMax, 30).filter((m) => m % 60 !== 0);
   // Etiquetas del eje: horas completas y, si no coinciden con una, el inicio y fin de la jornada

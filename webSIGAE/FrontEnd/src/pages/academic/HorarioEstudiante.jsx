@@ -50,15 +50,15 @@ function HorarioEstudiante() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const clases = (datos?.horario || []).map((h) => ({
-    id: h.id,
-    dia: h.dia,
-    horaInicio: h.horaInicio,
-    horaFin: h.horaFin,
-    titulo: h.asignatura,
-    lineas: [h.docente || "Docente por asignar"],
-    colorKey: h.asignaturaId,
-    estado: h.estado,
+  const clases = (datos?.horario || []).map((h, idx) => ({
+    id: h.id ?? h.Horario_Asignatura_Id ?? idx,
+    dia: h.dia || h.Horario_Dia_Semana,
+    horaInicio: h.horaInicio || h.hora_inicio || h.Horario_Hora_Inicio || "08:00:00",
+    horaFin: h.horaFin || h.hora_fin || h.Horario_Hora_Fin || "08:45:00",
+    titulo: h.asignatura || h.Asignatura_Nombre,
+    lineas: [h.docente || h.Docente_Nombre || "Docente por asignar"],
+    colorKey: h.asignaturaId ?? h.Asignatura_Id ?? h.asignatura,
+    estado: h.estado || h.Horario_Estado || "Activo",
     pendiente: Boolean(Number(h.pendiente)),
   }));
 

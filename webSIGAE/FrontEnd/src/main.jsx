@@ -369,6 +369,8 @@ const SEED_HORARIOS = [
     docente: "Ana Torres",
     Docente_Nombre: "Ana Torres",
     Bloque_Horario_Id: 1,
+    horaInicio: "08:00:00",
+    horaFin: "08:45:00",
     hora_inicio: "08:00:00",
     hora_fin: "08:45:00",
     dia: "Lunes",
@@ -389,6 +391,8 @@ const SEED_HORARIOS = [
     docente: "Ana Torres",
     Docente_Nombre: "Ana Torres",
     Bloque_Horario_Id: 2,
+    horaInicio: "08:45:00",
+    horaFin: "09:30:00",
     hora_inicio: "08:45:00",
     hora_fin: "09:30:00",
     dia: "Lunes",
@@ -409,6 +413,8 @@ const SEED_HORARIOS = [
     docente: "María Morales",
     Docente_Nombre: "María Morales",
     Bloque_Horario_Id: 4,
+    horaInicio: "09:45:00",
+    horaFin: "10:30:00",
     hora_inicio: "09:45:00",
     hora_fin: "10:30:00",
     dia: "Martes",
@@ -429,6 +435,8 @@ const SEED_HORARIOS = [
     docente: "María Morales",
     Docente_Nombre: "María Morales",
     Bloque_Horario_Id: 5,
+    horaInicio: "10:30:00",
+    horaFin: "11:15:00",
     hora_inicio: "10:30:00",
     hora_fin: "11:15:00",
     dia: "Martes",
@@ -449,6 +457,8 @@ const SEED_HORARIOS = [
     docente: "Roberto Silva",
     Docente_Nombre: "Roberto Silva",
     Bloque_Horario_Id: 5,
+    horaInicio: "10:30:00",
+    horaFin: "11:15:00",
     hora_inicio: "10:30:00",
     hora_fin: "11:15:00",
     dia: "Miércoles",
@@ -457,10 +467,189 @@ const SEED_HORARIOS = [
     eliminado: 0,
     observaciones: ["Clase regular de Ciencias Naturales."]
   },
+  {
+    Horario_Asignatura_Id: 6,
+    Curso_Id: 1,
+    curso: "1° Básico A",
+    Curso_Nombre: "1° Básico A",
+    Asignatura_Id: 2,
+    asignatura: "Matemáticas",
+    Asignatura_Nombre: "Matemáticas",
+    Usuario_Id: 3,
+    docente: "María Morales",
+    Docente_Nombre: "María Morales",
+    Bloque_Horario_Id: 1,
+    horaInicio: "08:00:00",
+    horaFin: "08:45:00",
+    hora_inicio: "08:00:00",
+    hora_fin: "08:45:00",
+    dia: "Jueves",
+    estado: "Activo",
+    Horario_Estado: "Activo",
+    eliminado: 0,
+    observaciones: ["Clase regular de Matemáticas."]
+  },
+  {
+    Horario_Asignatura_Id: 7,
+    Curso_Id: 1,
+    curso: "1° Básico A",
+    Curso_Nombre: "1° Básico A",
+    Asignatura_Id: 2,
+    asignatura: "Matemáticas",
+    Asignatura_Nombre: "Matemáticas",
+    Usuario_Id: 3,
+    docente: "María Morales",
+    Docente_Nombre: "María Morales",
+    Bloque_Horario_Id: 2,
+    horaInicio: "08:45:00",
+    horaFin: "09:30:00",
+    hora_inicio: "08:45:00",
+    hora_fin: "09:30:00",
+    dia: "Jueves",
+    estado: "Activo",
+    Horario_Estado: "Activo",
+    eliminado: 0,
+    observaciones: ["Clase regular de Matemáticas."]
+  },
+  {
+    Horario_Asignatura_Id: 8,
+    Curso_Id: 1,
+    curso: "1° Básico A",
+    Curso_Nombre: "1° Básico A",
+    Asignatura_Id: 2,
+    asignatura: "Matemáticas",
+    Asignatura_Nombre: "Matemáticas",
+    Usuario_Id: 3,
+    docente: "María Morales",
+    Docente_Nombre: "María Morales",
+    Bloque_Horario_Id: 4,
+    horaInicio: "09:45:00",
+    horaFin: "10:30:00",
+    hora_inicio: "09:45:00",
+    hora_fin: "10:30:00",
+    dia: "Viernes",
+    estado: "Activo",
+    Horario_Estado: "Activo",
+    eliminado: 0,
+    observaciones: ["Clase regular de Matemáticas."]
+  },
+  {
+    Horario_Asignatura_Id: 9,
+    Curso_Id: 1,
+    curso: "1° Básico A",
+    Curso_Nombre: "1° Básico A",
+    Asignatura_Id: 1,
+    asignatura: "Lenguaje y Comunicación",
+    Asignatura_Nombre: "Lenguaje y Comunicación",
+    Usuario_Id: 5,
+    docente: "Ana Torres",
+    Docente_Nombre: "Ana Torres",
+    Bloque_Horario_Id: 1,
+    horaInicio: "08:00:00",
+    horaFin: "08:45:00",
+    hora_inicio: "08:00:00",
+    hora_fin: "08:45:00",
+    dia: "Miércoles",
+    estado: "Activo",
+    Horario_Estado: "Activo",
+    eliminado: 0,
+    observaciones: ["Clase regular de Lenguaje y Comunicación."]
+  },
+  {
+    Horario_Asignatura_Id: 10,
+    Curso_Id: 1,
+    curso: "1° Básico A",
+    Curso_Nombre: "1° Básico A",
+    Asignatura_Id: 1,
+    asignatura: "Lenguaje y Comunicación",
+    Asignatura_Nombre: "Lenguaje y Comunicación",
+    Usuario_Id: 5,
+    docente: "Ana Torres",
+    Docente_Nombre: "Ana Torres",
+    Bloque_Horario_Id: 2,
+    horaInicio: "08:45:00",
+    horaFin: "09:30:00",
+    hora_inicio: "08:45:00",
+    hora_fin: "09:30:00",
+    dia: "Miércoles",
+    estado: "Activo",
+    Horario_Estado: "Activo",
+    eliminado: 0,
+    observaciones: ["Clase regular de Lenguaje y Comunicación."]
+  },
+  {
+    Horario_Asignatura_Id: 11,
+    Curso_Id: 1,
+    curso: "1° Básico A",
+    Curso_Nombre: "1° Básico A",
+    Asignatura_Id: 3,
+    asignatura: "Ciencias Naturales",
+    Asignatura_Nombre: "Ciencias Naturales",
+    Usuario_Id: 6,
+    docente: "Roberto Silva",
+    Docente_Nombre: "Roberto Silva",
+    Bloque_Horario_Id: 5,
+    horaInicio: "10:30:00",
+    horaFin: "11:15:00",
+    hora_inicio: "10:30:00",
+    hora_fin: "11:15:00",
+    dia: "Lunes",
+    estado: "Activo",
+    Horario_Estado: "Activo",
+    eliminado: 0,
+    observaciones: ["Clase regular de Ciencias Naturales."]
+  },
+  {
+    Horario_Asignatura_Id: 12,
+    Curso_Id: 1,
+    curso: "1° Básico A",
+    Curso_Nombre: "1° Básico A",
+    Asignatura_Id: 3,
+    asignatura: "Ciencias Naturales",
+    Asignatura_Nombre: "Ciencias Naturales",
+    Usuario_Id: 6,
+    docente: "Roberto Silva",
+    Docente_Nombre: "Roberto Silva",
+    Bloque_Horario_Id: 5,
+    horaInicio: "10:30:00",
+    horaFin: "11:15:00",
+    hora_inicio: "10:30:00",
+    hora_fin: "11:15:00",
+    dia: "Jueves",
+    estado: "Activo",
+    Horario_Estado: "Activo",
+    eliminado: 0,
+    observaciones: ["Clase regular de Ciencias Naturales."]
+  },
+  {
+    Horario_Asignatura_Id: 13,
+    Curso_Id: 1,
+    curso: "1° Básico A",
+    Curso_Nombre: "1° Básico A",
+    Asignatura_Id: 1,
+    asignatura: "Lenguaje y Comunicación",
+    Asignatura_Nombre: "Lenguaje y Comunicación",
+    Usuario_Id: 5,
+    docente: "Ana Torres",
+    Docente_Nombre: "Ana Torres",
+    Bloque_Horario_Id: 1,
+    horaInicio: "08:00:00",
+    horaFin: "08:45:00",
+    hora_inicio: "08:00:00",
+    hora_fin: "08:45:00",
+    dia: "Viernes",
+    estado: "Activo",
+    Horario_Estado: "Activo",
+    eliminado: 0,
+    observaciones: ["Clase regular de Lenguaje y Comunicación."]
+  },
 ];
 
-
 let STORE_HORARIOS = loadStore("SIGAE_HORARIOS", SEED_HORARIOS);
+if (!Array.isArray(STORE_HORARIOS) || STORE_HORARIOS.length < SEED_HORARIOS.length || !STORE_HORARIOS[0]?.horaInicio) {
+  STORE_HORARIOS = SEED_HORARIOS;
+  saveStore("SIGAE_HORARIOS", STORE_HORARIOS);
+}
 
 // 7. Cursos Institucionales
 const STORE_CURSOS = [
@@ -1580,9 +1769,59 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     return STORE_HORARIOS;
   }
 
-  // Horario de Docente
+  // Horario de Docente (/api/horarios/docente/:id/horario)
   if (p.includes("/horarios/docente/") && p.includes("/horario")) {
-    return STORE_HORARIOS.filter(h => h.Usuario_Id === 3 || h.Usuario_Id === 5 || h.estado !== "Eliminado");
+    const targetDocenteId = reqId || 3;
+    return STORE_HORARIOS.filter(h =>
+      (Number(h.Usuario_Id) === Number(targetDocenteId) || Number(h.docente_id) === Number(targetDocenteId)) &&
+      h.estado !== "Eliminado" &&
+      h.eliminado !== 1
+    ).map(h => ({
+      id: h.Horario_Asignatura_Id,
+      dia: h.dia,
+      horaInicio: h.horaInicio || h.hora_inicio || h.Horario_Hora_Inicio || "08:00:00",
+      horaFin: h.horaFin || h.hora_fin || h.Horario_Hora_Fin || "08:45:00",
+      hora_inicio: h.hora_inicio || h.horaInicio || "08:00:00",
+      hora_fin: h.hora_fin || h.horaFin || "08:45:00",
+      asignatura: h.asignatura || h.Asignatura_Nombre,
+      asignaturaId: h.Asignatura_Id,
+      curso: h.curso || h.Curso_Nombre,
+      docente: h.docente || h.Docente_Nombre,
+      estado: h.estado || h.Horario_Estado || "Activo",
+      pendiente: Boolean(Number(h.pendiente)),
+    }));
+  }
+
+  // Horario de Estudiante (/api/horarios/estudiante/:id/horario)
+  if (p.includes("/horarios/estudiante/") && p.includes("/horario")) {
+    const est = (reqId && STORE_ESTUDIANTES.find(e => e.Estudiante_Id === reqId)) || STORE_ESTUDIANTES[0];
+    const cursoId = est ? est.Curso_Id : 1;
+    const clasesCurso = STORE_HORARIOS.filter(h =>
+      (Number(h.Curso_Id) === Number(cursoId) || Number(h.curso_id) === Number(cursoId)) &&
+      h.estado !== "Eliminado" &&
+      h.eliminado !== 1
+    ).map(h => ({
+      id: h.Horario_Asignatura_Id,
+      dia: h.dia,
+      horaInicio: h.horaInicio || h.hora_inicio || h.Horario_Hora_Inicio || "08:00:00",
+      horaFin: h.horaFin || h.hora_fin || h.Horario_Hora_Fin || "08:45:00",
+      hora_inicio: h.hora_inicio || h.horaInicio || "08:00:00",
+      hora_fin: h.hora_fin || h.horaFin || "08:45:00",
+      asignatura: h.asignatura || h.Asignatura_Nombre,
+      asignaturaId: h.Asignatura_Id,
+      curso: h.curso || h.Curso_Nombre,
+      docente: h.docente || h.Docente_Nombre,
+      estado: h.estado || h.Horario_Estado || "Activo",
+      pendiente: Boolean(Number(h.pendiente)),
+    }));
+    return {
+      estudiante: {
+        id: est.Estudiante_Id,
+        nombre: est.Estudiante_Nombre_Completo,
+        curso: est.Curso_Nombre || "1° Básico A"
+      },
+      horario: clasesCurso
+    };
   }
 
   // Parámetros institucionales
