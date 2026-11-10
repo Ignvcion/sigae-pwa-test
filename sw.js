@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sigae-pwa-v18';
+const CACHE_NAME = 'sigae-pwa-v19';
 const PRECACHE_ASSETS = [
   './manifest.json',
   './favicon.svg',
