@@ -242,7 +242,7 @@ Producción durante la marcha blanca:
 
 ### 1. Código en el servidor
 
-El servidor solo recibe el backend y el esquema (sparse-checkout de lista blanca): `webSIGAE/BackEnd/`, `webSIGAE/Database/schema_base.sql` y `webSIGAE/Database/catalogos_base.sql`, **excluyendo** `SIGAE.sql`, `BackEnd/tests/` y `BackEnd/hashPasswords.js`. `BackEnd/scripts/` **sí** va al servidor: de ahí salen `crearSuperAdmin.js` (paso 2) y `backup.sh` (paso 6).
+El servidor solo recibe el backend y el esquema (sparse-checkout de lista blanca): `webSIGAE/BackEnd/`, `webSIGAE/Database/schema_base.sql` y `webSIGAE/Database/catalogos_base.sql`, **excluyendo** `SIGAE.sql`, `BackEnd/tests/` y `BackEnd/hashPasswords.js`. `BackEnd/scripts/` **sí** va al servidor: de ahí sale `crearSuperAdmin.js` (paso 2). `backup.sh` no se usa en producción: los respaldos de la base son los snapshots de la RDS (paso 6).
 
 **Node 22 (≥ 22.12)**, la misma versión mayor que el codespace (`node --version`): Puppeteer lo exige. `apt` de Debian 13 trae Node 20, así que instálalo desde NodeSource: `curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs`.
 
