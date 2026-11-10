@@ -42,6 +42,10 @@ const SEED_USUARIOS = [
     Usuario_Correo: "es.gonzales@jacquescousteau.edu",
     Usuario_Telefono: "+56 9 8765 4321",
     Usuario_Estado_Cuenta: 1,
+    Usuario_Direccion_Calle: "Av. El Bosque",
+    Usuario_Direccion_Numero: "101",
+    Usuario_Direccion_Depto: "Of. 402",
+    Usuario_Direccion_Comuna: "Las Condes",
   },
   {
     Usuario_Id: 2,
@@ -55,6 +59,10 @@ const SEED_USUARIOS = [
     Usuario_Correo: "c.gonzales@jacquescousteau.edu",
     Usuario_Telefono: "+56 9 1234 5678",
     Usuario_Estado_Cuenta: 1,
+    Usuario_Direccion_Calle: "Av. El Bosque",
+    Usuario_Direccion_Numero: "101",
+    Usuario_Direccion_Depto: "Of. 402",
+    Usuario_Direccion_Comuna: "Las Condes",
   },
   {
     Usuario_Id: 3,
@@ -66,8 +74,13 @@ const SEED_USUARIOS = [
     Docente_Correo_Institucional: "m.morales@jacquescousteau.edu",
     Usuario_Correo: "m.morales@jacquescousteau.edu",
     Docente_Especialidad: "Matemáticas",
+    Docente_Carga_Horaria_Maxima: 36,
     Usuario_Telefono: "+56 9 4321 8765",
     Usuario_Estado_Cuenta: 1,
+    Usuario_Direccion_Calle: "Los Aromos",
+    Usuario_Direccion_Numero: "450",
+    Usuario_Direccion_Depto: "",
+    Usuario_Direccion_Comuna: "Providencia",
   },
   {
     Usuario_Id: 4,
@@ -76,9 +89,14 @@ const SEED_USUARIOS = [
     Es_Administrador: 0,
     Es_Docente: 0,
     Es_Apoderado: 1,
+    Apoderado_Correo_Natural: "p.fernandez@email.cl",
     Usuario_Correo: "p.fernandez@email.cl",
     Usuario_Telefono: "+56 9 3344 5566",
     Usuario_Estado_Cuenta: 1,
+    Usuario_Direccion_Calle: "Av. Las Perdices",
+    Usuario_Direccion_Numero: "300",
+    Usuario_Direccion_Depto: "Casa B",
+    Usuario_Direccion_Comuna: "La Florida",
   },
   {
     Usuario_Id: 5,
@@ -90,8 +108,13 @@ const SEED_USUARIOS = [
     Docente_Correo_Institucional: "a.torres@jacquescousteau.edu",
     Usuario_Correo: "a.torres@jacquescousteau.edu",
     Docente_Especialidad: "Lenguaje y Comunicación",
+    Docente_Carga_Horaria_Maxima: 36,
     Usuario_Telefono: "+56 9 5566 7788",
     Usuario_Estado_Cuenta: 1,
+    Usuario_Direccion_Calle: "San Martín",
+    Usuario_Direccion_Numero: "123",
+    Usuario_Direccion_Depto: "",
+    Usuario_Direccion_Comuna: "Santiago",
   },
   {
     Usuario_Id: 6,
@@ -103,8 +126,13 @@ const SEED_USUARIOS = [
     Docente_Correo_Institucional: "r.silva@jacquescousteau.edu",
     Usuario_Correo: "r.silva@jacquescousteau.edu",
     Docente_Especialidad: "Ciencias Naturales",
+    Docente_Carga_Horaria_Maxima: 36,
     Usuario_Telefono: "+56 9 6677 8899",
     Usuario_Estado_Cuenta: 1,
+    Usuario_Direccion_Calle: "Av. Grecia",
+    Usuario_Direccion_Numero: "789",
+    Usuario_Direccion_Depto: "",
+    Usuario_Direccion_Comuna: "Ñuñoa",
   },
   {
     Usuario_Id: 7,
@@ -113,9 +141,14 @@ const SEED_USUARIOS = [
     Es_Administrador: 0,
     Es_Docente: 0,
     Es_Apoderado: 1,
+    Apoderado_Correo_Natural: "f.soto@email.cl",
     Usuario_Correo: "f.soto@email.cl",
     Usuario_Telefono: "+56 9 7788 9900",
     Usuario_Estado_Cuenta: 0, // Inactivo para pruebas
+    Usuario_Direccion_Calle: "Av. Las Perdices",
+    Usuario_Direccion_Numero: "340",
+    Usuario_Direccion_Depto: "",
+    Usuario_Direccion_Comuna: "La Florida",
   },
   {
     Usuario_Id: 8,
@@ -127,12 +160,30 @@ const SEED_USUARIOS = [
     Docente_Correo_Institucional: "g.ramos@jacquescousteau.edu",
     Usuario_Correo: "g.ramos@jacquescousteau.edu",
     Docente_Especialidad: "Historia y Geografía",
+    Docente_Carga_Horaria_Maxima: 36,
     Usuario_Telefono: "+56 9 7788 9900",
     Usuario_Estado_Cuenta: 0, // Inactivo para pruebas
+    Usuario_Direccion_Calle: "Vicuña Mackenna",
+    Usuario_Direccion_Numero: "555",
+    Usuario_Direccion_Depto: "",
+    Usuario_Direccion_Comuna: "La Florida",
   },
 ];
 
-let STORE_USUARIOS = loadStore("SIGAE_USUARIOS", SEED_USUARIOS);
+let STORE_USUARIOS = loadStore("SIGAE_USUARIOS", SEED_USUARIOS).map(u => {
+  const seed = SEED_USUARIOS.find(s => s.Usuario_Id === u.Usuario_Id);
+  return {
+    ...seed,
+    ...u,
+    Usuario_Direccion_Calle: u.Usuario_Direccion_Calle || seed?.Usuario_Direccion_Calle || "Av. Las Perdices",
+    Usuario_Direccion_Numero: u.Usuario_Direccion_Numero || seed?.Usuario_Direccion_Numero || "100",
+    Usuario_Direccion_Depto: u.Usuario_Direccion_Depto || seed?.Usuario_Direccion_Depto || "",
+    Usuario_Direccion_Comuna: u.Usuario_Direccion_Comuna || seed?.Usuario_Direccion_Comuna || "La Florida",
+    Administrador_Correo_Institucional: u.Administrador_Correo_Institucional || seed?.Administrador_Correo_Institucional || (u.Es_Administrador ? u.Usuario_Correo : null),
+    Docente_Correo_Institucional: u.Docente_Correo_Institucional || seed?.Docente_Correo_Institucional || (u.Es_Docente ? u.Usuario_Correo : null),
+    Apoderado_Correo_Natural: u.Apoderado_Correo_Natural || seed?.Apoderado_Correo_Natural || (u.Es_Apoderado ? u.Usuario_Correo : null),
+  };
+});
 
 
 // Asegurar que el docente inactivo esté presente en STORE_USUARIOS
@@ -1433,6 +1484,49 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   }
 
   if (m === "PUT" || m === "PATCH") {
+    // Desactivar / Reactivar cuenta de usuario (CU21 / CU22)
+    if (p.includes("/usuarios/") && p.includes("/estado") && reqId) {
+      let nuevoEstado = 0;
+      STORE_USUARIOS = STORE_USUARIOS.map(u => {
+        if (Number(u.Usuario_Id) === Number(reqId)) {
+          nuevoEstado = u.Usuario_Estado_Cuenta ? 0 : 1;
+          return { ...u, Usuario_Estado_Cuenta: nuevoEstado };
+        }
+        return u;
+      });
+      saveStore("SIGAE_USUARIOS", STORE_USUARIOS);
+      return { ok: true, status: 200, mensaje: "Estado actualizado", estado: nuevoEstado };
+    }
+
+    // Editar datos personales del propio perfil (CU19)
+    if (p.includes("/usuarios/perfil") && !p.includes("/foto")) {
+      const targetId = b?.id || 1;
+      STORE_USUARIOS = STORE_USUARIOS.map(u => {
+        if (Number(u.Usuario_Id) === Number(targetId) || u.Es_Administrador) {
+          return {
+            ...u,
+            Usuario_Correo: b?.correo || u.Usuario_Correo,
+            Administrador_Correo_Institucional: u.Es_Administrador ? (b?.correo || u.Administrador_Correo_Institucional) : u.Administrador_Correo_Institucional,
+            Docente_Correo_Institucional: u.Es_Docente ? (b?.correo || u.Docente_Correo_Institucional) : u.Docente_Correo_Institucional,
+            Apoderado_Correo_Natural: u.Es_Apoderado ? (b?.correo || u.Apoderado_Correo_Natural) : u.Apoderado_Correo_Natural,
+            Usuario_Telefono: b?.telefono || u.Usuario_Telefono,
+            Usuario_Direccion_Calle: b?.direccion?.calle ?? u.Usuario_Direccion_Calle,
+            Usuario_Direccion_Numero: b?.direccion?.numero ?? u.Usuario_Direccion_Numero,
+            Usuario_Direccion_Depto: b?.direccion?.depto ?? u.Usuario_Direccion_Depto,
+            Usuario_Direccion_Comuna: b?.direccion?.comuna ?? u.Usuario_Direccion_Comuna,
+          };
+        }
+        return u;
+      });
+      saveStore("SIGAE_USUARIOS", STORE_USUARIOS);
+      return { ok: true, status: 200, mensaje: "Perfil actualizado correctamente" };
+    }
+
+    // Editar fotografía de perfil (CU20)
+    if (p.includes("/usuarios/perfil/foto")) {
+      return { ok: true, status: 200, mensaje: "Fotografía actualizada exitosamente" };
+    }
+
     // Editar usuario o administrador
     if (p.includes("/usuarios") && reqId) {
       STORE_USUARIOS = STORE_USUARIOS.map(u => {
@@ -1788,7 +1882,7 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
   }
 
   // Horario de Docente (/api/horarios/docente/:id/horario)
-  if (p.includes("/horarios/docente/") && p.includes("/horario")) {
+  if (p.includes("/horarios/docente/") && !p.includes("/asignaciones") && (p.includes("/horario/") || p.endsWith("/horario") || p.includes("/horario?"))) {
     const targetDocenteId = reqId || 3;
     return STORE_HORARIOS.filter(h =>
       (Number(h.Usuario_Id) === Number(targetDocenteId) || Number(h.docente_id) === Number(targetDocenteId)) &&
@@ -1856,9 +1950,63 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     };
   }
 
+  // Cursos y asignaturas asignadas a un docente (CU42)
+  if (p.includes("/horarios/docente/") && p.includes("/asignaciones")) {
+    const targetDocenteId = reqId || 3;
+    const clasesDoc = STORE_HORARIOS.filter(h =>
+      (Number(h.Usuario_Id) === Number(targetDocenteId) || Number(h.docente_id) === Number(targetDocenteId)) &&
+      h.estado !== "Eliminado" &&
+      h.eliminado !== 1
+    );
+
+    const grupos = {};
+    for (const c of clasesDoc) {
+      const key = `${c.Curso_Id || c.curso}-${c.Asignatura_Id || c.asignatura}`;
+      if (!grupos[key]) {
+        grupos[key] = {
+          cursoId: c.Curso_Id || 1,
+          curso: c.curso || c.Curso_Nombre || "1° Básico A",
+          nivelEducativo: c.nivelEducativo || "1° Básico",
+          asignaturaId: c.Asignatura_Id || 1,
+          asignatura: c.asignatura || c.Asignatura_Nombre || "Asignatura",
+          horasSemanales: 0,
+          estadoVigencia: c.estado || "Activo",
+          bloques: []
+        };
+      }
+      grupos[key].horasSemanales += 0.75;
+      grupos[key].bloques.push({
+        dia: c.dia,
+        horaInicio: c.horaInicio || c.hora_inicio || "08:00:00",
+        horaFin: c.horaFin || c.hora_fin || "08:45:00",
+        estado: c.estado || "Activo"
+      });
+    }
+    return Object.values(grupos);
+  }
+
   // Horarios de curso
   if (p.includes("/horarios") && !p.includes("/exportar")) {
     return STORE_HORARIOS;
+  }
+
+  // Usuario individual por ID (CU17 / CU18)
+  if (p.includes("/usuarios/") && reqId && !p.includes("/administradores") && !p.includes("/buscar") && !p.includes("/filtrar")) {
+    const u = STORE_USUARIOS.find(usr => Number(usr.Usuario_Id) === Number(reqId));
+    if (!u) return null;
+    return {
+      ...u,
+      Usuario_Foto_Perfil: u.Usuario_Foto_Perfil || null,
+      Administrador_Correo_Institucional: u.Administrador_Correo_Institucional || (u.Es_Administrador ? u.Usuario_Correo : null),
+      Docente_Correo_Institucional: u.Docente_Correo_Institucional || (u.Es_Docente ? u.Usuario_Correo : null),
+      Apoderado_Correo_Natural: u.Apoderado_Correo_Natural || (u.Es_Apoderado ? u.Usuario_Correo : null),
+      Docente_Especialidad: u.Docente_Especialidad || (u.Es_Docente ? "General" : null),
+      Docente_Carga_Horaria_Maxima: u.Docente_Carga_Horaria_Maxima || (u.Es_Docente ? 36 : null),
+      Usuario_Direccion_Calle: u.Usuario_Direccion_Calle || "Av. Las Perdices",
+      Usuario_Direccion_Numero: u.Usuario_Direccion_Numero || "100",
+      Usuario_Direccion_Depto: u.Usuario_Direccion_Depto || "",
+      Usuario_Direccion_Comuna: u.Usuario_Direccion_Comuna || "La Florida",
+    };
   }
 
   // Lista general de Usuarios con filtros

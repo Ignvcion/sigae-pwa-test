@@ -80,7 +80,10 @@ function Perfil() {
           setErrorPerfil(data.mensaje || "No fue posible cargar el perfil");
           return;
         }
-        setDatos(data);
+        const userObj = Array.isArray(data)
+          ? (data.find((u) => String(u.Usuario_Id) === String(idObjetivo)) || data[0])
+          : data;
+        setDatos(userObj);
       })
       .catch(() => setErrorPerfil("No fue posible cargar el perfil"))
       .finally(() => setCargando(false));
@@ -162,7 +165,12 @@ function Perfil() {
         if (!r || !r.ok) throw new Error(`HTTP ${r?.status}`);
         return r.json();
       })
-      .then((data) => setDatos(data))
+      .then((data) => {
+        const userObj = Array.isArray(data)
+          ? (data.find((u) => String(u.Usuario_Id) === String(idObjetivo)) || data[0])
+          : data;
+        setDatos(userObj);
+      })
       .catch(console.error);
   };
 
