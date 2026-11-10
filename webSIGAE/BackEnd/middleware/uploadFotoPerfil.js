@@ -10,14 +10,18 @@ const { UPLOADS_DIR } = require('../config/env');
 const UPLOAD_DIR = path.join(UPLOADS_DIR, 'perfiles');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-const TIPOS_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp'];
+// Extensión según el tipo permitido. NUNCA se usa la extensión del nombre que
+// envía el cliente: el tipo declarado también lo manda el cliente, y un
+// "x.html" declarado como image/png se serviría luego desde /uploads como HTML
+// en el mismo dominio de la aplicación.
+const EXTENSION_POR_TIPO = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
+const TIPOS_PERMITIDOS = Object.keys(EXTENSION_POR_TIPO);
 const TAMANO_MAXIMO_BYTES = 5 * 1024 * 1024; // 5MB
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `usuario-${req.user.id}-${Date.now()}${ext}`);
+    cb(null, `usuario-${req.user.id}-${Date.now()}${EXTENSION_POR_TIPO[file.mimetype]}`);
   },
 });
 
@@ -32,5 +36,29 @@ const uploadFotoPerfil = multer({
   },
 }).single('foto');
 
+/**
+ * Comprueba los primeros bytes del archivo ya guardado (JPEG, PNG o WEBP reales).
+ * Si no coinciden con el tipo declarado, borra el archivo y devuelve false.
+ */
+function esImagenValida(rutaArchivo, mimetype) {
+  let fd;
+  try {
+    fd = fs.openSync(rutaArchivo, 'r');
+    const b = Buffer.alloc(12);
+    fs.readSync(fd, b, 0, 12, 0);
+    const ok = {
+      'image/jpeg': () => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
+      'image/png': () => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+      'image/webp': () => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP',
+    }[mimetype];
+    if (ok && ok()) return true;
+  } catch { /* se trata como inválido */ } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+  try { fs.unlinkSync(rutaArchivo); } catch { /* ya no existe */ }
+  return false;
+}
+
 module.exports = uploadFotoPerfil;
 module.exports.UPLOAD_DIR = UPLOAD_DIR;
+module.exports.esImagenValida = esImagenValida;
