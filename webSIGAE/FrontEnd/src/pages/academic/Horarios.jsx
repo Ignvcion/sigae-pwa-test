@@ -110,7 +110,7 @@ function ClasesEliminadasMini({ clases }) {
 /* ═══════════════════════════════════════════════════════════════ */
 /*  ListadoCursosSidebar — panel that overlays the nav sidebar   */
 /* ═══════════════════════════════════════════════════════════════ */
-function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
+function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh, onSelectCurso, cursoSeleccionado }) {
   const [vistas, setVistas] = useState({});
 
   useEffect(() => {
@@ -138,54 +138,197 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
   };
 
   return (
-    <div
-      style={{ position: "fixed", top: 0, left: 0, width: 300, height: "100vh", background: "#fff", boxShadow: "4px 0 28px rgba(0,0,0,0.15)", display: "flex", flexDirection: "column", animation: "slideInLeft 0.22s ease", zIndex: 990 }}
-    >
-        {/* Header */}
-        <div style={{ background: "#0f172a", padding: "0.85rem 1.1rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, position: "sticky", top: 0, zIndex: 1 }}>
+    <>
+      {/* Backdrop overlay para cerrar al tocar afuera en móvil y escritorio */}
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(15, 23, 42, 0.55)",
+          backdropFilter: "blur(2px)",
+          zIndex: 1100,
+        }}
+      />
+
+      {/* Drawer desplegable con z-index superior a la barra superior móvil (999) */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "min(340px, 86vw)",
+          height: "100vh",
+          background: "#fff",
+          boxShadow: "4px 0 28px rgba(0,0,0,0.25)",
+          display: "flex",
+          flexDirection: "column",
+          animation: "slideInLeft 0.22s ease",
+          zIndex: 1101,
+        }}
+      >
+        {/* Header visible con título y botón de cierre */}
+        <div
+          style={{
+            background: "#0f172a",
+            padding: "0.85rem 1.1rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexShrink: 0,
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
+          }}
+        >
           <div>
-            <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.88rem" }}>Listado de Cursos</div>
-            <div style={{ color: "#94a3b8", fontSize: "0.68rem", marginTop: 1 }}>{cursos.length} cursos — comparación de horarios</div>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.92rem", display: "flex", alignItems: "center", gap: 6 }}>
+              <span>📋</span> Listado de Cursos
+            </div>
+            <div style={{ color: "#94a3b8", fontSize: "0.7rem", marginTop: 2 }}>
+              {cursos.length} cursos registrados
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={onRefresh} title="Actualizar" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#94a3b8", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: "0.75rem", display: "flex", alignItems: "center", justifyContent: "center" }}>↺</button>
-            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: "0.85rem", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <button
+              onClick={onRefresh}
+              title="Actualizar datos"
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                color: "#cbd5e1",
+                borderRadius: 6,
+                width: 28,
+                height: 28,
+                cursor: "pointer",
+                fontSize: "0.8rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              ↺
+            </button>
+            <button
+              onClick={onClose}
+              title="Cerrar panel"
+              style={{
+                background: "rgba(255,255,255,0.15)",
+                border: "1px solid rgba(255,255,255,0.25)",
+                color: "#fff",
+                borderRadius: 6,
+                width: 28,
+                height: 28,
+                cursor: "pointer",
+                fontSize: "0.9rem",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              ✕
+            </button>
           </div>
         </div>
 
-        {/* Course list */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "0.55rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+        {/* Lista de Cursos */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "0.6rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
           {cursos.length === 0 ? (
-            <p style={{ color: "#94a3b8", fontSize: "0.82rem", textAlign: "center", marginTop: "2rem" }}>Cargando...</p>
+            <p style={{ color: "#94a3b8", fontSize: "0.82rem", textAlign: "center", marginTop: "2rem" }}>Cargando cursos...</p>
           ) : cursos.map(curso => {
-            const pct = curso.total_horas_requeridas > 0
-              ? Math.min(100, Math.round((curso.total_horas_programadas / curso.total_horas_requeridas) * 100))
-              : 0;
+            const prog = Number(curso.total_horas_programadas) || 0;
+            const req = Number(curso.total_horas_requeridas) || 0;
+            const pct = req > 0 ? Math.min(100, Math.round((prog / req) * 100)) : (prog > 0 ? 100 : 0);
             const vistaData = vistas[curso.Curso_Id];
             const vistaAbierta = vistaData && vistaData !== "loading";
             const barColor = pct >= 100 ? "#22c55e" : pct > 50 ? "#6366f1" : "#f59e0b";
+            const esSeleccionado = Number(cursoSeleccionado) === Number(curso.Curso_Id);
 
             return (
-              <div key={curso.Curso_Id} style={{ background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", padding: "0.5rem 0.6rem" }}>
-                <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {curso.Curso_Nombre}
+              <div
+                key={curso.Curso_Id}
+                style={{
+                  background: esSeleccionado ? "#f0f7ff" : "#f8fafc",
+                  borderRadius: 8,
+                  border: `1px solid ${esSeleccionado ? "#3b82f6" : "#e2e8f0"}`,
+                  padding: "0.55rem 0.65rem",
+                  boxShadow: esSeleccionado ? "0 0 0 2px rgba(59, 130, 246, 0.25)" : "none",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+                  <div
+                    onClick={() => onSelectCurso && onSelectCurso(curso.Curso_Id)}
+                    style={{
+                      fontWeight: 700,
+                      fontSize: "0.84rem",
+                      color: esSeleccionado ? "#1d4ed8" : "#1e293b",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                    title="Clic para seleccionar este curso"
+                  >
+                    <span>{curso.Curso_Nombre}</span>
+                    {esSeleccionado && (
+                      <span style={{ fontSize: "0.62rem", background: "#3b82f6", color: "#fff", padding: "1px 6px", borderRadius: 10, fontWeight: 600 }}>
+                        Seleccionado
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => onSelectCurso && onSelectCurso(curso.Curso_Id)}
+                    style={{
+                      fontSize: "0.68rem",
+                      padding: "2px 7px",
+                      borderRadius: 4,
+                      border: "1px solid #cbd5e1",
+                      background: "#fff",
+                      color: "#334155",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                    }}
+                    title="Ver horario de este curso"
+                  >
+                    Ver →
+                  </button>
                 </div>
-                <div style={{ fontSize: "0.67rem", color: "#64748b", marginBottom: 5 }}>{curso.Nivel_Educativo_Nombre}</div>
+
+                <div style={{ fontSize: "0.68rem", color: "#64748b", marginBottom: 5 }}>
+                  {curso.Nivel_Educativo_Nombre || "Nivel"} · Periodo {curso.Curso_Periodo_Lectivo || "2026"}
+                </div>
+
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                  <span style={{ fontSize: "0.64rem", color: "#6b7280" }}>
-                    {Number(curso.total_horas_programadas).toFixed(1)}h de {curso.total_horas_requeridas}h
+                  <span style={{ fontSize: "0.66rem", color: "#6b7280" }}>
+                    {prog.toFixed(1)}h {req > 0 ? `de ${req}h` : "programadas"}
                   </span>
-                  <span style={{ fontSize: "0.64rem", fontWeight: 700, color: pct >= 100 ? "#166534" : "#6b7280" }}>{pct}%</span>
+                  <span style={{ fontSize: "0.66rem", fontWeight: 700, color: pct >= 100 ? "#166534" : "#6b7280" }}>
+                    {pct}%
+                  </span>
                 </div>
-                <div style={{ height: 4, background: "#e2e8f0", borderRadius: 2, overflow: "hidden", marginBottom: 7 }}>
-                  <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: 2, transition: "width 0.3s" }} />
+
+                <div style={{ height: 5, background: "#e2e8f0", borderRadius: 3, overflow: "hidden", marginBottom: 7 }}>
+                  <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: 3, transition: "width 0.3s" }} />
                 </div>
+
                 <button
                   onClick={() => toggleVista(curso.Curso_Id)}
-                  style={{ width: "100%", border: `1px solid ${vistaAbierta ? "#c4b5fd" : "#dbeafe"}`, borderRadius: 5, padding: "0.2rem 0.5rem", fontSize: "0.69rem", fontWeight: 600, cursor: "pointer", background: vistaAbierta ? "#ede9fe" : "#f0f4ff", color: vistaAbierta ? "#5b21b6" : "#4f46e5", transition: "all 0.15s" }}
+                  style={{
+                    width: "100%",
+                    border: `1px solid ${vistaAbierta ? "#c4b5fd" : "#dbeafe"}`,
+                    borderRadius: 5,
+                    padding: "0.22rem 0.5rem",
+                    fontSize: "0.7rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    background: vistaAbierta ? "#ede9fe" : "#f0f4ff",
+                    color: vistaAbierta ? "#5b21b6" : "#4f46e5",
+                    transition: "all 0.15s",
+                  }}
                 >
-                  {vistaData === "loading" ? "Cargando..." : vistaAbierta ? "▲ Ocultar" : "▼ Vista rápida"}
+                  {vistaData === "loading" ? "Cargando..." : vistaAbierta ? "▲ Ocultar vista rápida" : "▼ Vista rápida"}
                 </button>
+
                 {vistaAbierta && (
                   <>
                     <MiniGrid bloques={bloques} horarios={vistaData.horarios.filter(h => !esEliminada(h))} colorMap={vistaData.colorMap} />
@@ -197,6 +340,7 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
           })}
         </div>
       </div>
+    </>
   );
 }
 
@@ -916,6 +1060,11 @@ export default function Horarios() {
           bloques={bloques}
           onClose={() => setListadoAbierto(false)}
           onRefresh={cargarResumenCursos}
+          onSelectCurso={(cId) => {
+            handleCursoChange(cId);
+            setListadoAbierto(false);
+          }}
+          cursoSeleccionado={cursoSeleccionado}
         />
       )}
     </div>

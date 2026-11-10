@@ -1859,30 +1859,32 @@ body.horarios-panel-open .main-content {
   padding-right: 460px;
 }
 
-/* ===== LISTADO CURSOS: colapsa sidebar izquierda ===== */
-body.horarios-listado-open .sidebar {
-  width: 60px;
-  min-width: 60px;
-  padding: 14px 10px;
-  overflow: hidden;
-}
+/* ===== LISTADO CURSOS: colapsa sidebar izquierda (solo en pantallas de escritorio) ===== */
+@media (min-width: 769px) {
+  body.horarios-listado-open .sidebar {
+    width: 60px;
+    min-width: 60px;
+    padding: 14px 10px;
+    overflow: hidden;
+  }
 
-body.horarios-listado-open .sidebar .logo,
-body.horarios-listado-open .sidebar .sidebar-user-info,
-body.horarios-listado-open .sidebar .menu-section,
-body.horarios-listado-open .sidebar .logout-button {
-  display: none;
-}
+  body.horarios-listado-open .sidebar .logo,
+  body.horarios-listado-open .sidebar .sidebar-user-info,
+  body.horarios-listado-open .sidebar .menu-section,
+  body.horarios-listado-open .sidebar .logout-button {
+    display: none;
+  }
 
-body.horarios-listado-open .sidebar .menu a {
-  font-size: 0;
-  padding: 10px;
-  display: flex;
-  justify-content: center;
-}
+  body.horarios-listado-open .sidebar .menu a {
+    font-size: 0;
+    padding: 10px;
+    display: flex;
+    justify-content: center;
+  }
 
-body.horarios-listado-open .main-content {
-  padding-left: 240px;
+  body.horarios-listado-open .main-content {
+    padding-left: 240px;
+  }
 }
 
 /* ===== BLOQUES HORARIOS: oculta sidebar completamente ===== */

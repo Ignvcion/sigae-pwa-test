@@ -2589,9 +2589,79 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
     return Object.values(grupos);
   }
 
-  // Horarios de curso
-  if (p.includes("/horarios") && !p.includes("/exportar")) {
-    return STORE_HORARIOS;
+  // Resumen de horas por curso para el listado lateral (/api/horarios/resumen-cursos)
+  if (p.includes("/horarios/resumen-cursos")) {
+    return STORE_CURSOS.map(c => {
+      const cId = Number(c.Curso_Id);
+      const clasesCurso = STORE_HORARIOS.filter(h =>
+        (Number(h.Curso_Id) === cId || h.curso === c.Curso_Nombre) &&
+        h.estado !== "Eliminado" &&
+        h.eliminado !== 1
+      );
+      const totalProg = Math.round(clasesCurso.length * 0.75 * 10) / 10;
+      const asigsActivas = (c.asignaturas || []).filter(a => a.Estado_Asignacion === "Activa" || a.estado === "Activa");
+      const totalReq = asigsActivas.length > 0 ? asigsActivas.length * 4 : 16;
+
+      return {
+        Curso_Id: cId,
+        Curso_Nombre: c.Curso_Nombre,
+        Nivel_Educativo_Nombre: c.Nivel_Educativo_Nombre || (cId + "° Básico"),
+        Curso_Periodo_Lectivo: c.Curso_Periodo_Lectivo || "2026",
+        total_horas_requeridas: totalReq,
+        total_horas_programadas: totalProg,
+      };
+    });
+  }
+
+  // Asignaturas de un curso con horas requeridas y programadas (/api/horarios/asignaturas-curso?curso_id=X)
+  if (p.includes("/horarios/asignaturas-curso")) {
+    let targetCursoId = 1;
+    try {
+      const u = new URL(urlStr, "http://localhost");
+      if (u.searchParams.get("curso_id")) targetCursoId = Number(u.searchParams.get("curso_id"));
+    } catch {}
+
+    const targetCurso = STORE_CURSOS.find(c => Number(c.Curso_Id) === targetCursoId) || STORE_CURSOS[0];
+    const asigs = (targetCurso?.asignaturas && targetCurso.asignaturas.length > 0) ? targetCurso.asignaturas : [
+      { Asignatura_Id: 1, Asignatura_Nombre: "Lenguaje y Comunicación", Estado_Asignacion: "Activa" },
+      { Asignatura_Id: 2, Asignatura_Nombre: "Matemáticas", Estado_Asignacion: "Activa" },
+      { Asignatura_Id: 3, Asignatura_Nombre: "Ciencias Naturales", Estado_Asignacion: "Activa" },
+      { Asignatura_Id: 4, Asignatura_Nombre: "Historia y Geografía", Estado_Asignacion: "Activa" },
+    ];
+
+    return asigs.map(a => {
+      const asigId = Number(a.Asignatura_Id);
+      const clasesAsig = STORE_HORARIOS.filter(h =>
+        (Number(h.Curso_Id) === targetCursoId || h.curso === targetCurso?.Curso_Nombre) &&
+        Number(h.Asignatura_Id) === asigId &&
+        h.estado !== "Eliminado" &&
+        h.eliminado !== 1
+      );
+      const horasProg = Math.round(clasesAsig.length * 0.75 * 10) / 10;
+      return {
+        Asignatura_Id: asigId,
+        Asignatura_Nombre: a.Asignatura_Nombre,
+        Horas_Semanales_Requeridas: a.Horas_Semanales_Requeridas ?? a.horas_semanales ?? 4,
+        Horas_Programadas: horasProg,
+      };
+    });
+  }
+
+  // Horarios de curso (/api/horarios?curso_id=X&incluir_eliminadas=1)
+  if (p.includes("/horarios") && !p.includes("/exportar") && !p.includes("/resumen-cursos") && !p.includes("/asignaturas-curso")) {
+    let filtered = [...STORE_HORARIOS];
+    try {
+      const u = new URL(urlStr, "http://localhost");
+      const cId = u.searchParams.get("curso_id");
+      const incElim = u.searchParams.get("incluir_eliminadas");
+      if (cId) {
+        filtered = filtered.filter(h => Number(h.Curso_Id) === Number(cId) || (Number(cId) === 1 && !h.Curso_Id));
+      }
+      if (incElim !== "1" && incElim !== "true") {
+        filtered = filtered.filter(h => h.estado !== "Eliminado" && h.eliminado !== 1);
+      }
+    } catch {}
+    return filtered;
   }
 
   // Usuario individual por ID (CU17 / CU18)
