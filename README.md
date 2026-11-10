@@ -117,6 +117,7 @@ Toda la documentación, salvo este README, está en `docs/`. No agregues archivo
 | [`docs/api-citaciones.md`](docs/api-citaciones.md) | Contrato entre frontend y backend del módulo de citaciones (CU74–CU79): endpoints, formato de respuestas y permisos. |
 | [`docs/navegacion-sidebar.md`](docs/navegacion-sidebar.md) | Cómo funciona el sidebar (`MainLayout.jsx`), reglas para agregar enlaces y pendientes conocidos. |
 | [`docs/tabla-historial.md`](docs/tabla-historial.md) | Estado de la tabla de auditoría `historial` y cómo se escriben sus valores. |
+| [`docs/despliegue-produccion.txt`](docs/despliegue-produccion.txt) | Todo lo conocido del despliegue en Amazon (EC2 + RDS): orden de pasos, sparse-checkout, carga de la base, `.env`, primer super administrador, Nginx, respaldos y checklist final. |
 | [`docs/mailer-smtp-produccion.md`](docs/mailer-smtp-produccion.md) | Cómo dejar funcionando el envío de códigos por correo en producción (Google Workspace, SPF/DKIM/DMARC, prueba desde la EC2 y diagnóstico de errores). |
 | [`docs/decisiones-rf60-rf61-periodos.txt`](docs/decisiones-rf60-rf61-periodos.txt) | Acuerdos del Incremento 4 que van más allá del mockup: profesor jefe, situación final, promoción, períodos lectivos y limpieza de datos. |
 
@@ -231,6 +232,8 @@ No agregues archivos de migración aparte mientras tanto.
 ## 📦 Deploy
 
 Producción durante la marcha blanca:
+
+> Guía completa paso a paso, con lo que aún está por definir: [`docs/despliegue-produccion.txt`](docs/despliegue-produccion.txt).
 
 | Pieza | Dónde |
 | --- | --- |

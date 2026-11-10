@@ -1,0 +1,373 @@
+SIGAE - Despliegue a producción (Amazon): todo lo que se sabe
+(10 de noviembre de 2026. Reúne lo del README, docs/ y lo verificado en el
+diagnóstico. Lo que aún no se conoce está marcado como [POR DEFINIR].)
+
+======================================================================
+0. RESUMEN EN UNA PÁGINA
+======================================================================
+
+  Orden recomendado (cada paso se detalla más abajo):
+
+   1. Crear la RDS (MariaDB 10.11) y la EC2 (Debian 13, t3.small).
+   2. Preparar la EC2: Node 22, Chromium, Nginx, pm2, marca de producción.
+   3. Bajar el código con sparse-checkout (solo backend y esquema).
+   4. Cargar schema_base.sql y catalogos_base.sql en la RDS (una vez).
+   5. Crear el usuario de la app (sigae_app) con permisos acotados.
+   6. Escribir el .env de producción (chmod 600).
+   7. Dejar funcionando y PROBAR el correo (docs/mailer-smtp-produccion.md).
+   8. Crear el primer super administrador con scripts/crearSuperAdmin.js.
+   9. Arrancar el backend con pm2.
+  10. Compilar el frontend y copiar dist/ a la EC2; configurar Nginx + HTTPS.
+  11. Primer ingreso del super administrador (código por correo).
+  12. Cargar desde la aplicación: parámetros, bloques, asignaturas, planes,
+      cursos, usuarios, estudiantes y horarios.
+
+======================================================================
+1. ARQUITECTURA
+======================================================================
+
+  Pieza                  Dónde
+  ---------------------  ------------------------------------------------
+  Backend (Node+Express) EC2 Debian 13 (t3.small, 2 GB), pm2, proceso
+                         "sigae-api" (webSIGAE/BackEnd/ecosystem.config.js)
+  Frontend               dist/ de Vite, servido por Nginx en la misma EC2.
+                         Se compila fuera del servidor (Codespaces).
+  Proxy y HTTPS          Nginx + certbot. "/" -> dist/;
+                         "/api" y "/uploads" -> 127.0.0.1:3000
+  Base de datos          Amazon RDS (MariaDB), sin acceso público, solo
+                         desde la EC2 (puerto 3306).
+  Fotos de perfil        /var/sigae/uploads en la EC2 (fuera del repo).
+  Correo                 noreply@colegiojc.cl por SMTP (Google Workspace).
+  Respaldos (Excel)      Google Drive de respaldosigae@colegiojc.cl.
+
+  Red: abiertos solo 80 y 443 al público. El 22 cerrado al público y
+  accesible por Tailscale. El backend escucha solo en 127.0.0.1:3000.
+
+  [POR DEFINIR] Dominio público, región de AWS, endpoint de la RDS, usuario
+  de sistema que corre pm2, ruta donde vive el repo y el dist/ en la EC2.
+
+======================================================================
+2. DATOS DEL COLEGIO
+======================================================================
+
+  - Dominios institucionales (docentes y administradores):
+      @colegiojc.cl (principal) y @colegiojacquescousteau.cl
+    El provisorio @jacquescousteau.edu ya no se acepta.
+  - Apoderados: correo PERSONAL (cualquier dominio). El colegio no les
+    entrega cuenta institucional.
+  - Cuenta que envía los códigos: noreply@colegiojc.cl
+  - Cuenta de respaldos (Google Drive): respaldosigae@colegiojc.cl
+  - Un solo lugar por capa para estos datos:
+      BackEnd/config/institucion.js y FrontEnd/src/config/institucion.js
+
+======================================================================
+3. SERVIDOR EC2
+======================================================================
+
+3.1 Marca de producción (antes que nada)
+      sudo touch /etc/sigae-production
+    Con ese archivo, setup.sh, win_setup.sh y hashPasswords.js se niegan a
+    correr. En el servidor NUNCA se corren SIGAE.sql, setup.sh,
+    win_setup.sh ni hashPasswords.js.
+
+3.2 Paquetes
+    - Node 22 (>= 22.12; Puppeteer 25 lo exige). apt de Debian 13 trae
+      Node 20, así que se instala desde NodeSource:
+        curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+        sudo apt install -y nodejs
+    - Chromium del sistema (exportación a PNG con Puppeteer):
+        sudo apt install -y chromium      (queda en /usr/bin/chromium)
+    - Nginx y certbot:  sudo apt install -y nginx certbot python3-certbot-nginx
+    - pm2:              sudo npm install -g pm2
+    - Cliente MariaDB (para cargar el esquema): sudo apt install -y mariadb-client
+
+3.3 Código (sparse-checkout de lista blanca)
+    El servidor recibe SOLO:
+      webSIGAE/BackEnd/                     (sin tests/ ni hashPasswords.js)
+      webSIGAE/Database/schema_base.sql
+      webSIGAE/Database/catalogos_base.sql
+    Nunca: SIGAE.sql (borra tablas y trae usuarios de prueba con contraseñas
+    en texto plano), BackEnd/tests/, BackEnd/hashPasswords.js, el README (tiene
+    la tabla de usuarios de prueba), .devcontainer/, win_setup.sh.
+    BackEnd/scripts/ SÍ va: de ahí sale crearSuperAdmin.js.
+
+    Ejemplo (git >= 2.25; ajustar la URL y la carpeta):
+      git clone --no-checkout --filter=blob:none <url-del-repo> sigae
+      cd sigae
+      git sparse-checkout init --no-cone
+      git sparse-checkout set '/webSIGAE/BackEnd/' '!/webSIGAE/BackEnd/tests/' \
+        '!/webSIGAE/BackEnd/hashPasswords.js' \
+        '/webSIGAE/Database/schema_base.sql' '/webSIGAE/Database/catalogos_base.sql'
+      git checkout main
+    Comprobar que no bajó nada de más:
+      ls webSIGAE/Database          -> solo schema_base.sql y catalogos_base.sql
+      ls webSIGAE/BackEnd/tests     -> no existe
+      ls README.md                  -> no existe
+
+3.4 Dependencias del backend (sin las de desarrollo, sin el Chromium de npm)
+      cd webSIGAE/BackEnd && PUPPETEER_SKIP_DOWNLOAD=true npm ci --omit=dev
+
+3.5 Carpeta de fotos (antes de arrancar: el backend la usa al iniciar)
+      sudo mkdir -p /var/sigae/uploads
+      sudo chown <usuario-pm2>: /var/sigae/uploads
+    No la cubren los snapshots de la RDS: respaldarla aparte.
+
+======================================================================
+4. BASE DE DATOS (RDS)
+======================================================================
+
+4.1 Instancia
+    - MariaDB 10.11 (la misma versión mayor que desarrollo: el codespace usa
+      10.11). Sin acceso público. Grupo de seguridad: 3306 solo desde la EC2.
+    - Snapshots automáticos activados.
+    - El nombre de la base DEBE ser "sigae": schema_base.sql y
+      catalogos_base.sql traen "CREATE DATABASE ... sigae" y "USE sigae".
+
+4.2 Carga inicial (una sola vez, con el usuario administrador de la RDS)
+      mariadb -h <endpoint> -u <admin> -p --default-character-set=utf8mb4 < webSIGAE/Database/schema_base.sql
+      mariadb -h <endpoint> -u <admin> -p --default-character-set=utf8mb4 < webSIGAE/Database/catalogos_base.sql
+    - schema_base.sql: solo estructura (33 tablas), sin datos. Si una tabla
+      ya existe, falla: nunca sobrescribe datos.
+    - catalogos_base.sql: los 14 niveles educativos con su orden (Pre-Kinder
+      a 4to Medio). Sin ellos no funciona la promoción. Es idempotente
+      (INSERT IGNORE) y fija SET NAMES utf8mb4 (con un cliente en latin1 los
+      nombres quedaban "1ero BÃ¡sico"; verificado y corregido).
+    - Los ALTER TABLE que aparecen en otros documentos de docs/ son para
+      una RDS que YA tenía datos: en una base nueva NO se aplican.
+
+4.3 Usuario de la aplicación (permisos acotados, sin DDL)
+      CREATE USER 'sigae_app'@'%' IDENTIFIED BY '<contraseña larga>';
+      GRANT SELECT, INSERT, UPDATE, DELETE ON sigae.* TO 'sigae_app'@'%';
+    Restringir el host a la subred de la EC2 si se puede. Verificado: la
+    aplicación y crearSuperAdmin.js funcionan con solo esos cuatro permisos.
+
+4.4 Qué queda en la base después de la carga (verificado)
+    - 0 usuarios. Ningún usuario, estudiante ni dato de prueba.
+    - Solo nivel_educativo con 14 filas.
+    - Todo lo demás se carga desde la aplicación. Al guardar los parámetros
+      institucionales queda fijado el período vigente (el año actual).
+
+======================================================================
+5. .env DE PRODUCCIÓN
+======================================================================
+
+  Archivo webSIGAE/BackEnd/.env, chmod 600, dueño: el usuario de pm2.
+  .env.example sirve como lista de variables, pero ningún valor de
+  desarrollo. Con NODE_ENV=production el backend NO arranca si falta una
+  variable obligatoria y lo dice en "pm2 logs sigae-api" (sin mostrar
+  valores). Tampoco arranca con valores de ejemplo: JWT_SECRET de ejemplo
+  o corto, DB_PASSWORD=sigae123, FRONTEND_URL con localhost o UPLOADS_DIR
+  relativa.
+
+    DB_HOST=<endpoint de la RDS>
+    DB_PORT=3306
+    DB_USER=sigae_app
+    DB_PASSWORD=<contraseña de sigae_app>
+    DB_NAME=sigae
+    DB_SSL=true                      (TLS verificado con la CA de Amazon RDS)
+    JWT_SECRET=<48 bytes aleatorios>
+        node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+    FRONTEND_URL=https://<dominio>   (sin / final; también es el origen CORS)
+    # CORS_ORIGINS=...               (opcional; por defecto FRONTEND_URL)
+    UPLOADS_DIR=/var/sigae/uploads
+    SMTP_HOST=smtp.gmail.com
+    SMTP_PORT=465
+    SMTP_SECURE=true
+    SMTP_USER=noreply@colegiojc.cl
+    SMTP_PASS="<contraseña de aplicación, 16 letras sin espacios>"
+    EMAIL_FROM="SIGAE <noreply@colegiojc.cl>"
+
+  Los fija ecosystem.config.js (no van en el .env):
+    NODE_ENV=production, PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+  En producción los logs tapan RUT, correos, tokens y textos entre comillas.
+
+======================================================================
+6. CORREO (BOT DE CÓDIGOS)
+======================================================================
+
+  Detalle completo: docs/mailer-smtp-produccion.md. Lo esencial:
+  - El primer ingreso de TODA cuenta (también el super administrador) exige
+    un código de 6 dígitos enviado al correo. Si el SMTP no funciona, nadie
+    puede entrar. Por eso el correo se prueba ANTES de crear usuarios.
+  - Cuenta noreply@colegiojc.cl con verificación en 2 pasos y una
+    "contraseña de aplicación" (la contraseña normal no sirve para SMTP).
+  - AWS bloquea el puerto 25 en EC2: usar 465 (SMTP_SECURE=true) o 587.
+  - EMAIL_FROM debe ser la misma cuenta que SMTP_USER.
+  - SPF, DKIM y DMARC del dominio colegiojc.cl para que no caiga en spam.
+  - Prueba desde la EC2 (en webSIGAE/BackEnd, con el .env de producción):
+      node -e "const m=require('./utils/mailer'); m.enviarCodigoVerificacion({para:'tucorreo@colegiojc.cl',nombre:'Prueba',codigo:'123456',minutos:10,proposito:'Recuperacion'}).then(()=>console.log('OK'),e=>{console.error('FALLO',e.code,e.message);process.exit(1)})"
+  - Los códigos vencen a los 10 minutos, sirven una vez, se bloquean tras
+    5 intentos y entre envíos al mismo usuario deben pasar 60 segundos.
+
+======================================================================
+7. PRIMER SUPER ADMINISTRADOR (CON LA BASE VACÍA)
+======================================================================
+
+  La base parte sin usuarios y ningún caso de uso crea super
+  administradores: se crean con un script, desde la EC2, que escribe
+  directamente en la RDS usando el .env de producción.
+
+  Requisitos:
+    - .env de producción completo (sección 5) y correo probado (sección 6).
+    - Una casilla institucional REAL que la persona pueda abrir: ahí le
+      llegará el código del primer ingreso.
+    - El RUT no puede existir ya (un administrador no puede ser además
+      docente ni apoderado).
+
+  Comando (desde webSIGAE/BackEnd):
+      node scripts/crearSuperAdmin.js --rut 12345678-9 --nombre "Ana Pérez" \
+           --telefono 912345678 --correo an.perez@colegiojc.cl
+    - La contraseña se pide por consola sin mostrarla. Alternativa:
+      SUPERADMIN_PASSWORD='...' delante del comando (queda en el historial
+      de la shell: preferir la consola).
+    - Reglas: RUT con dígito verificador correcto, nombre y apellido,
+      teléfono de 9 dígitos, correo @colegiojc.cl o
+      @colegiojacquescousteau.cl, contraseña de 8+ caracteres con una
+      mayúscula y un número.
+    - La contraseña se guarda con bcrypt. NO se usa hashPasswords.js.
+    - Sirve también para los dos o tres super administradores adicionales.
+
+  Primer ingreso: RUT + contraseña -> el sistema envía un código al correo
+  -> se ingresa el código -> sesión. Desde ahí, el super administrador crea
+  a los demás administradores, docentes y apoderados desde la aplicación.
+
+  Verificado en una base creada solo con schema_base.sql + catalogos_base.sql
+  y un usuario con SELECT, INSERT, UPDATE, DELETE: el script crea la cuenta
+  (hash $2b$10$, 60 caracteres), el login pide el código y, con el código,
+  entrega la sesión.
+
+  Plan B (solo si el correo se rompe y nadie puede entrar): marcar la cuenta
+  como verificada para que el login no pida código, y arreglar el SMTP:
+      UPDATE usuario SET Usuario_Correo_Verificado = 1 WHERE Usuario_RUT = '12345678-9';
+
+======================================================================
+8. USUARIOS Y CONTRASEÑAS EN PRODUCCIÓN
+======================================================================
+
+  - Los usuarios de prueba (tabla del README) existen SOLO en SIGAE.sql,
+    que nunca se carga en producción. No llegan ni a la base ni al servidor.
+    Tampoco hay credenciales de prueba en el código ni en el frontend
+    compilado (revisado).
+  - Toda contraseña se guarda con bcrypt al momento de escribirla:
+      crearSuperAdmin.js, crear usuario (POST /api/usuarios), editar usuario
+      (PUT /api/usuarios/:id), recuperar contraseña (código por correo) y
+      cambiar la propia contraseña.
+  - Las reglas de fortaleza (8+ caracteres, una mayúscula y un número) se
+    exigen en todas esas rutas. Editar usuario no las validaba: corregido.
+  - El login solo compara contra hash (bcrypt.compare): una contraseña
+    guardada en texto plano nunca serviría para entrar.
+  - Las respuestas de la API nunca devuelven la contraseña.
+  - Cada cuenta nueva confirma su correo con un código en su primer ingreso.
+
+======================================================================
+9. ARRANQUE DEL BACKEND (pm2)
+======================================================================
+
+      cd webSIGAE/BackEnd && pm2 start ecosystem.config.js
+      pm2 save && pm2 startup
+  - Un proceso (fork), reinicio automático, máximo 600 MB de memoria,
+    logs con fecha:  pm2 logs sigae-api
+  - Comprobación local en la EC2:
+      curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/api/no-existe   -> 404
+
+======================================================================
+10. FRONTEND Y NGINX
+======================================================================
+
+10.1 Compilar (fuera del servidor, p. ej. en Codespaces)
+      cd webSIGAE/FrontEnd && npm ci && npm run build
+    No necesita variables: el frontend llama a /api y /uploads en el mismo
+    dominio. Copiar el contenido de dist/ a la EC2 (scp por Tailscale).
+    [POR DEFINIR] Carpeta destino en la EC2 (p. ej. /var/www/sigae).
+
+10.2 Nginx (no hay plantilla en el repo; requisitos)
+    - root apuntando al dist/, con  try_files $uri /index.html;  (rutas de React)
+    - location /api/ y location /uploads/ -> proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+      El backend confía en UN proxy (trust proxy 1): el rate limiter usa la IP
+      real y la redirección a HTTPS usa X-Forwarded-Proto.
+    - client_max_body_size 6m;  (fotos de hasta 5 MB)
+    - HTTPS con certbot:  sudo certbot --nginx -d <dominio>
+    - Recomendado: cabeceras de seguridad para el frontend (HSTS,
+      X-Frame-Options, X-Content-Type-Options). El backend ya las pone en
+      /api y /uploads (helmet), pero el dist/ lo sirve Nginx.
+
+======================================================================
+11. RESPALDOS
+======================================================================
+
+  - RDS: snapshots automáticos, y uno manual antes de cualquier cambio de
+    esquema.
+  - /var/sigae/uploads: NO la cubren los snapshots; respaldarla aparte.
+    [POR DEFINIR] Cómo (p. ej. cron diario hacia S3).
+  - Cierre de período (Gestión Académica › Cierre de Período): el super
+    administrador descarga un Excel con lo que se va a eliminar y lo sube al
+    Drive de respaldosigae@colegiojc.cl. Tiene datos personales de menores:
+    no se guarda en equipos personales.
+  - scripts/backup.sh no se usa en producción (ignora DB_PORT y DB_SSL y
+    pide permisos que sigae_app no tiene).
+
+======================================================================
+12. ACTUALIZACIONES
+======================================================================
+
+  Backend:
+      git pull && cd webSIGAE/BackEnd && PUPPETEER_SKIP_DOWNLOAD=true npm ci --omit=dev && pm2 restart sigae-api
+  Frontend: volver a compilar y copiar dist/.
+  Publicar backend y frontend juntos cuando un cambio afecta a ambos.
+
+  Cambios de esquema: nunca se reimporta nada. Snapshot de la RDS y luego
+  el ALTER TABLE revisado, a mano. schema_base.sql solo sirve para crear una
+  base nueva. Hasta definir una estrategia de migraciones, no se agregan
+  archivos de migración aparte.
+
+======================================================================
+13. VERIFICACIÓN FINAL (CHECKLIST)
+======================================================================
+
+  [ ] /etc/sigae-production existe en la EC2.
+  [ ] En la EC2 no existen SIGAE.sql, README.md, BackEnd/tests ni
+      BackEnd/hashPasswords.js.
+  [ ] node --version >= 22.12; /usr/bin/chromium existe.
+  [ ] La RDS no es pública; 3306 solo desde la EC2.
+  [ ] SELECT COUNT(*) FROM usuario;  antes del script -> 0.
+  [ ] SELECT COUNT(*) FROM nivel_educativo; -> 14, con tildes correctas.
+  [ ] .env con chmod 600; pm2 arranca sin "Configuración de producción
+      incompleta".
+  [ ] Prueba de correo desde la EC2: OK y llega a la bandeja de entrada.
+  [ ] Super administrador creado; su contraseña empieza con $2b$.
+  [ ] Primer ingreso con código por correo: OK.
+  [ ] https://<dominio> carga; /api responde; una foto de perfil se sube
+      y se ve.
+  [ ] Solo 80 y 443 abiertos al público.
+  [ ] Snapshots de la RDS activos; respaldo de /var/sigae/uploads definido.
+
+======================================================================
+14. PENDIENTES CONOCIDOS (NO BLOQUEAN EL DESPLIEGUE)
+======================================================================
+
+  - Gestión de Roles: el menú solo lo ve el super administrador, pero la ruta
+    del frontend admite a cualquier administrador (el backend sí restringe
+    el cambio de roles al super administrador). Decidir cuál manda.
+  - Indicador "debe horas" en el horario por docente y en el horario maestro.
+  - Las exportaciones del horario del docente no muestran los bloques P.I.E.
+  - Las fotos de perfil se sirven sin sesión desde /uploads.
+  - Plantilla de Nginx y respaldo de /var/sigae/uploads.
+  - Los 8 estudiantes de prueba de SIGAE.sql tienen RUT con dígito
+    verificador inválido (solo afecta a desarrollo).
+
+======================================================================
+15. ESTADO DEL CÓDIGO AL ESCRIBIR ESTE DOCUMENTO
+======================================================================
+
+  - Backend: 713 pruebas en verde. CI con Node 22, tests y arranque real.
+  - Frontend: lint en cero, build correcto, 0 vulnerabilidades en las
+    dependencias de producción.
+  - Corregido antes del despliegue: subida de fotos (extensión y contenido
+    real de la imagen), atención y citaciones que ignoraban P.I.E. y
+    electivos, contraseña sin validar al editar usuarios, catálogo en
+    utf8mb4, .env de desarrollo rechazado en producción, pestaña vacía de
+    Reportes eliminada.

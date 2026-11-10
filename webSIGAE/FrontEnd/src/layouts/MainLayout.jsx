@@ -279,10 +279,6 @@ function MainLayout() {
                 <Link to="/citaciones/historial">
                   Historial de Citaciones
                 </Link>
-
-                <Link to="/reportes">
-                  Reportes
-                </Link>
               </>
             )}
 

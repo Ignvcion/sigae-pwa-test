@@ -80,13 +80,12 @@ const MODULOS_ADMIN = [
     ],
   },
   {
-    titulo: "Citaciones y Reportes",
+    titulo: "Citaciones",
     icono: "📨",
     color: "#b45309",
     links: [
       { label: "Citaciones",              to: "/citaciones" },
       { label: "Historial de Citaciones", to: "/citaciones/historial" },
-      { label: "Reportes",                to: "/reportes" },
     ],
   },
 ];
@@ -102,7 +101,6 @@ const ACCESOS_RAPIDOS_ADMIN = [
   { label: "Horario Maestro",            to: "/horario-maestro" },
   { label: "Eventos Institucionales",    to: "/bloques-horarios?tab=eventos" },
   { label: "Citaciones",                 to: "/citaciones" },
-  { label: "Reportes",                   to: "/reportes" },
 ];
 
 function DashboardAdmin({ esSuperAdmin }) {
