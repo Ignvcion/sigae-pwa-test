@@ -18,15 +18,6 @@ id_rsa*
 id_ed25519*
 .aws/
 
-# ── Datos para cargar en producción ──────────────────────────
-# Carpeta de trabajo para los archivos con datos reales (listas de estudiantes,
-# apoderados, docentes...). NUNCA se sube a git: tiene datos personales de
-# menores. Se copia al servidor aparte (scp) y se carga desde ahí.
-# Solo se versionan el .gitkeep y el LEEME.md.
-datos-produccion/*
-!datos-produccion/.gitkeep
-!datos-produccion/LEEME.md
-
 # ── Respaldos y datos ────────────────────────────────────────
 # OJO: no se ignora *.sql en general (SIGAE.sql y schema_base.sql
 # van versionados); solo los respaldos y volcados.

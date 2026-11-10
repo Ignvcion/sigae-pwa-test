@@ -102,7 +102,6 @@ web-dev-SIGAE/
 │   └── setup.sh       # Setup para Codespaces / Linux / macOS
 ├── win_setup.sh       # Setup para Windows (correr desde Git Bash)
 ├── docs/              # Documentación del proyecto (ver abajo)
-├── datos-produccion/  # Archivos con datos reales para cargar (git los ignora; ver Deploy)
 └── webSIGAE/
     ├── BackEnd/       # API Node.js + Express
     ├── FrontEnd/      # App Vite + React
@@ -307,10 +306,6 @@ El backend escucha solo en `127.0.0.1:3000`; únicamente Nginx llega a él.
 - La RDS: snapshots automáticos (y uno manual antes de cualquier cambio de esquema).
 - **`/var/sigae/uploads` no la cubren los snapshots de la RDS**: respáldala aparte.
 - Al cambiar de período (Gestión Académica › Cierre de Período), el super administrador descarga un Excel con todo lo que se va a eliminar (cursos de dos períodos atrás, sus egresados y retirados con su historial, y apoderados sin estudiantes) y lo sube al Google Drive de la cuenta de respaldos **`respaldosigae@colegiojc.cl`**. Tiene datos personales de menores: no se guarda en equipos personales.
-
-### Cargar los datos reales
-
-Deja los archivos con los datos reales (estudiantes, apoderados, docentes...) en `datos-produccion/`: git **ignora** todo lo que hay ahí (tiene datos personales de menores) y el servidor, que recibe solo la lista blanca del paso 1, nunca los baja por `git pull`. Cópialos a la EC2 por `scp` (por Tailscale, el 22 está cerrado al público), cárgalos y bórralos de la EC2 y de tu equipo.
 
 ### Actualizar el backend
 
