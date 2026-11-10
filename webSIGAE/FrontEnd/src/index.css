@@ -2845,3 +2845,21 @@ button.btn-enlace:disabled {
   color: #5b21b6;
   font-weight: 600;
 }
+
+/* Mi horario / Horario de docente: resumen de la regla 65/35 con horas P.I.E. */
+.resumen-65-35 {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #3730a3;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.resumen-65-35--excede {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}

@@ -1,4 +1,8 @@
 const pool = require('../config/db');
+const {
+  calcularCargaLectiva, clasesLectivas, datosCarga, mensajeExcede,
+  verificarCargaLectiva, docentesConPIEEnBloque, MENSAJE_BLOQUE_PIE,
+} = require('../utils/cargaLectiva');
 const { condicionDesajustado, motivoDesajuste } = require('../utils/bloquesDesajustados');
 const { ESTADO_ELIMINADO, claseVigente } = require('../utils/clasesEliminadas');
 const { mismoPeriodoQueCurso, enPeriodoVigente, cursoNoArchivado, obtenerPeriodos, estadoPeriodoCursoSQL, PERIODO_VIGENTE_SQL } = require('../utils/periodos');
@@ -9,7 +13,7 @@ const {
 } = require('../utils/disponibilidadLaboral');
 const { esApoderadoDelEstudiante } = require('../utils/apoderadosEstudiante');
 const {
-  conflictoRegularConElectivos, bloquesElectivoDelDia, horasElectivoDocente, completitudElectivos, cursoConElectivosSQL,
+  conflictoRegularConElectivos, bloquesElectivoDelDia, completitudElectivos, cursoConElectivosSQL,
 } = require('../utils/electivos');
 
 // ── GET /api/horarios?curso_id=X  (admin ve todo, docente solo el suyo) ──
@@ -226,7 +230,7 @@ const getDocentesDisponibles = async (req, res) => {
   try {
     const [docentes] = await pool.execute(
       `SELECT Usuario_Id, Usuario_Nombre_Completo, Docente_Especialidad,
-              Docente_Carga_Horaria_Semanal
+              Docente_Carga_Horaria_Semanal, Docente_Horas_PIE
        FROM usuario
        WHERE Es_Docente = 1 AND Usuario_Estado_Cuenta = 1
        ORDER BY Usuario_Nombre_Completo`
@@ -234,14 +238,12 @@ const getDocentesDisponibles = async (req, res) => {
 
     if (docentes.length === 0) return res.json([]);
 
-    // Duración y horario del bloque nuevo (en horas)
+    // Horario del bloque nuevo (disponibilidad laboral)
     const [bloqueInfo] = await pool.execute(
-      `SELECT TIME_TO_SEC(TIMEDIFF(Bloque_Horario_Hora_Fin, Bloque_Horario_Hora_Inicio)) / 3600
-         AS duracion_horas, Bloque_Horario_Hora_Inicio, Bloque_Horario_Hora_Fin
+      `SELECT Bloque_Horario_Hora_Inicio, Bloque_Horario_Hora_Fin
        FROM bloque_horario WHERE Bloque_Horario_Id = ?`,
       [bloque_id]
     );
-    const duracionNueva = bloqueInfo.length > 0 ? Number(bloqueInfo[0].duracion_horas) : 0;
 
     const userIds    = docentes.map(d => d.Usuario_Id);
     const phList     = userIds.map(() => '?').join(',');
@@ -277,36 +279,10 @@ const getDocentesDisponibles = async (req, res) => {
     );
     for (const c of conflictosElectivo || []) conflictoSet.add(c.Docente_Usuario_Id);
 
-    // Carga horaria semanal actual de cada docente
-    let cargaQuery =
-      `SELECT ha.Usuario_Id,
-              COALESCE(SUM(
-                TIME_TO_SEC(TIMEDIFF(bh.Bloque_Horario_Hora_Fin, bh.Bloque_Horario_Hora_Inicio)) / 3600
-              ), 0) AS horas_actuales
-       FROM horario_asignatura ha
-       JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
-       JOIN curso c ON c.Curso_Id = ha.Curso_Id
-       WHERE ha.Usuario_Id IN (${phList})
-         AND ha.Horario_Asignatura_Estado = 'Activo'
-         AND c.Curso_Periodo_Lectivo = ?`;
-    const cargaParams = [...userIds, periodo];
-    if (excludeId) { cargaQuery += ' AND ha.Horario_Asignatura_Id != ?'; cargaParams.push(excludeId); }
-    cargaQuery += ' GROUP BY ha.Usuario_Id';
-
-    const [cargas] = await pool.execute(cargaQuery, cargaParams);
-    const cargaMap = Object.fromEntries(cargas.map(c => [c.Usuario_Id, Number(c.horas_actuales)]));
-    // La carga semanal incluye los electivos del período
-    const [cargasElectivo] = await pool.query(
-      `SELECT ce.Docente_Usuario_Id,
-              SUM(TIME_TO_SEC(TIMEDIFF(bh.Bloque_Horario_Hora_Fin, bh.Bloque_Horario_Hora_Inicio)) / 3600) AS horas
-         FROM clase_electivo ce JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ce.Bloque_Horario_Id
-        WHERE ce.Docente_Usuario_Id IN (?) AND ce.Clase_Electivo_Periodo_Lectivo = ?
-        GROUP BY ce.Docente_Usuario_Id`,
-      [userIds, periodo]
-    );
-    for (const c of cargasElectivo || []) {
-      cargaMap[c.Docente_Usuario_Id] = (cargaMap[c.Docente_Usuario_Id] || 0) + Number(c.horas);
-    }
+    // Horas P.I.E.: bloques del docente reservados ese día y bloque
+    const conPIE = await docentesConPIEEnBloque(pool, userIds, periodo, dia, bloque_id);
+    // Regla 65/35: clases lectivas actuales (bloques regulares + electivos del período)
+    const clasesMap = await clasesLectivas(pool, userIds, periodo, { excluirHorarioId: excludeId });
 
     // CU107: disponibilidad laboral semanal (tramos y horas disponibles por docente en el período)
     const mapaDisp = await mapaDisponibilidad(pool, userIds, [periodo]);
@@ -321,10 +297,12 @@ const getDocentesDisponibles = async (req, res) => {
     const horasDispMap = Object.fromEntries(horasDisp.map(h => [h.Docente_Usuario_Id, Math.round(Number(h.horas) * 100) / 100]));
 
     const resultado = docentes.map(d => {
-      const cargaActual   = Math.round((cargaMap[d.Usuario_Id] || 0) * 100) / 100;
-      const cargaSemanal   = d.Docente_Carga_Horaria_Semanal ?? null;
+      const cargaSemanal  = d.Docente_Carga_Horaria_Semanal ?? null;
+      const lectiva       = calcularCargaLectiva(cargaSemanal, d.Docente_Horas_PIE);
+      const clasesActuales = clasesMap.get(Number(d.Usuario_Id)) || 0;
       const conflicto     = conflictoSet.has(d.Usuario_Id);
-      const excedeCarga   = cargaSemanal !== null && (cargaActual + duracionNueva) > cargaSemanal;
+      const bloquePIE     = conPIE.has(Number(d.Usuario_Id));
+      const excedeCarga   = lectiva !== null && clasesActuales + 1 > lectiva.maxLectivas;
       const fueraDisp     = bloqueInfo.length > 0 && !estaDisponible(mapaDisp, {
         docenteId: d.Usuario_Id, periodo, dia,
         horaInicio: bloqueInfo[0].Bloque_Horario_Hora_Inicio, horaFin: bloqueInfo[0].Bloque_Horario_Hora_Fin,
@@ -339,16 +317,20 @@ const getDocentesDisponibles = async (req, res) => {
         Usuario_Nombre_Completo: d.Usuario_Nombre_Completo,
         Docente_Especialidad:    d.Docente_Especialidad,
         Docente_Carga_Horaria_Semanal: cargaSemanal,
-        carga_actual:   cargaActual,
-        carga_nueva:    Math.round((cargaActual + duracionNueva) * 100) / 100,
+        // Regla 65/35 en horas pedagógicas (cada bloque de clase = 1)
+        horas_pie:      lectiva ? lectiva.horasPIE : Number(d.Docente_Horas_PIE) || 0,
+        max_lectivas:   lectiva ? lectiva.maxLectivas : null,
+        carga_actual:   clasesActuales,
+        carga_nueva:    clasesActuales + 1,
         conflicto_horario: conflicto,
+        bloque_pie:        bloquePIE,
         excede_carga:      excedeCarga,
         fuera_disponibilidad: fueraDisp,
         horas_disponibles: horasDisponibles,
         horas_adeudadas:   horasAdeudadas,
         periodo,
         coincide_especialidad: nombreAsignatura ? coincideEspecialidad(d.Docente_Especialidad, nombreAsignatura) : null,
-        disponible:        !conflicto && !excedeCarga && !fueraDisp,
+        disponible:        !conflicto && !bloquePIE && !excedeCarga && !fueraDisp,
       };
     });
 
@@ -557,38 +539,14 @@ const createHorario = async (req, res) => {
       });
       if (fueraDisponibilidad) return res.status(422).json({ error: fueraDisponibilidad });
 
-      const [[docente]] = await pool.execute(
-        'SELECT Docente_Carga_Horaria_Semanal FROM usuario WHERE Usuario_Id = ? AND Es_Docente = 1',
-        [Usuario_Id]
-      );
-      if (docente?.Docente_Carga_Horaria_Semanal != null) {
-        const [[bloqueDur]] = await pool.execute(
-          `SELECT TIME_TO_SEC(TIMEDIFF(Bloque_Horario_Hora_Fin, Bloque_Horario_Hora_Inicio)) / 3600
-             AS duracion FROM bloque_horario WHERE Bloque_Horario_Id = ?`,
-          [Bloque_Horario_Id]
-        );
-        const [[cargaRow]] = await pool.execute(
-          `SELECT COALESCE(SUM(
-             TIME_TO_SEC(TIMEDIFF(bh.Bloque_Horario_Hora_Fin, bh.Bloque_Horario_Hora_Inicio)) / 3600
-           ), 0) AS horas_actuales
-           FROM horario_asignatura ha
-           JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
-           WHERE ha.Usuario_Id = ? AND ha.Horario_Asignatura_Estado = 'Activo'
-             AND ${mismoPeriodoQueCurso('ha')}`,
-          [Usuario_Id, Curso_Id]
-        );
-        // La carga semanal incluye los electivos del docente en el período
-        const horasActuales = Number(cargaRow.horas_actuales)
-          + await horasElectivoDocente(pool, Usuario_Id, await periodoDelCurso(pool, Curso_Id));
-        const duracion      = Number(bloqueDur?.duracion || 0);
-        const maxHoras      = Number(docente.Docente_Carga_Horaria_Semanal);
-        if ((horasActuales + duracion) > maxHoras) {
-          return res.status(422).json({
-            error: `El docente excedería su carga horaria semanal de ${maxHoras}h semanales `
-                 + `(actual: ${horasActuales.toFixed(1)}h, este bloque añade: ${duracion.toFixed(1)}h)`,
-          });
-        }
+      // Horas P.I.E.: un bloque P.I.E. del docente no admite clases
+      const periodoClase = await periodoDelCurso(pool, Curso_Id);
+      if ((await docentesConPIEEnBloque(pool, [Usuario_Id], periodoClase, Horario_Asignatura_Dia_Semana, Bloque_Horario_Id)).size > 0) {
+        return res.status(409).json({ error: MENSAJE_BLOQUE_PIE });
       }
+      // Regla 65/35: máximo de clases = 65 % de (carga − horas P.I.E.), en horas pedagógicas
+      const excedeLectivas = await verificarCargaLectiva(pool, Usuario_Id, periodoClase);
+      if (excedeLectivas) return res.status(422).json({ error: excedeLectivas });
     }
 
     // ── Registro final ───────────────────────────────────────────────
@@ -845,36 +803,20 @@ const updateHorario = async (req, res) => {
         if (fueraDisponibilidad) return res.status(422).json({ error: fueraDisponibilidad });
       }
 
-      const [[docente]] = await pool.execute(
-        'SELECT Docente_Carga_Horaria_Semanal FROM usuario WHERE Usuario_Id = ? AND Es_Docente = 1',
-        [Usuario_Id]
-      );
-      if (docente?.Docente_Carga_Horaria_Semanal != null) {
-        const [[bloqueDur]] = await pool.execute(
-          `SELECT TIME_TO_SEC(TIMEDIFF(Bloque_Horario_Hora_Fin, Bloque_Horario_Hora_Inicio)) / 3600
-             AS duracion FROM bloque_horario WHERE Bloque_Horario_Id = ?`,
-          [Bloque_Horario_Id]
-        );
-        const [[cargaRow]] = await pool.execute(
-          `SELECT COALESCE(SUM(
-             TIME_TO_SEC(TIMEDIFF(bh.Bloque_Horario_Hora_Fin, bh.Bloque_Horario_Hora_Inicio)) / 3600
-           ), 0) AS horas_actuales
-           FROM horario_asignatura ha
-           JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ha.Bloque_Horario_Id
-           WHERE ha.Usuario_Id = ? AND ha.Horario_Asignatura_Estado = 'Activo'
-             AND ha.Horario_Asignatura_Id != ? AND ${mismoPeriodoQueCurso('ha')}`,
-          [Usuario_Id, id, Curso_Id]
-        );
-        const horasActuales = Number(cargaRow.horas_actuales)
-          + await horasElectivoDocente(pool, Usuario_Id, await periodoDelCurso(pool, Curso_Id));
-        const duracion      = Number(bloqueDur?.duracion || 0);
-        const maxHoras      = Number(docente.Docente_Carga_Horaria_Semanal);
-        if ((horasActuales + duracion) > maxHoras) {
-          return res.status(422).json({
-            error: `El docente excedería su carga horaria semanal de ${maxHoras}h semanales `
-                 + `(actual: ${horasActuales.toFixed(1)}h, este bloque añade: ${duracion.toFixed(1)}h)`,
-          });
-        }
+      const periodoClase = await periodoDelCurso(pool, Curso_Id);
+      // Horas P.I.E.: un bloque P.I.E. del docente no admite clases
+      if (cambiaUbicacion
+          && (await docentesConPIEEnBloque(pool, [Usuario_Id], periodoClase, Horario_Asignatura_Dia_Semana, Bloque_Horario_Id)).size > 0) {
+        return res.status(409).json({ error: MENSAJE_BLOQUE_PIE });
+      }
+      // Regla 65/35: solo si la clase pasa a otro docente o vuelve a estar activa
+      // (editar otros datos de una clase ya contada no la vuelve a sumar)
+      const sumaClase = Number(original.Usuario_Id) !== Number(Usuario_Id)
+        || Number(original.Curso_Id) !== Number(Curso_Id)
+        || (original.Horario_Asignatura_Estado !== 'Activo' && (Horario_Asignatura_Estado || 'Activo') === 'Activo');
+      if (sumaClase) {
+        const excedeLectivas = await verificarCargaLectiva(pool, Usuario_Id, periodoClase, { excluirHorarioId: id });
+        if (excedeLectivas) return res.status(422).json({ error: excedeLectivas });
       }
     }
 
@@ -2059,6 +2001,22 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
 
   // CU107: disponibilidad laboral semanal del docente. Solo se revisan los bloques
   // que cambian de posición o de docente; una clase que ya estaba fuera se mantiene.
+  // Horas P.I.E.: un bloque P.I.E. del docente no admite clases
+  if ((cambiaPosicion || cambiaDoc) && docenteIds.length > 0) {
+    const periodosPIE = [...new Set(propuestas.map((p) => p.periodo).filter(Boolean))];
+    const resPIE = periodosPIE.length > 0 ? await db.query(
+      `SELECT Docente_Usuario_Id AS id, Bloque_Pie_Periodo_Lectivo AS periodo, Bloque_Pie_Dia_Semana AS dia, Bloque_Horario_Id
+         FROM bloque_pie_docente WHERE Docente_Usuario_Id IN (?) AND Bloque_Pie_Periodo_Lectivo IN (?)`,
+      [docenteIds, periodosPIE]
+    ) : null;
+    const pie = new Set((Array.isArray(resPIE?.[0]) ? resPIE[0] : []).map((f) => `${f.id}|${f.periodo}|${f.dia}|${f.Bloque_Horario_Id}`));
+    for (const p of propuestas) {
+      if (p.Usuario_Id && pie.has(`${p.Usuario_Id}|${p.periodo}|${p.dia}|${p.Bloque_Horario_Id}`)) {
+        conflictos.push(`${p.docente} tiene horas P.I.E. el ${etiqueta(p)}`);
+      }
+    }
+  }
+
   if ((cambiaPosicion || cambiaDoc) && docenteIds.length > 0) {
     const mapa = await mapaDisponibilidad(db, docenteIds, propuestas.map((p) => p.periodo));
     const avisados = new Set();
@@ -2141,7 +2099,7 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
   const sugerencias = [];
   if ((cambiaDoc || cambiaBloque || cambiaAsig) && docenteIds.length > 0) {
     const [docentes] = await db.query(
-      `SELECT Usuario_Id, Usuario_Nombre_Completo, Docente_Carga_Horaria_Semanal, Docente_Especialidad
+      `SELECT Usuario_Id, Usuario_Nombre_Completo, Docente_Carga_Horaria_Semanal, Docente_Horas_PIE, Docente_Especialidad
        FROM usuario WHERE Usuario_Id IN (?)`,
       [docenteIds]
     );
@@ -2154,35 +2112,37 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
         }
       }
     }
-    // La carga semanal incluye los electivos del docente en los períodos involucrados
-    const horasElectivo = new Map();
-    if ((cambiaDoc || cambiaBloque) && docentes.some((d) => d.Docente_Carga_Horaria_Semanal != null)) {
-      const filasCarga = await db.query(
-        `SELECT ce.Docente_Usuario_Id,
-                SUM(TIME_TO_SEC(TIMEDIFF(bh.Bloque_Horario_Hora_Fin, bh.Bloque_Horario_Hora_Inicio)) / 3600) AS horas
-           FROM clase_electivo ce JOIN bloque_horario bh ON bh.Bloque_Horario_Id = ce.Bloque_Horario_Id
-          WHERE ce.Docente_Usuario_Id IN (?) AND ce.Clase_Electivo_Periodo_Lectivo IN (?)
-          GROUP BY ce.Docente_Usuario_Id`,
-        [docenteIds, [...new Set(propuestas.map((p) => p.periodo).filter(Boolean)), '']]
-      );
-      for (const f of Array.isArray(filasCarga?.[0]) ? filasCarga[0] : []) {
-        if (f && f.Docente_Usuario_Id != null) horasElectivo.set(Number(f.Docente_Usuario_Id), Number(f.horas) || 0);
-      }
-    }
-    for (const d of docentes) {
-      if (!(cambiaDoc || cambiaBloque)) break;
-      if (d.Docente_Carga_Horaria_Semanal == null) continue;
-      const max = Number(d.Docente_Carga_Horaria_Semanal);
-      const delDocente = (r) => r.Usuario_Id === d.Usuario_Id && r.estado === 'Activo';
-      const cargaOtros   = otros.filter(delDocente).reduce((acc, r) => acc + Number(r.duracion), 0)
-        + (horasElectivo.get(Number(d.Usuario_Id)) || 0);
-      const cargaNueva   = cargaOtros + propuestas.filter(delDocente).reduce((acc, r) => acc + r.duracion, 0);
-      const cargaActual  = cargaOtros + seleccionados.filter(delDocente).reduce((acc, r) => acc + Number(r.duracion), 0);
-      if (cargaNueva > max && cargaNueva > cargaActual) {
-        conflictos.push(
-          `${d.Usuario_Nombre_Completo} excedería su carga horaria semanal de ${max}h semanales ` +
-          `(quedaría con ${cargaNueva.toFixed(1)}h)`
-        );
+    // Regla 65/35 (bloquea): por docente y período, clases lectivas en horas pedagógicas
+    // (cada bloque = 1; incluye electivos) hasta el 65 % de (carga − horas P.I.E.)
+    if (cambiaDoc || cambiaBloque) {
+      for (const periodo of [...new Set(propuestas.map((p) => p.periodo))]) {
+        const delPeriodo = (r) => periodo === undefined || r.periodo === undefined || r.periodo === periodo;
+        // Electivos del período (las clases regulares se cuentan desde otros/propuestas)
+        const electivosDe = new Map();
+        if (periodo) {
+          const filasEl = await db.query(
+            `SELECT Docente_Usuario_Id AS id, COUNT(*) AS n FROM clase_electivo
+              WHERE Docente_Usuario_Id IN (?) AND Clase_Electivo_Periodo_Lectivo = ?
+              GROUP BY Docente_Usuario_Id`,
+            [docenteIds, periodo]
+          );
+          for (const f of Array.isArray(filasEl?.[0]) ? filasEl[0] : []) electivosDe.set(Number(f.id), Number(f.n));
+        }
+        for (const d of docentes) {
+          const info = calcularCargaLectiva(d.Docente_Carga_Horaria_Semanal, d.Docente_Horas_PIE);
+          if (!info) continue;
+          const delDocente = (r) => r.Usuario_Id === d.Usuario_Id && r.estado === 'Activo' && delPeriodo(r);
+          const base = otros.filter(delDocente).length + (electivosDe.get(Number(d.Usuario_Id)) || 0);
+          const nuevas = base + propuestas.filter(delDocente).length;
+          const actuales = base + seleccionados.filter(delDocente).length;
+          if (nuevas > info.maxLectivas && nuevas > actuales) {
+            conflictos.push(
+              `${d.Usuario_Nombre_Completo} superaría su máximo semanal de ${info.maxLectivas} `
+              + `${info.maxLectivas === 1 ? 'clase' : 'clases'}${periodo ? ` en ${periodo}` : ''} `
+              + `(65 % de ${info.disponibles} h; quedaría con ${nuevas})`
+            );
+          }
+        }
       }
     }
   }

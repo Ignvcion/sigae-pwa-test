@@ -172,16 +172,30 @@ describe('CU106: programación de electivos', () => {
     expect(r.json.mock.calls[0][0].mensaje).toContain('ya tiene 1ero Básico A (Matemática)');
   });
 
-  test('RF35: el electivo cuenta en la carga horaria semanal del docente', async () => {
+  test('RF35 / regla 65/35: el electivo cuenta como una clase más del docente', async () => {
     pool.query = porPatron([PERIODOS]);
     mockConn([PLAN, ITEMS, DOCENTES_PLAN, BLOQUE,
       [/FROM usuario WHERE Usuario_Id = \? AND Es_Docente = 1/, [[{ Usuario_Id: 7, Usuario_Nombre_Completo: 'Carmen', Docente_Carga_Horaria_Semanal: 2 }]]],
-      [/FROM horario_asignatura ha\s+JOIN bloque_horario bh/, [[{ horas: 0.75 }]]],
-      [/FROM clase_electivo ce JOIN bloque_horario bh/, [[{ horas: 0.75 }]]]]);
+      // Carga 2 h, sin P.I.E.: máximo floor(65 % de 2) = 1 clase; ya tiene 1 regular
+      [/FROM usuario WHERE Usuario_Id IN/, [[{ Usuario_Id: 7, Usuario_Nombre_Completo: 'Carmen', Docente_Carga_Horaria_Semanal: 2, Docente_Horas_PIE: 0 }]]],
+      [/COUNT\(\*\) AS n\s+FROM horario_asignatura/, [[{ id: 7, n: 1 }]]]]);
     const r = res();
     await electivos.programarElectivo(programar({}), r);
     expect(r.status).toHaveBeenCalledWith(422);
-    expect(r.json.mock.calls[0][0].mensaje).toContain('carga horaria semanal de 2 h');
+    expect(r.json.mock.calls[0][0].mensaje).toBe(
+      'Carmen superaría su máximo semanal de 1 clase (2 h → 1 clase (65 %) y 1 h no lectivas (35 %)). Ya tiene 1 clase y quedaría con 2.'
+    );
+  });
+
+  test('Horas P.I.E.: no se programa un electivo en un bloque P.I.E. del docente', async () => {
+    pool.query = porPatron([PERIODOS]);
+    mockConn([PLAN, ITEMS, DOCENTES_PLAN, BLOQUE,
+      [/FROM usuario WHERE Usuario_Id = \? AND Es_Docente = 1/, [[{ Usuario_Id: 7, Usuario_Nombre_Completo: 'Carmen', Docente_Carga_Horaria_Semanal: 40 }]]],
+      [/FROM bloque_pie_docente/, [[{ id: 7 }]]]]);
+    const r = res();
+    await electivos.programarElectivo(programar({}), r);
+    expect(r.status).toHaveBeenCalledWith(409);
+    expect(r.json.mock.calls[0][0].mensaje).toContain('tiene horas P.I.E.');
   });
 });
 

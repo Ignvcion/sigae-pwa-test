@@ -3,6 +3,7 @@ const disponibilidadLaboral = require('../controllers/disponibilidadLaboralContr
 const router = express.Router();
 
 const usuarioController = require('../controllers/usuarioController');
+const pie = require('../controllers/pieController');
 const uploadFotoPerfil = require('../middleware/uploadFotoPerfil');
 const { codigoLimiter } = require('../middleware/rateLimiter');
 
@@ -50,6 +51,9 @@ router.get('/docentes', verifyToken, verifyAdmin, usuarioController.getDocentes)
 // CU32 y CU33: Listado y filtros de apoderados — Super Admin/Admin
 router.get('/apoderados', verifyToken, verifyAdmin, usuarioController.getApoderados);
 router.get('/disponibilidad/opciones', verifyToken, verifyAdmin, disponibilidadLaboral.getOpcionesDisponibilidad);
+// Horas P.I.E. del docente y su reparto 65/35 (lo ve también el propio docente)
+router.get('/:id/pie', verifyToken, pie.getPIE);
+router.put('/:id/pie', verifyToken, verifyAdmin, pie.guardarPIE);
 router.get('/:id', verifyToken, usuarioController.getUsuarioById);
 
 // Solo Administrador puede crear, modificar estado o eliminar usuarios

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getHorarioDocente, getListaDocentes, getMiHorarioAtencion, getDisponibilidadDocente } from "../../services/api";
+import { getHorarioDocente, getListaDocentes, getMiHorarioAtencion, getDisponibilidadDocente, getPIEDocente } from "../../services/api";
+import { textoReparto } from "../../utils/cargaLectiva";
 import ExportMenu from "../../components/ExportMenu";
 import HorarioSemanal from "../../components/horarios/HorarioSemanal";
 import AvisoTopes from "../../components/horarios/AvisoTopes";
@@ -35,12 +36,16 @@ function MiHorario() {
 
   // CU107: indicador "debe horas" del docente (disponibilidad laboral frente a su carga semanal)
   const [resumenDisp, setResumenDisp] = useState(null);
+  // Horas P.I.E. y regla 65/35 del docente
+  const [pie, setPie] = useState(null);
 
   // CU43: horario semanal a partir de sus cursos asociados
   const cargarHorario = async (id) => {
     if (!id) return;
     setResumenDisp(null);
+    setPie(null);
     getDisponibilidadDocente(id).then((d) => setResumenDisp(d?.resumen || null)).catch(() => {});
+    getPIEDocente(id).then(setPie).catch(() => {});
     setLoading(true);
     setErrorCarga("");
     setMensajeInfo("");
@@ -105,7 +110,17 @@ function MiHorario() {
     lineas: [],
     colorKey: "Atención de apoderados",
   }));
-  const grilla = [...clases, ...bloquesAtencion];
+  // Horas P.I.E.: bloques reservados en su horario (no admiten clases)
+  const bloquesPIE = (pie?.bloques || []).map((b) => ({
+    id: `pie-${b.dia}-${b.bloqueId}`,
+    dia: b.dia,
+    horaInicio: b.horaInicio,
+    horaFin: b.horaFin,
+    titulo: "Horas P.I.E.",
+    lineas: ["Programa de Integración Escolar"],
+    colorKey: "Horas P.I.E.",
+  }));
+  const grilla = [...clases, ...bloquesAtencion, ...bloquesPIE];
 
 
   return (
@@ -163,7 +178,15 @@ function MiHorario() {
         </div>
       )}
 
-      {!loading && !errorCarga && (esAdmin ? docenteId && !mensajeInfo : true) && grilla.length > 0 && (
+      {docenteId && pie?.reparto && (
+        <div className={`resumen-65-35${pie.clasesAsignadas > pie.reparto.maxLectivas ? " resumen-65-35--excede" : ""}`} role="status">
+          <strong>Regla 65/35:</strong> {textoReparto(pie.reparto)}.{" "}
+          Clases asignadas en {pie.periodo}: <strong>{pie.clasesAsignadas} de {pie.reparto.maxLectivas}</strong>.
+          {pie.horasPIE > 0 && ` Horas P.I.E. ubicadas en el horario: ${pie.bloques.length} de ${pie.horasPIE}.`}
+        </div>
+      )}
+
+      {!loading && !errorCarga && (esAdmin ? docenteId && (!mensajeInfo || bloquesPIE.length > 0) : true) && grilla.length > 0 && (
         <HorarioSemanal clases={grilla} />
       )}
 

@@ -146,6 +146,31 @@ INSERT INTO `bloque_horario` VALUES (11111111,'09:15:00','Clase','10:00:00','Ma�
 UNLOCK TABLES;
 
 --
+-- Table structure for table `bloque_pie_docente`
+-- Horas P.I.E. ubicadas en el horario semanal del docente, por período (día y bloque horario). Un
+-- bloque P.I.E. ocupa ese día y bloque: no se le asignan clases. Su cantidad no supera
+-- usuario.Docente_Horas_PIE (BackEnd/utils/cargaLectiva.js).
+--
+
+DROP TABLE IF EXISTS `bloque_pie_docente`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `bloque_pie_docente` (
+  `Bloque_Pie_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Docente_Usuario_Id` int unsigned NOT NULL,
+  `Bloque_Pie_Periodo_Lectivo` varchar(10) NOT NULL,
+  `Bloque_Pie_Dia_Semana` varchar(20) NOT NULL,
+  `Bloque_Horario_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Bloque_Pie_Id`),
+  UNIQUE KEY `Bloque_Pie_UNIQUE` (`Docente_Usuario_Id`,`Bloque_Pie_Periodo_Lectivo`,`Bloque_Pie_Dia_Semana`,`Bloque_Horario_Id`),
+  KEY `fk_Bloque_Pie_Bloque_idx` (`Bloque_Horario_Id`),
+  CONSTRAINT `fk_Bloque_Pie_Bloque` FOREIGN KEY (`Bloque_Horario_Id`) REFERENCES `bloque_horario` (`Bloque_Horario_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Bloque_Pie_Docente` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `chk_Bloque_Pie_Dia` CHECK (`Bloque_Pie_Dia_Semana` IN ('Lunes','Martes','Miércoles','Jueves','Viernes'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `citacion`
 --
 
@@ -1060,6 +1085,8 @@ UNLOCK TABLES;
 -- Usuario_Correo_Verificado: 0 hasta confirmar el correo principal con un código (primer ingreso);
 -- vuelve a 0 si la administración cambia un correo de la cuenta
 -- Docente_Color: color (#RRGGBB) que identifica al docente; se asigna al azar de la paleta básica
+-- Docente_Horas_PIE: horas P.I.E. del docente; se restan de la carga y sobre el resto se aplica la regla
+-- 65/35 (máximo de clases = 65 % de carga − P.I.E., en horas pedagógicas). Ver bloque_pie_docente
 --
 
 DROP TABLE IF EXISTS `usuario`;
@@ -1090,6 +1117,7 @@ CREATE TABLE `usuario` (
   `Apoderado_Sin_Asociaciones_Desde` varchar(10) DEFAULT NULL,
   `Usuario_Correo_Verificado` tinyint(1) NOT NULL DEFAULT 0,
   `Docente_Color` char(7) DEFAULT NULL,
+  `Docente_Horas_PIE` int unsigned NOT NULL DEFAULT 0,
   PRIMARY KEY (`Usuario_Id`),
   UNIQUE KEY `Usuario_RUT_UNIQUE` (`Usuario_RUT`),
   UNIQUE KEY `Apoderado_Correo_Natural_UNIQUE` (`Apoderado_Correo_Natural`),
@@ -1104,7 +1132,7 @@ CREATE TABLE `usuario` (
 
 LOCK TABLES `usuario` WRITE;
 /*!40000 ALTER TABLE `usuario` DISABLE KEYS */;
-INSERT INTO `usuario` VALUES (1,'5682711-0','961900000','Esperanza Penelope Gonzales Farias',1,'1234',NULL,0,NULL,NULL,NULL,1,'Super Admin','es.gonzales@colegiojc.cl',0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,NULL),(2,'9343727-6','979746782','Carlos Vicente Gonzales Muñoz',1,'ilovemilf',NULL,0,NULL,NULL,NULL,1,'Administrador Normal','ca.gonzales@colegiojc.cl',0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,NULL),(3,'3483606-k','946789765','María Claudia Morales Rojas',1,'Gato123',NULL,1,38,'Matemáticas','ma.morales@colegiojc.cl',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,'#DC2626'),(4,'5738925-7','944706559','Pedro Humberto Fernandez Soto',1,'4532',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Avenida Concha y Toro','134',NULL,'Puente Alto','pedrofernandez453@gmail.com',1,NULL,1,NULL),(5,'3890710-7','912345678','Ana Lucía Torres Vega',1,'Hamster#23',NULL,1,32,'Lenguaje','an.torres@colegiojc.cl',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,'#0D9488'),(6,'7135657-4','923456789','Roberto Andrés Silva Pinto',1,'Cotorra-15',NULL,1,40,'Historia','ro.silva@colegiojc.cl',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,'#C026D3'),(7,'2258000-0','934567890','Carmen Gloria Díaz Muñoz',1,'Perrito@7',NULL,1,36,'Ciencias','ca.diaz@colegiojc.cl',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,'#65A30D'),(8,'8636451-4','945678901','Luis Eduardo Ramos Fuentes',1,'Conejo#42',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Calle Los Pinos','456',NULL,'Santiago','luisramos@gmail.com',1,NULL,1,NULL),(9,'9230041-2','956789012','Sandra Patricia Vera Molina',1,'Tortuga-99',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Pasaje Las Rosas','789',NULL,'Maipú','sandravera@gmail.com',1,NULL,1,NULL),(10,'5158743-k','967890123','Jorge Ignacio Campos Reyes',1,'Pinguino@5',NULL,1,38,'Inglés','jo.campos@colegiojc.cl',0,NULL,NULL,1,'Avenida Principal','321',NULL,'Las Condes','jorge.campos@gmail.com',1,NULL,1,'#4F46E5');
+INSERT INTO `usuario` VALUES (1,'5682711-0','961900000','Esperanza Penelope Gonzales Farias',1,'1234',NULL,0,NULL,NULL,NULL,1,'Super Admin','es.gonzales@colegiojc.cl',0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,NULL,0),(2,'9343727-6','979746782','Carlos Vicente Gonzales Muñoz',1,'ilovemilf',NULL,0,NULL,NULL,NULL,1,'Administrador Normal','ca.gonzales@colegiojc.cl',0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,NULL,0),(3,'3483606-k','946789765','María Claudia Morales Rojas',1,'Gato123',NULL,1,38,'Matemáticas','ma.morales@colegiojc.cl',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,'#DC2626',0),(4,'5738925-7','944706559','Pedro Humberto Fernandez Soto',1,'4532',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Avenida Concha y Toro','134',NULL,'Puente Alto','pedrofernandez453@gmail.com',1,NULL,1,NULL,0),(5,'3890710-7','912345678','Ana Lucía Torres Vega',1,'Hamster#23',NULL,1,32,'Lenguaje','an.torres@colegiojc.cl',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,'#0D9488',0),(6,'7135657-4','923456789','Roberto Andrés Silva Pinto',1,'Cotorra-15',NULL,1,40,'Historia','ro.silva@colegiojc.cl',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,'#C026D3',0),(7,'2258000-0','934567890','Carmen Gloria Díaz Muñoz',1,'Perrito@7',NULL,1,36,'Ciencias','ca.diaz@colegiojc.cl',0,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,1,NULL,1,'#65A30D',0),(8,'8636451-4','945678901','Luis Eduardo Ramos Fuentes',1,'Conejo#42',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Calle Los Pinos','456',NULL,'Santiago','luisramos@gmail.com',1,NULL,1,NULL,0),(9,'9230041-2','956789012','Sandra Patricia Vera Molina',1,'Tortuga-99',NULL,0,NULL,NULL,NULL,0,NULL,NULL,1,'Pasaje Las Rosas','789',NULL,'Maipú','sandravera@gmail.com',1,NULL,1,NULL,0),(10,'5158743-k','967890123','Jorge Ignacio Campos Reyes',1,'Pinguino@5',NULL,1,38,'Inglés','jo.campos@colegiojc.cl',0,NULL,NULL,1,'Avenida Principal','321',NULL,'Las Condes','jorge.campos@gmail.com',1,NULL,1,'#4F46E5',0);
 /*!40000 ALTER TABLE `usuario` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

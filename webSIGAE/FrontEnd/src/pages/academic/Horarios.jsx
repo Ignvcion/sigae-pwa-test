@@ -1881,9 +1881,7 @@ function PanelForm({
                       {sugeridos.map((d) => (
                         <option key={d.Usuario_Id} value={d.Usuario_Id}>
                           {d.Usuario_Nombre_Completo} — {d.Docente_Especialidad}
-                          {d.Docente_Carga_Horaria_Semanal != null
-                            ? ` (${d.carga_actual}h/${d.Docente_Carga_Horaria_Semanal}h)`
-                            : ""}
+                          {d.max_lectivas != null ? ` (${d.carga_actual}/${d.max_lectivas} clases)` : ""}
                         </option>
                       ))}
                     </optgroup>
@@ -1894,9 +1892,7 @@ function PanelForm({
                         <option key={d.Usuario_Id} value={d.Usuario_Id}>
                           {d.Usuario_Nombre_Completo}
                           {d.Docente_Especialidad ? ` — ${d.Docente_Especialidad}` : ""}
-                          {d.Docente_Carga_Horaria_Semanal != null
-                            ? ` (${d.carga_actual}h/${d.Docente_Carga_Horaria_Semanal}h)`
-                            : ""}
+                          {d.max_lectivas != null ? ` (${d.carga_actual}/${d.max_lectivas} clases)` : ""}
                         </option>
                       ))}
                     </optgroup>
@@ -1908,9 +1904,11 @@ function PanelForm({
                           {d.Usuario_Nombre_Completo} —{" "}
                           {d.conflicto_horario
                             ? "conflicto de horario"
+                            : d.bloque_pie
+                            ? "horas P.I.E. en ese bloque"
                             : d.fuera_disponibilidad
                             ? "fuera de su disponibilidad laboral"
-                            : `carga semanal completa (${d.carga_actual}h/${d.Docente_Carga_Horaria_Semanal}h)`}
+                            : `máximo de clases alcanzado (${d.carga_actual}/${d.max_lectivas}, regla 65/35)`}
                         </option>
                       ))}
                     </optgroup>
@@ -1936,9 +1934,11 @@ function PanelForm({
                   : docSel.Docente_Especialidad
                   ? `💡 Sugerencia: su especialidad (${docSel.Docente_Especialidad}) no coincide con la asignatura. Puedes asignarlo igual.`
                   : "ℹ Sin especialidad registrada."}
-                {docSel.Docente_Carga_Horaria_Semanal != null && (
+                {docSel.max_lectivas != null && (
                   <span style={{ marginLeft: 8, color: "#64748b" }}>
-                    Carga semanal: {docSel.carga_nueva}h / {docSel.Docente_Carga_Horaria_Semanal}h
+                    Clases: {docSel.carga_nueva} / {docSel.max_lectivas} (65 % de{" "}
+                    {docSel.Docente_Carga_Horaria_Semanal - (docSel.horas_pie || 0)} h
+                    {docSel.horas_pie > 0 ? `; ${docSel.horas_pie} h P.I.E.` : ""})
                   </span>
                 )}
                 {docSel.horas_adeudadas > 0 && (

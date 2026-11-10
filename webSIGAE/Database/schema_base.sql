@@ -125,6 +125,33 @@ CREATE TABLE `bloque_horario` (
 
 
 --
+-- Table structure for table `bloque_pie_docente`
+-- Horas P.I.E. ubicadas en el horario semanal del docente, por período (día y bloque horario). Un
+-- bloque P.I.E. ocupa ese día y bloque: no se le asignan clases. Su cantidad no supera
+-- usuario.Docente_Horas_PIE (BackEnd/utils/cargaLectiva.js).
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `bloque_pie_docente` (
+  `Bloque_Pie_Id` int unsigned NOT NULL AUTO_INCREMENT,
+  `Docente_Usuario_Id` int unsigned NOT NULL,
+  `Bloque_Pie_Periodo_Lectivo` varchar(10) NOT NULL,
+  `Bloque_Pie_Dia_Semana` varchar(20) NOT NULL,
+  `Bloque_Horario_Id` int unsigned NOT NULL,
+  PRIMARY KEY (`Bloque_Pie_Id`),
+  UNIQUE KEY `Bloque_Pie_UNIQUE` (`Docente_Usuario_Id`,`Bloque_Pie_Periodo_Lectivo`,`Bloque_Pie_Dia_Semana`,`Bloque_Horario_Id`),
+  KEY `fk_Bloque_Pie_Bloque_idx` (`Bloque_Horario_Id`),
+  CONSTRAINT `fk_Bloque_Pie_Bloque` FOREIGN KEY (`Bloque_Horario_Id`) REFERENCES `bloque_horario` (`Bloque_Horario_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Bloque_Pie_Docente` FOREIGN KEY (`Docente_Usuario_Id`) REFERENCES `usuario` (`Usuario_Id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `chk_Bloque_Pie_Dia` CHECK (`Bloque_Pie_Dia_Semana` IN ('Lunes','Martes','Miércoles','Jueves','Viernes'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+--
+
+--
 -- Table structure for table `citacion`
 --
 
@@ -859,6 +886,8 @@ CREATE TABLE `tieneasig` (
 -- Usuario_Correo_Verificado: 0 hasta confirmar el correo principal con un código (primer ingreso);
 -- vuelve a 0 si la administración cambia un correo de la cuenta
 -- Docente_Color: color (#RRGGBB) que identifica al docente; se asigna al azar de la paleta básica
+-- Docente_Horas_PIE: horas P.I.E. del docente; se restan de la carga y sobre el resto se aplica la regla
+-- 65/35 (máximo de clases = 65 % de carga − P.I.E., en horas pedagógicas). Ver bloque_pie_docente
 --
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -888,6 +917,7 @@ CREATE TABLE `usuario` (
   `Apoderado_Sin_Asociaciones_Desde` varchar(10) DEFAULT NULL,
   `Usuario_Correo_Verificado` tinyint(1) NOT NULL DEFAULT 0,
   `Docente_Color` char(7) DEFAULT NULL,
+  `Docente_Horas_PIE` int unsigned NOT NULL DEFAULT 0,
   PRIMARY KEY (`Usuario_Id`),
   UNIQUE KEY `Usuario_RUT_UNIQUE` (`Usuario_RUT`),
   UNIQUE KEY `Apoderado_Correo_Natural_UNIQUE` (`Apoderado_Correo_Natural`),

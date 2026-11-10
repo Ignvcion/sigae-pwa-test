@@ -111,6 +111,15 @@ function columnaCorreoPrincipal(usuario) {
   return null;
 }
 
+// Horas P.I.E. (utils/cargaLectiva.js): entero ≥ 0 que no supera la carga horaria semanal
+function validarHorasPIE(horas, carga) {
+  if (!Number.isInteger(horas) || horas < 0) return 'Las horas P.I.E. deben ser un número entero igual o mayor a 0';
+  if (carga !== undefined && carga !== null && carga !== '' && horas > Number(carga)) {
+    return `Las horas P.I.E. (${horas}) no pueden superar la carga horaria semanal (${carga} h)`;
+  }
+  return null;
+}
+
 const COLUMNAS_CORREO = ['Administrador_Correo_Institucional', 'Docente_Correo_Institucional', 'Apoderado_Correo_Natural'];
 
 // Si la administración cambia un correo de la cuenta, el usuario lo confirma con
@@ -344,6 +353,7 @@ const createUsuario = async (req, res) => {
     Es_Docente,
     Docente_Carga_Horaria_Semanal,
     Docente_Correo_Institucional,
+    Docente_Horas_PIE,
     // Administrador
     Es_Administrador,
     Administrador_Tipo,
@@ -369,6 +379,14 @@ const createUsuario = async (req, res) => {
     return res.status(400).json({ mensaje: `El correo institucional del administrador debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}` });
   if (Es_Apoderado && !Apoderado_Correo_Natural)
     return res.status(400).json({ mensaje: 'El correo del apoderado es obligatorio' });
+
+  // Horas P.I.E.: entero entre 0 y la carga horaria semanal (se restan antes de la regla 65/35)
+  const horasPIE = Docente_Horas_PIE === undefined || Docente_Horas_PIE === null || Docente_Horas_PIE === ''
+    ? 0 : Number(Docente_Horas_PIE);
+  if (Es_Docente) {
+    const errorPIE = validarHorasPIE(horasPIE, Docente_Carga_Horaria_Semanal);
+    if (errorPIE) return res.status(400).json({ mensaje: errorPIE });
+  }
 
   // RF04: especialidades como etiquetas (arreglo o texto separado por comas)
   let especialidades = null;
@@ -480,8 +498,9 @@ const createUsuario = async (req, res) => {
           Es_Docente, Docente_Carga_Horaria_Semanal, Docente_Especialidad, Docente_Correo_Institucional,
           Es_Administrador, Administrador_Tipo, Administrador_Correo_Institucional,
           Es_Apoderado, Usuario_Direccion_Calle, Usuario_Direccion_Numero,
-          Usuario_Direccion_Depto, Usuario_Direccion_Comuna, Apoderado_Correo_Natural, Docente_Color
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          Usuario_Direccion_Depto, Usuario_Direccion_Comuna, Apoderado_Correo_Natural, Docente_Color,
+          Docente_Horas_PIE
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           Usuario_RUT,
           normalizarTelefono(Usuario_Telefono),
@@ -500,6 +519,7 @@ const createUsuario = async (req, res) => {
           ...columnasDireccion(direccionDesdeColumnas(req.body)).map(([, valor]) => valor),
           Apoderado_Correo_Natural        || null,
           colorDocente,
+          Es_Docente ? horasPIE : 0,
         ]
       );
       if (especialidades) await guardarEspecialidadesDocente(conn, resultado.insertId, especialidades);
@@ -530,7 +550,7 @@ const updateUsuario = async (req, res) => {
 
   try {
     const [existe] = await db.query(
-      'SELECT Es_Administrador, Administrador_Tipo, Es_Apoderado, Es_Docente FROM usuario WHERE Usuario_Id = ?', [id]
+      'SELECT Es_Administrador, Administrador_Tipo, Es_Apoderado, Es_Docente, Docente_Horas_PIE FROM usuario WHERE Usuario_Id = ?', [id]
     );
     if (existe.length === 0) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
 
@@ -594,6 +614,14 @@ const updateUsuario = async (req, res) => {
       const leida = leerDisponibilidad(camposRaw.Docente_Disponibilidad);
       if (!leida.ok) return res.status(400).json({ mensaje: leida.mensaje });
       disponibilidad = leida;
+    }
+
+    // La carga horaria semanal no puede quedar bajo las horas P.I.E. del docente
+    if (otrosDatos.Docente_Carga_Horaria_Semanal !== undefined
+        && Number(otrosDatos.Docente_Carga_Horaria_Semanal) < Number(objetivo.Docente_Horas_PIE || 0)) {
+      return res.status(400).json({
+        mensaje: `La carga horaria semanal no puede ser menor que las horas P.I.E. del docente (${objetivo.Docente_Horas_PIE} h)`,
+      });
     }
 
     // Correos que se están actualizando: obligatorios (no se pueden dejar vacíos) y, los

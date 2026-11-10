@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import BloquePIE from "../../components/BloquePIE";
 import { getEspecialidades, getDisponibilidadDocente } from "../../services/api";
 import EtiquetasInput, { separarEtiquetas } from "../../components/EtiquetasInput";
 import DisponibilidadSemanal, { errorTramos } from "../../components/DisponibilidadSemanal";
@@ -335,6 +336,7 @@ function FormEditarUsuario({ datos, onGuardado }) {
         <BloqueCorreoRol datos={datos} onGuardado={onGuardado} titulo="Datos de apoderado"
           name="Apoderado_Correo_Natural" label="Correo personal" />
       )}
+      {!!datos.Es_Docente && <BloquePIE datos={datos} onGuardado={onGuardado} />}
       {!!datos.Es_Docente && <BloqueDisponibilidad datos={datos} onGuardado={onGuardado} />}
     </section>
   );

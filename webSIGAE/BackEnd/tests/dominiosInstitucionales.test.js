@@ -29,7 +29,7 @@ function simularBase(usuarioExistente = null) {
     if (/WHERE Usuario_RUT = \?/.test(sql)) return [[]];
     if (/FROM especialidad WHERE Especialidad_Nombre = \?/.test(sql)) return [[{ Especialidad_Id: 1, Especialidad_Nombre: valores[0] }]];
     if (/SELECT \* FROM usuario WHERE Usuario_Id = \?/.test(sql)) return [[usuarioExistente || { Usuario_Id: 50 }]];
-    if (/SELECT Es_Administrador, Administrador_Tipo, Es_Apoderado, Es_Docente FROM usuario/.test(sql)) return [[usuarioExistente]];
+    if (/SELECT Es_Administrador, Administrador_Tipo, Es_Apoderado, Es_Docente(, Docente_Horas_PIE)? FROM usuario/.test(sql)) return [[usuarioExistente]];
     if (/SELECT Es_Administrador, Administrador_Tipo FROM usuario/.test(sql)) return [[usuarioExistente]];
     if (/SELECT Usuario_Id FROM usuario WHERE/.test(sql)) return [[]]; // sin duplicados
     if (/SELECT Usuario_Id, Usuario_Nombre_Completo, Usuario_Telefono/.test(sql)) return [[{ Usuario_Id: 2 }]];
