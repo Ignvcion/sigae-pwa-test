@@ -185,8 +185,54 @@ let STORE_USUARIOS = loadStore("SIGAE_USUARIOS", SEED_USUARIOS).map(u => {
   };
 });
 
-// Reclasificar registros erróneos creados con admin.nuevo@jacquescousteau.edu por el bug previo
+// Reclasificación y saneamiento inteligente de cuentas creadas durante pruebas
 let storeUsuariosModificado = false;
+
+// 1. Manejo específico para las cuentas de prueba de Ignacio mora
+// (Cuenta 1 = Administrador, Cuenta 2 = Apoderado, Cuenta 3 = Docente)
+const ignacioMatches = STORE_USUARIOS.filter(u =>
+  (u.Usuario_RUT && String(u.Usuario_RUT).replace(/[\.\-\s]/g, "") === "16730793") ||
+  (u.Usuario_Nombre_Completo && String(u.Usuario_Nombre_Completo).trim().toLowerCase().includes("ignacio mora"))
+);
+
+if (ignacioMatches.length >= 2) {
+  storeUsuariosModificado = true;
+  // Cuenta 1: Administrador
+  const adminAcc = ignacioMatches[0];
+  adminAcc.Es_Administrador = 1;
+  adminAcc.Es_Docente = 0;
+  adminAcc.Es_Apoderado = 0;
+  adminAcc.Administrador_Tipo = adminAcc.Administrador_Tipo || "Administrador Normal";
+  adminAcc.Administrador_Correo_Institucional = adminAcc.Administrador_Correo_Institucional || adminAcc.Usuario_Correo || "ignacioelpro@jacquescousteau.edu";
+  adminAcc.Usuario_Correo = adminAcc.Administrador_Correo_Institucional;
+
+  // Cuenta 2: Apoderado
+  const apoAcc = ignacioMatches[1];
+  apoAcc.Es_Administrador = 0;
+  apoAcc.Es_Docente = 0;
+  apoAcc.Es_Apoderado = 1;
+  apoAcc.Administrador_Tipo = null;
+  apoAcc.Administrador_Correo_Institucional = null;
+  apoAcc.Docente_Correo_Institucional = null;
+  apoAcc.Apoderado_Correo_Natural = apoAcc.Apoderado_Correo_Natural || "ignacio.mora.apoderado@email.cl";
+  apoAcc.Usuario_Correo = apoAcc.Apoderado_Correo_Natural;
+
+  // Cuenta 3 (y subsiguientes): Docente
+  if (ignacioMatches.length >= 3) {
+    const docAcc = ignacioMatches[2];
+    docAcc.Es_Administrador = 0;
+    docAcc.Es_Docente = 1;
+    docAcc.Es_Apoderado = 0;
+    docAcc.Administrador_Tipo = null;
+    docAcc.Administrador_Correo_Institucional = null;
+    docAcc.Docente_Correo_Institucional = docAcc.Docente_Correo_Institucional || "i.mora@jacquescousteau.edu";
+    docAcc.Docente_Especialidad = docAcc.Docente_Especialidad || "Historia y Geografía";
+    docAcc.Docente_Carga_Horaria_Maxima = docAcc.Docente_Carga_Horaria_Maxima || 36;
+    docAcc.Usuario_Correo = docAcc.Docente_Correo_Institucional;
+  }
+}
+
+// 2. Corregir cualquier usuario que tenga campos o correos de docente/apoderado pero haya quedado como admin por el bug previo
 STORE_USUARIOS = STORE_USUARIOS.map(u => {
   if (u.Administrador_Correo_Institucional === "admin.nuevo@jacquescousteau.edu" || u.Usuario_Correo === "admin.nuevo@jacquescousteau.edu") {
     storeUsuariosModificado = true;
@@ -201,8 +247,32 @@ STORE_USUARIOS = STORE_USUARIOS.map(u => {
       Usuario_Correo: "ignacio.mora.apoderado@email.cl",
     };
   }
+  if (u.Docente_Especialidad && u.Es_Administrador && !u.Es_Docente) {
+    storeUsuariosModificado = true;
+    return {
+      ...u,
+      Es_Administrador: 0,
+      Es_Docente: 1,
+      Es_Apoderado: 0,
+      Administrador_Tipo: null,
+      Administrador_Correo_Institucional: null,
+      Docente_Correo_Institucional: u.Docente_Correo_Institucional || u.Usuario_Correo || "docente@jacquescousteau.edu",
+    };
+  }
+  if (u.Apoderado_Correo_Natural && u.Es_Administrador && !u.Es_Apoderado && !u.Docente_Especialidad) {
+    storeUsuariosModificado = true;
+    return {
+      ...u,
+      Es_Administrador: 0,
+      Es_Docente: 0,
+      Es_Apoderado: 1,
+      Administrador_Tipo: null,
+      Administrador_Correo_Institucional: null,
+    };
+  }
   return u;
 });
+
 if (storeUsuariosModificado) {
   saveStore("SIGAE_USUARIOS", STORE_USUARIOS);
 }
@@ -1424,8 +1494,42 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
       return { ok: true, status: 201, id: nuevoEst.Estudiante_Id, mensaje: "Ficha estudiantil registrada correctamente" };
     }
 
+    // Asignar rol a usuario existente (/api/usuarios/:id/asignar-rol)
+    if (p.includes("/usuarios/") && p.includes("/asignar-rol") && reqId) {
+      let usuarioActualizado = null;
+      STORE_USUARIOS = STORE_USUARIOS.map(u => {
+        if (Number(u.Usuario_Id) === Number(reqId)) {
+          const rol = b?.rol;
+          const isDoc = rol === "Docente";
+          const isApo = rol === "Apoderado";
+          const isAdm = rol === "Administrador";
+
+          usuarioActualizado = {
+            ...u,
+            Es_Docente: isDoc ? 1 : u.Es_Docente,
+            Es_Apoderado: isApo ? 1 : u.Es_Apoderado,
+            Es_Administrador: isAdm ? 1 : u.Es_Administrador,
+            Docente_Correo_Institucional: isDoc ? (b?.Docente_Correo_Institucional || u.Docente_Correo_Institucional || u.Usuario_Correo) : u.Docente_Correo_Institucional,
+            Docente_Especialidad: isDoc ? (b?.Docente_Especialidad || u.Docente_Especialidad || "General") : u.Docente_Especialidad,
+            Docente_Carga_Horaria_Maxima: isDoc ? (Number(b?.Docente_Carga_Horaria_Maxima) || u.Docente_Carga_Horaria_Maxima || 36) : u.Docente_Carga_Horaria_Maxima,
+            Apoderado_Correo_Natural: isApo ? (b?.Apoderado_Correo_Natural || u.Apoderado_Correo_Natural || u.Usuario_Correo) : u.Apoderado_Correo_Natural,
+            Administrador_Correo_Institucional: isAdm ? (b?.Administrador_Correo_Institucional || u.Administrador_Correo_Institucional || u.Usuario_Correo) : u.Administrador_Correo_Institucional,
+            Administrador_Tipo: isAdm ? (b?.Administrador_Tipo || u.Administrador_Tipo || "Administrador Normal") : u.Administrador_Tipo,
+            Usuario_Direccion_Calle: b?.Usuario_Direccion_Calle || u.Usuario_Direccion_Calle,
+            Usuario_Direccion_Numero: b?.Usuario_Direccion_Numero || u.Usuario_Direccion_Numero,
+            Usuario_Direccion_Depto: b?.Usuario_Direccion_Depto ?? u.Usuario_Direccion_Depto,
+            Usuario_Direccion_Comuna: b?.Usuario_Direccion_Comuna || u.Usuario_Direccion_Comuna,
+          };
+          return usuarioActualizado;
+        }
+        return u;
+      });
+      saveStore("SIGAE_USUARIOS", STORE_USUARIOS);
+      return { ok: true, status: 200, mensaje: `Rol ${b?.rol} asignado exitosamente`, usuario: usuarioActualizado };
+    }
+
     // Registrar Usuario (Administrador / Docente / Apoderado)
-    if (p.includes("/usuarios/administradores") || p.includes("/usuarios/docentes") || p.includes("/usuarios/apoderados") || p.includes("/usuarios")) {
+    if ((p.includes("/usuarios/administradores") || p.includes("/usuarios/docentes") || p.includes("/usuarios/apoderados") || p.includes("/usuarios")) && !p.includes("/asignar-rol")) {
       let isAdm = false;
       let isDoc = false;
       let isApo = false;
@@ -1603,8 +1707,28 @@ function getMockResponseForUrl(urlStr, method = "GET", reqBody = null) {
       return { ok: true, status: 200, mensaje: "Fotografía actualizada exitosamente" };
     }
 
+    // Actualizar / Desactivar roles de usuario existente (/api/usuarios/:id/roles)
+    if (p.includes("/usuarios/") && p.includes("/roles") && reqId) {
+      let usuarioActualizado = null;
+      STORE_USUARIOS = STORE_USUARIOS.map(u => {
+        if (Number(u.Usuario_Id) === Number(reqId)) {
+          usuarioActualizado = {
+            ...u,
+            Es_Administrador: b?.Es_Administrador !== undefined ? Number(b.Es_Administrador) : u.Es_Administrador,
+            Es_Docente: b?.Es_Docente !== undefined ? Number(b.Es_Docente) : u.Es_Docente,
+            Es_Apoderado: b?.Es_Apoderado !== undefined ? Number(b.Es_Apoderado) : u.Es_Apoderado,
+            Administrador_Tipo: b?.Administrador_Tipo !== undefined ? b.Administrador_Tipo : u.Administrador_Tipo,
+          };
+          return usuarioActualizado;
+        }
+        return u;
+      });
+      saveStore("SIGAE_USUARIOS", STORE_USUARIOS);
+      return { ok: true, status: 200, mensaje: "Roles actualizados exitosamente", usuario: usuarioActualizado };
+    }
+
     // Editar usuario o administrador
-    if (p.includes("/usuarios") && reqId) {
+    if (p.includes("/usuarios") && !p.includes("/roles") && reqId) {
       STORE_USUARIOS = STORE_USUARIOS.map(u => {
         if (Number(u.Usuario_Id) === Number(reqId)) {
           const nuevoCorreo = b?.Administrador_Correo_Institucional || b?.Docente_Correo_Institucional || b?.Apoderado_Correo_Natural || b?.correo || b?.Usuario_Correo || u.Usuario_Correo;
@@ -2259,6 +2383,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     navigator.serviceWorker
       .register(swUrl)
       .then((reg) => {
+        reg.update();
         console.log('SIGAE PWA Service Worker registrado con éxito:', reg.scope);
       })
       .catch((err) => {
