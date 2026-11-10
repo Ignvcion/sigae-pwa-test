@@ -156,12 +156,17 @@ function HorarioMaestro() {
           )}
 
           <div style={s.grillaWrap}>
-            <table style={vista === "semana" ? { ...s.tabla, tableLayout: "fixed" } : s.tabla}>
+            <table
+            style={{
+              ...s.tabla,
+              minWidth: vista === "semana" ? 780 : Math.max(780, columnasCurso.length * 135 + 115),
+            }}
+          >
               <thead>
                 <tr>
-                  <th style={{ ...s.th, ...s.thBloque, ...(vista === "semana" ? { width: 120 } : {}) }}>Bloque</th>
+                  <th style={{ ...s.th, ...s.thBloque }}>Bloque</th>
                   {(vista === "dia" ? columnasCurso.map((c) => c.nombre) : DIAS_SEMANA).map((col) => (
-                    <th key={col} style={vista === "semana" ? { ...s.th, minWidth: 0 } : s.th}>{col}</th>
+                    <th key={col} style={{ ...s.th, minWidth: 130 }}>{col}</th>
                   ))}
                 </tr>
               </thead>
@@ -206,7 +211,7 @@ function HorarioMaestro() {
                               .filter((h) => h.dia === d)
                               .sort((x, y) => String(x.curso || x.Curso_Nombre || "").localeCompare(String(y.curso || y.Curso_Nombre || ""), "es"));
                             return (
-                              <td key={d} style={{ ...s.td, minWidth: 0 }}>
+                              <td key={d} style={{ ...s.td, minWidth: 130 }}>
                                 {delDia.length === 0 ? (
                                   <Vacio />
                                 ) : filtroCurso ? (
@@ -282,15 +287,25 @@ function ChipClase({ clase, color }) {
       style={{
         background: c.bg,
         borderLeft: `3px solid ${c.text}`,
-        borderRadius: 4,
-        padding: "2px 6px",
-        fontSize: "0.68rem",
-        lineHeight: 1.3,
+        borderRadius: 6,
+        padding: "4px 6px",
+        fontSize: "0.7rem",
+        lineHeight: 1.25,
         color: c.text,
-        overflowWrap: "anywhere",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
       }}
     >
-      <strong>{clase.curso}</strong> · {clase.asignatura}
+      <div style={{ fontWeight: 700, fontSize: "0.72rem", marginBottom: 2 }}>
+        {clase.curso}
+      </div>
+      <div style={{ wordBreak: "break-word", lineHeight: 1.2 }}>
+        {clase.asignatura}
+      </div>
+      {clase.docente && (
+        <div style={{ fontSize: "0.62rem", color: "#64748b", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          👤 {clase.docente}
+        </div>
+      )}
     </div>
   );
 }
@@ -329,7 +344,7 @@ function BotonSegmento({ activo, onClick, children }) {
 }
 
 const s = {
-  page: { padding: "2rem", maxWidth: "100%", boxSizing: "border-box" },
+  page: { padding: "1.25rem 1rem", maxWidth: "100%", boxSizing: "border-box" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap", marginBottom: "1.25rem" },
   titulo: { margin: 0, fontSize: "1.6rem", color: "#1e3a5f" },
   subtitulo: { margin: "4px 0 0", color: "#64748b", fontSize: "0.9rem" },
@@ -364,9 +379,10 @@ const s = {
     textTransform: "uppercase", letterSpacing: "0.03em", minWidth: 140, whiteSpace: "nowrap",
     borderLeft: "1px solid rgba(255,255,255,0.12)",
   },
-  thBloque: { left: 0, zIndex: 3, minWidth: 110, textAlign: "left" },
+  thBloque: { position: "sticky", left: 0, zIndex: 3, minWidth: 115, width: 115, textAlign: "left", background: "#1e3a5f" },
   tdBloque: {
     position: "sticky", left: 0, zIndex: 1, background: "#f8fafc",
+    minWidth: 115, width: 115,
     padding: "0.5rem 0.65rem", borderTop: "1px solid #eef2f7", borderRight: "1px solid #e5e7eb",
     verticalAlign: "middle", whiteSpace: "nowrap",
   },
