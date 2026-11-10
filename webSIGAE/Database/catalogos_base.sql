@@ -8,6 +8,8 @@
 -- institucionales); si falta, el backend usa el año actual.
 -- ============================================================================
 USE `sigae`;
+-- Los nombres llevan tildes: sin esto, un cliente en latin1 (p. ej. MySQL en Windows) los guarda mal.
+SET NAMES utf8mb4;
 
 INSERT IGNORE INTO `nivel_educativo` (`Nivel_Educativo_Nombre`, `Nivel_Educativo_Orden`) VALUES
   ('Pre-Kinder', 1),
