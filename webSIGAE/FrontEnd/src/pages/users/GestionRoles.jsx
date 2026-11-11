@@ -415,9 +415,15 @@ function GestionRoles() {
 
   if (loadingPage) return <div className="page-container"><p>Cargando...</p></div>;
 
+  // Al elegir el rol, sus datos se completan en una tarjeta a la derecha de la principal
+  // (debajo en pantallas angostas). Ambas quedan centradas en la página.
+  const FORM_ROL_ID = "form-asignar-rol";
+  const mostrarPanelRol = Boolean(seleccionado && rolNuevo && rolesDisponibles.length > 0);
+
   return (
     <div className="page-container">
-      <div className="form-card" style={{ maxWidth: "600px" }}>
+      <div className={`roles-layout${mostrarPanelRol ? " roles-layout--con-panel" : ""}`}>
+      <div className="form-card roles-card">
 
         <h1>Asignar Rol a Usuario Existente</h1>
         <p style={{ color: "#64748b", marginBottom: "24px" }}>
@@ -511,61 +517,30 @@ function GestionRoles() {
 
             {/* Formulario de asignación */}
             {rolesDisponibles.length > 0 ? (
-              <form onSubmit={handleSubmit}>
-                <div className="campo-pwd" style={{ marginBottom: "20px" }}>
-                  <label style={{ fontWeight: 600 }}>Rol a asignar</label>
-                  <select
-                    value={rolNuevo}
-                    onChange={e => handleRolChange(e.target.value)}
-                    required
-                    style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", marginTop: "6px" }}
-                  >
-                    <option value="">— Seleccione un rol —</option>
-                    {rolesDisponibles.map(r => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Datos específicos del rol seleccionado */}
-                {rolNuevo === "Docente" && (
-                  <CamposDocente datos={datosRol} errores={errores} onChange={handleDatosChange} />
-                )}
-                {rolNuevo === "Administrador" && (
-                  <CamposAdmin datos={datosRol} errores={errores} onChange={handleDatosChange} esSuperAdmin={esSuperAdmin} />
-                )}
-                {rolNuevo === "Apoderado" && (
-                  <CamposApoderado datos={datosRol} errores={errores} onChange={handleDatosChange} />
-                )}
-
-                {/* Aviso de conversión cuando Super Admin asigna Admin a usuario con otros roles */}
-                {rolNuevo === "Administrador" && (seleccionado.Es_Docente || seleccionado.Es_Apoderado) && (
-                  <div style={{
-                    background: "#fffbeb", border: "1px solid #fbbf24",
-                    borderRadius: "8px", padding: "12px 14px", marginTop: "16px",
-                  }}>
-                    <p style={{ margin: 0, color: "#92400e", fontSize: "0.88rem" }}>
-                      <strong>Conversión de rol:</strong> Al asignar el rol Administrador se eliminarán
-                      automáticamente los roles de{" "}
-                      <strong>
-                        {[seleccionado.Es_Docente && "Docente", seleccionado.Es_Apoderado && "Apoderado"]
-                          .filter(Boolean).join(" y ")}
-                      </strong>. Esta acción es exclusiva del Super Administrador.
-                    </p>
-                  </div>
-                )}
-
+              <div className="campo-pwd" style={{ marginBottom: "20px" }}>
+                <label htmlFor="rol-a-asignar" style={{ fontWeight: 600 }}>Rol a asignar</label>
+                {/* Pertenece al formulario del panel derecho (atributo form): el "required" sigue validándolo */}
+                <select
+                  id="rol-a-asignar"
+                  form={FORM_ROL_ID}
+                  value={rolNuevo}
+                  onChange={e => handleRolChange(e.target.value)}
+                  required
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", marginTop: "6px" }}
+                >
+                  <option value="">— Seleccione un rol —</option>
+                  {rolesDisponibles.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
                 {rolNuevo && (
-                  <button
-                    type="submit"
-                    className="btn-primario"
-                    disabled={loadingEnvio}
-                    style={{ marginTop: "20px", width: "100%" }}
-                  >
-                    {loadingEnvio ? "Asignando..." : `Asignar rol ${rolNuevo}`}
-                  </button>
+                  <span className="roles-ayuda-panel">
+                    Completa los datos del rol {rolNuevo} en el panel{" "}
+                    <span className="roles-ayuda-lado">de la derecha</span>
+                    <span className="roles-ayuda-abajo">de abajo</span>.
+                  </span>
                 )}
-              </form>
+              </div>
             ) : (
               <p style={{ color: "#64748b", fontStyle: "italic", textAlign: "center", padding: "16px 0" }}>
                 {esAdminUser
@@ -664,6 +639,58 @@ function GestionRoles() {
           </div>
         )}
 
+      </div>
+
+      {/* ── Panel derecho: datos del nuevo rol ── */}
+      {mostrarPanelRol && (
+        <form
+          id={FORM_ROL_ID}
+          onSubmit={handleSubmit}
+          className="form-card roles-panel"
+          aria-label={`Datos del rol ${rolNuevo}`}
+        >
+          <h2 className="roles-panel-titulo">Datos del rol {rolNuevo}</h2>
+          <p className="roles-panel-desc">
+            Para <strong>{seleccionado.Usuario_Nombre_Completo}</strong> · RUT {seleccionado.Usuario_RUT}
+          </p>
+
+          {rolNuevo === "Docente" && (
+            <CamposDocente datos={datosRol} errores={errores} onChange={handleDatosChange} />
+          )}
+          {rolNuevo === "Administrador" && (
+            <CamposAdmin datos={datosRol} errores={errores} onChange={handleDatosChange} esSuperAdmin={esSuperAdmin} />
+          )}
+          {rolNuevo === "Apoderado" && (
+            <CamposApoderado datos={datosRol} errores={errores} onChange={handleDatosChange} />
+          )}
+
+          {/* Aviso de conversión cuando Super Admin asigna Admin a usuario con otros roles */}
+          {rolNuevo === "Administrador" && (seleccionado.Es_Docente || seleccionado.Es_Apoderado) && (
+            <div style={{
+              background: "#fffbeb", border: "1px solid #fbbf24",
+              borderRadius: "8px", padding: "12px 14px", marginTop: "16px",
+            }}>
+              <p style={{ margin: 0, color: "#92400e", fontSize: "0.88rem" }}>
+                <strong>Conversión de rol:</strong> Al asignar el rol Administrador se eliminarán
+                automáticamente los roles de{" "}
+                <strong>
+                  {[seleccionado.Es_Docente && "Docente", seleccionado.Es_Apoderado && "Apoderado"]
+                    .filter(Boolean).join(" y ")}
+                </strong>. Esta acción es exclusiva del Super Administrador.
+              </p>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="btn-primario"
+            disabled={loadingEnvio}
+            style={{ marginTop: "20px", width: "100%" }}
+          >
+            {loadingEnvio ? "Asignando..." : `Asignar rol ${rolNuevo}`}
+          </button>
+        </form>
+      )}
       </div>
 
     </div>
