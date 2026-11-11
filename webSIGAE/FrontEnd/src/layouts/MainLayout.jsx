@@ -239,7 +239,7 @@ function MainLayout() {
                       </Link>
 
                       <Link to="/horarios">
-                        Horarios
+                        Creador Horario
                       </Link>
 
                       <Link to="/mi-horario">
@@ -254,7 +254,7 @@ function MainLayout() {
                       </Link>
 
                       <Link to="/bloques-horarios">
-                        Bloques Horarios
+                        Parámetros Institución
                       </Link>
 
                       <Link to="/registrar-estudiante">

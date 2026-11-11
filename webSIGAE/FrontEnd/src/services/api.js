@@ -107,16 +107,25 @@ function columnasDireccionUsuario({ calle, numero, depto, comuna }) {
   };
 }
 
+// La contraseña inicial la genera el backend y la envía al correo del usuario
+export function textoContrasenaEnviada(creado) {
+  return creado?.Contrasena_Enviada_A
+    ? `La contraseña se envió a ${creado.Contrasena_Enviada_A}.`
+    : "La contraseña se envió al correo del usuario.";
+}
+
+// Los espacios del teléfono no cuentan como caracteres ("9 1234 5678" → "912345678")
+const quitarEspacios = (texto) => String(texto ?? "").replace(/\s+/g, "");
+
 // ── ADMINISTRADOR ────────────────────────────
-export async function registrarAdmin({ nombre, rut, correo, telefono, password, estado, calle, numero, depto, comuna }) {
+export async function registrarAdmin({ nombre, rut, correo, telefono, estado, calle, numero, depto, comuna }) {
   const res = await fetch(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
     body   : JSON.stringify({
       Usuario_Nombre_Completo            : nombre,
       Usuario_RUT                        : rut,
-      Usuario_Telefono                   : telefono,
-      Usuario_Contraseña                 : password,
+      Usuario_Telefono                   : quitarEspacios(telefono),
       Usuario_Estado_Cuenta              : estado === 'Activo' ? 1 : 0,
       Es_Administrador                   : 1,
       Administrador_Tipo                 : 'Administrador Normal',
@@ -130,21 +139,21 @@ export async function registrarAdmin({ nombre, rut, correo, telefono, password, 
 }
 
 // ── DOCENTE ──────────────────────────────────
-export async function registrarDocente({ nombre, rut, correo, telefono, password, especialidades, cargaHoraria, horasPIE, disponibilidad, estado, calle, numero, depto, comuna }) {
+export async function registrarDocente({ nombre, rut, correo, telefono, especialidades, cargaHoraria, horasPIE, disponibilidad, horarioAtencion, estado, calle, numero, depto, comuna }) {
   const res = await fetch(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
     body   : JSON.stringify({
       Usuario_Nombre_Completo      : nombre,
       Usuario_RUT                  : rut,
-      Usuario_Telefono             : telefono,
-      Usuario_Contraseña           : password,
+      Usuario_Telefono             : quitarEspacios(telefono),
       Usuario_Estado_Cuenta        : estado === 'Activo' ? 1 : 0,
       Es_Docente                   : 1,
       Docente_Especialidades       : especialidades,
       Docente_Carga_Horaria_Semanal : parseInt(cargaHoraria, 10), // carga horaria semanal
       Docente_Horas_PIE            : horasPIE === "" || horasPIE == null ? 0 : parseInt(horasPIE, 10), // se restan antes del 65/35
       Docente_Disponibilidad       : { tramos: disponibilidad || [] }, // CU107: tramos desde–hasta por día
+      Docente_Horario_Atencion     : { tramos: horarioAtencion || [] }, // RF55: atención de apoderados (opcional)
       Docente_Correo_Institucional : correo,
       ...columnasDireccionUsuario({ calle, numero, depto, comuna }),
       Es_Administrador             : 0,
@@ -155,15 +164,14 @@ export async function registrarDocente({ nombre, rut, correo, telefono, password
 }
 
 // ── APODERADO ────────────────────────────────
-export async function registrarApoderado({ nombre, rut, correo, telefono, calle, numero, depto, comuna, password, estado }) {
+export async function registrarApoderado({ nombre, rut, correo, telefono, calle, numero, depto, comuna, estado }) {
   const res = await fetch(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
     body   : JSON.stringify({
       Usuario_Nombre_Completo : nombre,
       Usuario_RUT             : rut,
-      Usuario_Telefono        : telefono,
-      Usuario_Contraseña      : password,
+      Usuario_Telefono        : quitarEspacios(telefono),
       Usuario_Estado_Cuenta   : estado === 'Activo' ? 1 : 0,
       Es_Apoderado            : 1,
       ...columnasDireccionUsuario({ calle, numero, depto, comuna }),

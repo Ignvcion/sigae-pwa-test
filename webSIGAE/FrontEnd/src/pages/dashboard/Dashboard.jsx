@@ -27,7 +27,7 @@ function NavGroup({ titulo, icono, color, links }) {
 
 /* ── Dashboard de Administrador ───────────────────── */
 // Mismos enlaces que el bloque "Administración" del sidebar (MainLayout.jsx),
-// más accesos directos a las pestañas de Bloques Horarios. Los marcados con
+// más accesos directos a las pestañas de Parámetros Institución. Los marcados con
 // superAdmin solo los ve el Super Admin (rutas superAdminOnly o enlaces que el
 // sidebar le reserva).
 const MODULOS_ADMIN = [
@@ -71,11 +71,11 @@ const MODULOS_ADMIN = [
     icono: "🕐",
     color: "#0369a1",
     links: [
-      { label: "Horarios (creador por curso)", to: "/horarios" },
+      { label: "Creador Horario",              to: "/horarios" },
       { label: "Horario Maestro",              to: "/horario-maestro" },
       { label: "Horario de Docente",           to: "/mi-horario" },
       { label: "Consulta de Horarios",         to: "/consulta-horarios" },
-      { label: "Bloques Horarios",             to: "/bloques-horarios?tab=bloques" },
+      { label: "Parámetros Institución",       to: "/bloques-horarios" },
       { label: "Eventos Institucionales",      to: "/bloques-horarios?tab=eventos" },
     ],
   },
@@ -97,7 +97,7 @@ const ACCESOS_RAPIDOS_ADMIN = [
   { label: "Registrar Docente",          to: "/registrar-docente" },
   { label: "Registrar Estudiante",       to: "/registrar-estudiante" },
   { label: "Plan Educativo",             to: "/plan-educativo" },
-  { label: "Horarios",                   to: "/horarios" },
+  { label: "Creador Horario",            to: "/horarios" },
   { label: "Horario Maestro",            to: "/horario-maestro" },
   { label: "Eventos Institucionales",    to: "/bloques-horarios?tab=eventos" },
   { label: "Citaciones",                 to: "/citaciones" },

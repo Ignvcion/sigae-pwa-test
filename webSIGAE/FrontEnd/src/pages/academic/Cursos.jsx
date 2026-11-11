@@ -423,7 +423,7 @@ function Cursos() {
       {error && <p className="msg-error">{error}</p>}
 
       {mostrarForm && (
-        <div className="form-card">
+        <div className="form-card form-card--centrada">
           <h2>Nuevo Curso</h2>
           <form onSubmit={handleSubmit}>
             <label>Nivel Educativo</label>

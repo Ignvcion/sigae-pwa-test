@@ -20,7 +20,8 @@ const getParametros = async (req, res) => {
       `SELECT * FROM parametro_institucional LIMIT 1`
     );
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'No hay parámetros institucionales configurados' });
+      // Base recién creada (producción): el frontend muestra el formulario para crearlos (PUT)
+      return res.status(404).json({ error: 'No hay parámetros institucionales configurados', codigo: 'SIN_PARAMETROS' });
     }
     res.json(rows[0]);
   } catch (err) {
@@ -52,7 +53,7 @@ const updateParametros = async (req, res) => {
   const durRecreo  = Number(Parametro_Institucional_Duracion_Recreo);
   const maxBloques = Number(Parametro_Institucional_Bloques_Maximos_Diarios);
 
-  if (durBloque < 1 || durRecreo < 0 || maxBloques < 1) {
+  if (![durBloque, durRecreo, maxBloques].every(Number.isInteger) || durBloque < 1 || durRecreo < 0 || maxBloques < 1) {
     return res.status(400).json({ error: 'Valores numéricos inválidos' });
   }
 

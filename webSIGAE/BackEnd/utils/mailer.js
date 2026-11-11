@@ -2,7 +2,8 @@
 // Envío de correos por SMTP desde la cuenta no-reply del colegio
 // (noreply@colegiojc.cl): códigos de verificación para recuperar la contraseña
 // (CU14), confirmar un cambio de correo (CU19) y activar la cuenta en el primer
-// ingreso. Ver utils/codigosVerificacion.js.
+// ingreso (ver utils/codigosVerificacion.js), y la contraseña inicial que SIGAE
+// genera al registrar a un usuario (ver utils/contrasenaInicial.js).
 //
 // Variables del .env:
 //   SMTP_HOST, SMTP_PORT (587 por defecto), SMTP_SECURE (true solo para el
@@ -102,4 +103,37 @@ async function enviarCodigoVerificacion({ para, nombre, codigo, minutos, proposi
   });
 }
 
-module.exports = { correoConfigurado, enviarCodigoVerificacion, PLANTILLAS };
+/**
+ * Envía la contraseña inicial (aleatoria) de una cuenta recién registrada.
+ * Lanza el error de SMTP si el envío falla (quien llama deshace el registro).
+ */
+async function enviarContrasenaInicial({ para, nombre, rut, contrasena }) {
+  const saludo = nombre ? `Hola ${nombre},` : 'Hola,';
+  const motivo = 'La administración del colegio creó tu cuenta en SIGAE.';
+  const uso = 'Inicia sesión con tu RUT y esta contraseña. En tu primer ingreso te enviaremos '
+    + 'un código a este correo para activar la cuenta. Te recomendamos cambiar la contraseña '
+    + 'desde "Mi Perfil" o con "¿Olvidaste tu contraseña?".';
+  const pie = 'Este correo fue enviado automáticamente por SIGAE. No respondas a este mensaje.';
+
+  await obtenerTransporter().sendMail({
+    from: process.env.EMAIL_FROM,
+    to: para,
+    subject: 'Tu cuenta en SIGAE fue creada',
+    headers: { 'Auto-Submitted': 'auto-generated', 'X-Auto-Response-Suppress': 'All' },
+    text: `${saludo}\n\n${motivo}\n\n`
+      + `RUT: ${rut}\nContraseña: ${contrasena}\n\n`
+      + `${uso}\n`
+      + 'Nadie del colegio te pedirá tu contraseña: no la compartas.\n\n'
+      + `${pie}\n`,
+    html: `<p>${escaparHTML(saludo)}</p>`
+      + `<p>${escaparHTML(motivo)}</p>`
+      + `<p>RUT: <strong>${escaparHTML(rut)}</strong></p>`
+      + '<p>Contraseña:</p>'
+      + `<p style="font-size:22px;font-weight:bold;letter-spacing:2px;font-family:monospace">${escaparHTML(contrasena)}</p>`
+      + `<p>${escaparHTML(uso)}</p>`
+      + '<p>Nadie del colegio te pedirá tu contraseña: no la compartas.</p>'
+      + `<p style="color:#64748b;font-size:12px">${escaparHTML(pie)}</p>`,
+  });
+}
+
+module.exports = { correoConfigurado, enviarCodigoVerificacion, enviarContrasenaInicial, PLANTILLAS };

@@ -36,15 +36,20 @@ function normalizarCorreosCuerpo(body) {
   return body;
 }
 
-// Formato chileno: 9 dígitos, opcionalmente con prefijo internacional +56 (o 56).
-// Solo números: sin espacios, guiones ni letras.
-function validarTelefonoChileno(telefono) {
-  return /^(\+?56)?\d{9}$/.test(String(telefono).trim());
+// Los espacios no cuentan como caracteres del teléfono: "+56 9 1234 5678" = "+56912345678"
+function quitarEspacios(texto) {
+  return String(texto ?? '').replace(/\s+/g, '');
 }
 
-// Deja el teléfono siempre como 9 dígitos (quita el prefijo +56/56 si viene)
+// Formato chileno: 9 dígitos, opcionalmente con prefijo internacional +56 (o 56).
+// Solo números (se ignoran los espacios): sin guiones ni letras.
+function validarTelefonoChileno(telefono) {
+  return /^(\+?56)?\d{9}$/.test(quitarEspacios(telefono));
+}
+
+// Deja el teléfono siempre como 9 dígitos, sin espacios (quita el prefijo +56/56 si viene)
 function normalizarTelefono(telefono) {
-  const digitos = String(telefono).trim().replace(/^\+/, '');
+  const digitos = quitarEspacios(telefono).replace(/^\+/, '');
   return digitos.length === 11 ? digitos.slice(2) : digitos;
 }
 
@@ -173,13 +178,8 @@ const validateCrearUsuario = [
       }
       return true;
     }),
-  body('Usuario_Contraseña')
-    .notEmpty().withMessage('La contraseña es requerida')
-    .custom((value) => {
-      const error = validarFortalezaContrasena(value);
-      if (error) throw new Error(error);
-      return true;
-    }),
+  // Sin Usuario_Contraseña: SIGAE genera una aleatoria y la envía al correo del
+  // usuario (utils/contrasenaInicial.js). Si llega una en el cuerpo, se ignora.
   body('Apoderado_Correo_Natural')
     .optional({ nullable: true, checkFalsy: true })
     .custom((value, { req }) => {

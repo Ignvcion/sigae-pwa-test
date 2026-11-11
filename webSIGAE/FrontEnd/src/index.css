@@ -1617,6 +1617,21 @@ select {
   align-items: center;
 }
 
+/* Gestión de Usuarios, Buscar Usuarios y Gestión de Apoderados: los selectores de la
+   barra de filtros van en línea con el buscador (el estilo global de <select> los
+   estiraba a todo el ancho) */
+.usuarios-filtros--en-linea > select {
+  width: auto;
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
+/* Filtros que se aplican solos al escribir: aviso discreto mientras se consulta */
+.usuarios-actualizando {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
 .usuarios-search {
   flex: 1;
   min-width: 220px;
@@ -2605,6 +2620,122 @@ body.bloques-panel-open .main-content {
 .btn-volver:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Registro de usuarios: los campos de texto son fluidos (ocupan todo el ancho
+   de la tarjeta y se adaptan a la pantalla) en vez de quedar con el ancho fijo
+   del navegador, que cortaba los textos de ejemplo. */
+.form-card.form-registro {
+  width: 100%;
+  max-width: 720px;
+  box-sizing: border-box;
+}
+
+.form-registro form > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.form-registro form > div > input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.form-registro form > div > select,
+.form-registro form > div > textarea,
+.form-registro form > input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.form-registro form > select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font-size: 0.95rem;
+}
+
+.form-registro-aviso {
+  margin: -8px 0 16px;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+@media (max-width: 640px) {
+  .page-container:has(> .form-registro) {
+    padding: 16px;
+  }
+  .form-card.form-registro {
+    padding: 20px 16px;
+  }
+}
+
+/* Tarjeta de formulario centrada en la página (p. ej. "Nuevo Curso" en Cursos) */
+.form-card.form-card--centrada {
+  margin: 0 auto 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Gestión de Roles: tarjeta principal centrada y, al elegir un rol, sus datos en una
+   tarjeta a la derecha (debajo cuando no caben las dos) */
+.roles-layout {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.roles-layout .form-card {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+.roles-layout .roles-card {
+  flex: 1 1 460px;
+  max-width: 600px;
+}
+
+.roles-layout .roles-panel {
+  flex: 1 1 360px;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: roles-panel-entrar 0.2s ease-out;
+}
+
+.roles-panel .roles-panel-titulo {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.roles-panel .roles-panel-desc {
+  margin: -8px 0 4px;
+  font-size: 0.88rem;
+  color: #64748b;
+}
+
+.roles-ayuda-panel {
+  font-size: 0.82rem;
+  color: #2563eb;
+}
+
+/* "de la derecha" o "de abajo" según dónde quedó el panel */
+.roles-ayuda-abajo { display: none; }
+
+@keyframes roles-panel-entrar {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* 1180px: menú lateral (260) + márgenes + las dos tarjetas (460 + 24 + 360) */
+@media (max-width: 1180px) {
+  .roles-layout--con-panel .roles-panel { max-width: 600px; }
+  .roles-layout--con-panel .roles-card,
+  .roles-layout--con-panel .roles-panel { flex-basis: 100%; }
+  .roles-ayuda-lado { display: none; }
+  .roles-ayuda-abajo { display: inline; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roles-layout .roles-panel { animation: none; }
 }
 
 /* Selector de archivo dentro de tarjetas: no debe salirse en pantallas angostas */

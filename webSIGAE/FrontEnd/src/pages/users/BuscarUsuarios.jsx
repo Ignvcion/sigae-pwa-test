@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import useRetraso from "../../hooks/useRetraso";
 import { useNavigate } from "react-router-dom";
 import { buscarUsuarioExistente } from "../../services/api";
 
@@ -12,6 +13,8 @@ function BuscarUsuarios() {
   const [usuarios, setUsuarios] = useState([]);
   const [mensajeInfo, setMensajeInfo] = useState("");
   const [errorCarga, setErrorCarga] = useState("");
+  const ultimaBusqueda = useRef(0);
+  const { programar, cancelar } = useRetraso();
 
   const getBadgesRoles = (u) => {
     const badges = [];
@@ -30,15 +33,32 @@ function BuscarUsuarios() {
   const getCorreoPrincipal = (u) =>
     u.Administrador_Correo_Institucional || u.Docente_Correo_Institucional || u.Apoderado_Correo_Natural || "—";
 
-  // CU28: buscar usuarios por nombre completo, RUT o correo electrónico
-  const buscar = async (e) => {
-    e.preventDefault();
+  const reiniciar = () => {
+    ultimaBusqueda.current += 1; // descarta respuestas que aún no llegan
+    setUsuarios([]);
+    setMensajeInfo("");
+    setErrorCarga("");
+    setBuscado(false);
+    setLoading(false);
+  };
+
+  // CU28: buscar usuarios por nombre completo, RUT o correo electrónico. Se busca solo al
+  // escribir (tras una breve pausa), sin botón; con los tres campos vacíos no se busca.
+  const buscar = async (filtros) => {
+    const datos = { rut: filtros.rut.trim(), nombre: filtros.nombre.trim(), correo: filtros.correo.trim() };
+    if (!datos.rut && !datos.nombre && !datos.correo) {
+      reiniciar();
+      return;
+    }
+    const busqueda = ++ultimaBusqueda.current;
+    const vigente = () => busqueda === ultimaBusqueda.current;
     setLoading(true);
     setBuscado(true);
     setErrorCarga("");
     setMensajeInfo("");
     try {
-      const data = await buscarUsuarioExistente({ rut, nombre, correo });
+      const data = await buscarUsuarioExistente(datos);
+      if (!vigente()) return;
       if (Array.isArray(data)) {
         setUsuarios(data);
       } else {
@@ -47,22 +67,30 @@ function BuscarUsuarios() {
         setMensajeInfo(data.mensaje || "No se encontraron usuarios");
       }
     } catch (error) {
+      if (!vigente()) return;
       // CU28 - Excepción "Campos inválidos o incompletos", "Búsqueda fuera de alcance" o "Problema técnico"
       setUsuarios([]);
       setErrorCarga(error.message || "Ocurrió un problema técnico");
     } finally {
-      setLoading(false);
+      if (vigente()) setLoading(false);
     }
   };
 
+  // Cada campo dispara la búsqueda con los valores nuevos (el estado aún no se actualizó)
+  const cambiar = (campo, valor) => {
+    const filtros = { rut, nombre, correo, [campo]: valor };
+    if (campo === "rut") setRut(valor);
+    if (campo === "nombre") setNombre(valor);
+    if (campo === "correo") setCorreo(valor);
+    programar(() => buscar(filtros));
+  };
+
   const limpiar = () => {
+    cancelar();
     setRut("");
     setNombre("");
     setCorreo("");
-    setUsuarios([]);
-    setMensajeInfo("");
-    setErrorCarga("");
-    setBuscado(false);
+    reiniciar();
   };
 
   return (
@@ -72,33 +100,31 @@ function BuscarUsuarios() {
         <p>Busca usuarios registrados por nombre completo, RUT o correo electrónico</p>
       </div>
 
-      <form className="usuarios-filtros" onSubmit={buscar}>
+      <div className="usuarios-filtros usuarios-filtros--en-linea">
         <input
           type="text"
           className="usuarios-search"
           placeholder="Nombre completo..."
           value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
+          onChange={(e) => cambiar("nombre", e.target.value)}
         />
         <input
           type="text"
           className="usuarios-search"
           placeholder="RUT..."
           value={rut}
-          onChange={(e) => setRut(e.target.value)}
+          onChange={(e) => cambiar("rut", e.target.value)}
         />
         <input
           type="text"
           className="usuarios-search"
           placeholder="Correo electrónico..."
           value={correo}
-          onChange={(e) => setCorreo(e.target.value)}
+          onChange={(e) => cambiar("correo", e.target.value)}
         />
-        <button type="submit" className="btn-roles" disabled={loading}>
-          {loading ? "Buscando..." : "Buscar"}
-        </button>
         <button type="button" className="btn-roles" onClick={limpiar}>Limpiar</button>
-      </form>
+        {loading && <span className="usuarios-actualizando" role="status">Buscando…</span>}
+      </div>
 
       {errorCarga && (
         <div className="usuarios-empty" style={{ color: "#dc2626" }}>

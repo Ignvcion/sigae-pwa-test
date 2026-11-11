@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import useRetraso from "../../hooks/useRetraso";
 import { useAuth } from "../context/AuthContext";
 import {
   getApoderados,
@@ -11,6 +12,17 @@ import {
 } from "../../services/api";
 import { etiquetaApoderado, inactivoPorFaltaDeAsociacion, puedeAsociarse } from "../../utils/apoderados";
 
+// CU33: operadores del filtro por cantidad de estudiantes asociados, con su lectura
+// ("> más de 2"). `valor` es lo que espera el backend.
+const OPERADORES_CANTIDAD = [
+  { valor: "=",  simbolo: "=", texto: "igual a" },
+  { valor: "!=", simbolo: "≠", texto: "distinto de" },
+  { valor: ">",  simbolo: ">", texto: "más de" },
+  { valor: "<",  simbolo: "<", texto: "menos de" },
+  { valor: ">=", simbolo: "≥", texto: "igual o más de" },
+  { valor: "<=", simbolo: "≤", texto: "igual o menos de" },
+];
+
 function Apoderados() {
   const { usuario } = useAuth();
   const esAdmin =
@@ -19,6 +31,10 @@ function Apoderados() {
 
   const [apoderados, setApoderados]           = useState([]);
   const [loading, setLoading]                 = useState(true);
+  // Tras la primera carga, los filtros recargan sin reemplazar la pantalla (no se pierde el foco)
+  const [cargado, setCargado]                 = useState(false);
+  const ultimaPeticion                        = useRef(0);
+  const { programar: programarFiltro, cancelar: cancelarFiltro } = useRetraso();
   const [busqueda, setBusqueda]               = useState("");
   const [mensajeInfo, setMensajeInfo]         = useState("");
   const [errorCarga, setErrorCarga]           = useState("");
@@ -48,9 +64,13 @@ function Apoderados() {
 
   // Pide el listado; el estado cambia solo al llegar la respuesta (callbacks), así el efecto
   // de montaje no provoca renders en cascada. cargarApoderados() además limpia los avisos.
-  const pedirApoderados = (filtros) =>
-    getApoderados(filtros)
+  const pedirApoderados = (filtros) => {
+    // Si el filtro cambia antes de que llegue la respuesta anterior, esta se descarta
+    const peticion = ++ultimaPeticion.current;
+    const vigente = () => peticion === ultimaPeticion.current;
+    return getApoderados(filtros)
       .then((data) => {
+        if (!vigente()) return;
         if (Array.isArray(data)) {
           setApoderados(data);
         } else {
@@ -60,10 +80,16 @@ function Apoderados() {
         }
       })
       .catch((error) => {
+        if (!vigente()) return;
         // CU32 - Excepción "Interrupción técnica crítica"
         setErrorCarga(error.message || "Los datos no pudieron ser cargados, reintente más tarde");
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!vigente()) return;
+        setLoading(false);
+        setCargado(true);
+      });
+  };
 
   const cargarApoderados = (filtros) => {
     setLoading(true);
@@ -234,13 +260,29 @@ function Apoderados() {
     );
   });
 
-  // CU33: filtrar por operador y cantidad de estudiantes asociados
-  const aplicarFiltroCantidad = (e) => {
-    e.preventDefault();
-    cargarApoderados({ operador: operadorFiltro, cantidadEstudiantes: cantidadFiltro });
+  // CU33: filtrar por operador y cantidad de estudiantes asociados. Se aplica solo al
+  // escribir la cantidad (tras una breve pausa) o al cambiar el operador; sin cantidad,
+  // se listan todos. Un valor no entero o negativo igual llega al backend, que lo rechaza.
+  const filtrarPorCantidad = (operador, cantidad) => {
+    const valor = cantidad.trim();
+    cargarApoderados(valor === "" ? {} : { operador, cantidadEstudiantes: valor });
+  };
+
+  const cambiarCantidad = (cantidad) => {
+    setCantidadFiltro(cantidad);
+    programarFiltro(() => filtrarPorCantidad(operadorFiltro, cantidad));
+  };
+
+  const cambiarOperador = (operador) => {
+    setOperadorFiltro(operador);
+    if (cantidadFiltro.trim() !== "") {
+      cancelarFiltro();
+      filtrarPorCantidad(operador, cantidadFiltro);
+    }
   };
 
   const limpiarFiltroCantidad = () => {
+    cancelarFiltro();
     setOperadorFiltro("=");
     setCantidadFiltro("");
     cargarApoderados({});
@@ -255,7 +297,7 @@ function Apoderados() {
     return badges.length > 0 ? badges : <span style={{ color: "#94a3b8" }}>Sin roles</span>;
   };
 
-  if (loading) {
+  if (!cargado) {
     return (
       <div className="usuarios-container">
         <p>Cargando apoderados...</p>
@@ -271,7 +313,7 @@ function Apoderados() {
       </div>
 
       {/* Buscador */}
-      <div className="usuarios-filtros">
+      <div className="usuarios-filtros usuarios-filtros--en-linea">
         <input
           type="text"
           className="usuarios-search"
@@ -282,23 +324,21 @@ function Apoderados() {
       </div>
 
       {/* CU33: filtro por cantidad de estudiantes asociados */}
-      {/* noValidate: el diagrama exige que un valor no entero o negativo llegue al backend
-          para que sea éste quien lo rechace, en vez de bloquearlo en el navegador */}
-      <form className="usuarios-filtros" onSubmit={aplicarFiltroCantidad} noValidate>
+      {/* Sin validación en el navegador: el diagrama exige que un valor no entero o negativo
+          llegue al backend para que sea éste quien lo rechace */}
+      <div className="usuarios-filtros usuarios-filtros--en-linea">
         <span style={{ alignSelf: "center", color: "#475569", fontSize: "0.9rem" }}>
           Estudiantes asociados:
         </span>
         <select
           className="usuarios-select"
+          aria-label="Operador de la cantidad de estudiantes asociados"
           value={operadorFiltro}
-          onChange={(e) => setOperadorFiltro(e.target.value)}
+          onChange={(e) => cambiarOperador(e.target.value)}
         >
-          <option value="=">=</option>
-          <option value="!=">≠</option>
-          <option value=">">&gt;</option>
-          <option value="<">&lt;</option>
-          <option value=">=">&gt;=</option>
-          <option value="<=">&lt;=</option>
+          {OPERADORES_CANTIDAD.map((o) => (
+            <option key={o.valor} value={o.valor}>{o.simbolo} {o.texto}</option>
+          ))}
         </select>
         <input
           type="text"
@@ -307,11 +347,11 @@ function Apoderados() {
           style={{ maxWidth: "120px" }}
           placeholder="Cantidad"
           value={cantidadFiltro}
-          onChange={(e) => setCantidadFiltro(e.target.value)}
+          onChange={(e) => cambiarCantidad(e.target.value)}
         />
-        <button type="submit" className="btn-roles">Filtrar</button>
         <button type="button" className="btn-roles" onClick={limpiarFiltroCantidad}>Limpiar</button>
-      </form>
+        {loading && <span className="usuarios-actualizando" role="status">Actualizando…</span>}
+      </div>
 
       {/* Tabla */}
       {errorCarga && (

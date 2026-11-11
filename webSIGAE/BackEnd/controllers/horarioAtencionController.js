@@ -11,7 +11,16 @@
 // El docente lo edita por tramos o la semana completa (vista por bloques de 45 minutos).
 const pool = require('../config/db');
 const { obtenerPeriodos } = require('../utils/periodos');
-const { normalizarTramos, unirTramos, cabeEnTramos, aHora } = require('../utils/disponibilidadLaboral');
+const { aHora } = require('../utils/disponibilidadLaboral');
+const {
+  INICIO_ATENCION,
+  FIN_ATENCION,
+  alcanzaParaCitacion,
+  opcionesAtencion,
+  normalizarHorarioAtencion,
+  tramosFueraDeDisponibilidad,
+  guardarHorarioAtencionDocente,
+} = require('../utils/horarioAtencion');
 const {
   bloquesDeJornada, tramosGuardados,
 } = require('./disponibilidadLaboralController');
@@ -27,13 +36,6 @@ const {
   ocupacionesDelDocente,
   describirClase,
 } = require('../utils/disponibilidadDocente');
-
-const INICIO_ATENCION = 8 * 60;   // 08:00
-const FIN_ATENCION = 18 * 60;     // 18:00
-const PASO_MINUTOS = 30;          // duración de una citación (en punto o y media)
-
-/** ¿El tramo [inicio, fin) incluye al menos una citación de 30 minutos en punto o y media? */
-const alcanzaParaCitacion = (inicio, fin) => Math.ceil(inicio / PASO_MINUTOS) * PASO_MINUTOS + PASO_MINUTOS <= fin;
 
 const ESTADO_CANCELADA = 'Cancelada';
 
@@ -144,16 +146,11 @@ async function validarSuperposiciones(conn, docenteId, { dia, inicio, fin }, exc
 async function fueraDeDisponibilidadLaboral(conn, docenteId, tramos) {
   const { vigente } = await obtenerPeriodos(conn);
   const disponibilidad = await tramosGuardados(conn, docenteId, vigente);
-  if (disponibilidad.length === 0) return { disponibilidad, mensajes: [] };
-  const porDia = new Map(DIAS_SEMANA.map((d) => [d, unirTramos(disponibilidad.filter((t) => t.dia === d))]));
-  const mensajes = tramos
-    .filter((t) => !cabeEnTramos(porDia.get(t.dia) || [], t.inicio, t.fin))
-    .map((t) => {
-      const libres = (porDia.get(t.dia) || []).map((x) => `${aHora(x.inicio)}–${aHora(x.fin)}`).join(' y ');
-      return `El tramo ${t.dia} ${aHora(t.inicio)}–${aHora(t.fin)} queda fuera de tu disponibilidad laboral `
-        + `(${libres ? `ese día estás disponible ${libres}` : 'ese día no tienes disponibilidad'}). `
-        + 'Si necesitas otro horario, pide a un administrador que actualice tu disponibilidad.';
-    });
+  const mensajes = tramosFueraDeDisponibilidad(tramos, disponibilidad).map(({ tramo: t, libres }) => (
+    `El tramo ${t.dia} ${aHora(t.inicio)}–${aHora(t.fin)} queda fuera de tu disponibilidad laboral `
+      + `(${libres ? `ese día estás disponible ${libres}` : 'ese día no tienes disponibilidad'}). `
+      + 'Si necesitas otro horario, pide a un administrador que actualice tu disponibilidad.'
+  ));
   return { disponibilidad, mensajes };
 }
 
@@ -349,8 +346,7 @@ const getSemanaAtencion = async (req, res) => {
     return res.json({
       periodo: vigente,
       dias: DIAS_SEMANA,
-      limites: { minimo: minutosAHora(INICIO_ATENCION), maximo: minutosAHora(FIN_ATENCION) },
-      duracionCitacion: PASO_MINUTOS,
+      ...opcionesAtencion(), // límites 08:00–18:00, citación de 30 min y duraciones sugeridas (1 h, 2 h)
       tramos: bloques.map((b) => ({
         dia: b.Horario_Atencion_Dia_Semana,
         hora_inicio: b.Horario_Atencion_Hora_Inicio,
@@ -393,22 +389,10 @@ async function citacionesFueraDeLosTramos(conn, docenteId, actuales, nuevos) {
 // Reemplaza toda la semana con las mismas validaciones de CU87 y CU88.
 const guardarSemanaAtencion = async (req, res) => {
   if (!esDocente(req.user)) return res.status(403).json(SOLO_DOCENTE);
-  const normalizados = normalizarTramos(req.body?.tramos, {
-    minimo: INICIO_ATENCION,
-    maximo: FIN_ATENCION,
-    minDuracion: PASO_MINUTOS,
-    nombre: 'El horario de atención',
-  });
-  // CU87 Excepciones 1 y 3: datos inválidos o tramos de atención que se superponen
+  // CU87 Excepciones 1 y 3: datos inválidos, tramos que se superponen o sin espacio para una citación
+  const normalizados = normalizarHorarioAtencion(req.body?.tramos ?? null);
   if (!normalizados.ok) return res.status(400).json({ mensaje: normalizados.mensaje });
   const tramos = normalizados.tramos;
-  const sinCitacion = tramos.find((t) => !alcanzaParaCitacion(t.inicio, t.fin));
-  if (sinCitacion) {
-    return res.status(400).json({
-      mensaje: `El tramo ${sinCitacion.dia} ${aHora(sinCitacion.inicio)}–${aHora(sinCitacion.fin)} no incluye `
-        + 'ninguna citación de 30 minutos (en punto o y media)',
-    });
-  }
 
   const docenteId = req.user.id;
   let conn;
@@ -445,15 +429,7 @@ const guardarSemanaAtencion = async (req, res) => {
       });
     }
 
-    await conn.query('DELETE FROM horario_atencion WHERE Docente_Usuario_Id = ?', [docenteId]);
-    if (tramos.length > 0) {
-      await conn.query(
-        `INSERT INTO horario_atencion
-           (Horario_Atencion_Dia_Semana, Horario_Atencion_Hora_Inicio, Horario_Atencion_Hora_Fin, Docente_Usuario_Id)
-         VALUES ?`,
-        [tramos.map((t) => [t.dia, aHora(t.inicio), aHora(t.fin), docenteId])]
-      );
-    }
+    await guardarHorarioAtencionDocente(conn, docenteId, tramos);
     await conn.commit();
     return res.json({
       mensaje: tramos.length > 0

@@ -95,7 +95,7 @@ function RegisterStudent() {
 
   return (
     <div className="page-container">
-      <div className="form-card">
+      <div className="form-card form-registro">
         <h1>Registrar Ficha Estudiantil</h1>
 
         {error && <p style={{ color: "red", marginBottom: "1rem" }}>{error}</p>}

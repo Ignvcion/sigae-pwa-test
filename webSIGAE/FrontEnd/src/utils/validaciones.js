@@ -51,12 +51,17 @@ export function validarCorreo(correo) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.trim());
 }
 
-// Formato chileno: 9 dígitos, opcionalmente con prefijo internacional +56. Solo números.
-export function validarTelefonoChileno(telefono) {
-  return /^(\+?56)?\d{9}$/.test(String(telefono).trim());
+// Los espacios no cuentan como caracteres del teléfono: "+56 9 1234 5678" = "+56912345678"
+export function normalizarTelefono(telefono) {
+  return String(telefono ?? "").replace(/\s+/g, "");
 }
 
-export const MENSAJE_TELEFONO = "Ingresa 9 dígitos, opcionalmente con prefijo +56 (ej: 912345678 o +56912345678)";
+// Formato chileno: 9 dígitos, opcionalmente con prefijo internacional +56. Solo números (se ignoran los espacios).
+export function validarTelefonoChileno(telefono) {
+  return /^(\+?56)?\d{9}$/.test(normalizarTelefono(telefono));
+}
+
+export const MENSAJE_TELEFONO = "Ingresa 9 dígitos, opcionalmente con prefijo +56 (ej: 912345678 o +56 9 1234 5678)";
 
 // Contraseña: mínimo 8 caracteres, al menos una mayúscula y un número.
 // Devuelve el mensaje de error o "" si es válida.
