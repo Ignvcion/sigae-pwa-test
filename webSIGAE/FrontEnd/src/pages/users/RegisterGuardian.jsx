@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { registrarApoderado } from "../../services/api";
+import { registrarApoderado, textoContrasenaEnviada } from "../../services/api";
 import {
   validarRut, normalizarRut, validarNombreCompleto, validarCorreo, validarTelefonoChileno,
-  validarFortalezaContrasena, validarDireccion, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
+  validarDireccion, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
 } from "../../utils/validaciones";
 import CamposDireccion, { CAMPOS_DIRECCION, errorCampoDireccion } from "../../components/CamposDireccion";
 
@@ -25,7 +25,6 @@ function RegisterGuardian() {
     numero:"",
     depto:"",
     comuna:"",
-    password:"",
     estado:"Activo",
 
   });
@@ -55,8 +54,6 @@ function RegisterGuardian() {
           : "";
       case "telefono":
         return value && !validarTelefonoChileno(value) ? MENSAJE_TELEFONO : "";
-      case "password":
-        return value ? validarFortalezaContrasena(value) : "";
       default:
         return "";
     }
@@ -82,7 +79,6 @@ function RegisterGuardian() {
       rut: validarCampo("rut", formData.rut),
       correo: validarCampo("correo", formData.correo),
       telefono: validarCampo("telefono", formData.telefono),
-      password: validarCampo("password", formData.password),
       ...validarDireccion(formData),
     };
 
@@ -99,12 +95,12 @@ function RegisterGuardian() {
     try{
 
 
-      await registrarApoderado(formData);
+      const creado = await registrarApoderado(formData);
 
 
 
       alert(
-        "Apoderado registrado correctamente"
+        `Apoderado registrado correctamente.\n\n${textoContrasenaEnviada(creado)}`
       );
 
 
@@ -171,7 +167,7 @@ function RegisterGuardian() {
     <div className="page-container">
 
 
-      <div className="form-card">
+      <div className="form-card form-registro">
 
 
         <h1>
@@ -189,6 +185,10 @@ function RegisterGuardian() {
 
 
 
+
+        <p className="form-registro-aviso">
+          La contraseña se genera automáticamente y se envía al correo del usuario.
+        </p>
 
         <form onSubmit={handleSubmit}>
 
@@ -255,21 +255,6 @@ function RegisterGuardian() {
 
 
           <CamposDireccion valores={formData} errores={errores} onChange={handleChange} />
-
-
-
-          <div>
-            <input
-              type="password"
-              name="password"
-              placeholder="Contraseña (mín. 8 caracteres, una mayúscula y un número)"
-              value={formData.password}
-              onChange={handleChange}
-              className={errores.password ? "input-invalid" : ""}
-              required
-            />
-            {errores.password && <span className="input-error-msg">{errores.password}</span>}
-          </div>
 
 
 

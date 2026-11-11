@@ -27,6 +27,7 @@ const {
   emitirCodigo,
   verificarCodigo,
   responderErrorCodigo,
+  enmascararCorreo,
 } = require('../utils/codigosVerificacion');
 const {
   normalizarEspecialidades,
@@ -38,6 +39,11 @@ const {
   guardarDisponibilidadDocente,
   ErrorDisponibilidad,
 } = require('./disponibilidadLaboralController');
+const {
+  generarContrasenaAleatoria,
+  entregarContrasenaInicial,
+  ErrorEnvioContrasena,
+} = require('../utils/contrasenaInicial');
 
 /** Ejecuta `fn(conn)` en una transacción y devuelve su resultado. */
 async function enTransaccion(fn) {
@@ -349,7 +355,6 @@ const createUsuario = async (req, res) => {
     Usuario_Telefono,
     Usuario_Nombre_Completo,
     Usuario_Estado_Cuenta,
-    Usuario_Contraseña,
     // Docente
     Es_Docente,
     Docente_Carga_Horaria_Semanal,
@@ -364,9 +369,10 @@ const createUsuario = async (req, res) => {
     Apoderado_Correo_Natural,
   } = req.body;
 
-  // Campos base obligatorios
-  if (!Usuario_RUT || !Usuario_Telefono || !Usuario_Nombre_Completo || !Usuario_Contraseña) {
-    return res.status(400).json({ mensaje: 'Faltan campos obligatorios (RUT, teléfono, nombre, contraseña)' });
+  // Campos base obligatorios. La contraseña no se pide: SIGAE genera una
+  // aleatoria y la envía al correo del usuario desde la cuenta no-reply.
+  if (!Usuario_RUT || !Usuario_Telefono || !Usuario_Nombre_Completo) {
+    return res.status(400).json({ mensaje: 'Faltan campos obligatorios (RUT, teléfono, nombre)' });
   }
 
   // Validar correo según rol
@@ -380,6 +386,8 @@ const createUsuario = async (req, res) => {
     return res.status(400).json({ mensaje: `El correo institucional del administrador debe pertenecer al dominio ${TEXTO_DOMINIOS_INSTITUCIONALES}` });
   if (Es_Apoderado && !Apoderado_Correo_Natural)
     return res.status(400).json({ mensaje: 'El correo del apoderado es obligatorio' });
+  if (!Administrador_Correo_Institucional && !Docente_Correo_Institucional && !Apoderado_Correo_Natural)
+    return res.status(400).json({ mensaje: 'Se requiere un correo para enviar la contraseña inicial al usuario' });
 
   // Horas P.I.E.: entero entre 0 y la carga horaria semanal (se restan antes de la regla 65/35)
   const horasPIE = Docente_Horas_PIE === undefined || Docente_Horas_PIE === null || Docente_Horas_PIE === ''
@@ -486,7 +494,10 @@ const createUsuario = async (req, res) => {
         return res.status(400).json({ mensaje: 'Ya existe un apoderado con ese correo' });
     }
 
-    const hash = await bcrypt.hash(Usuario_Contraseña, 10);
+    const contrasenaInicial = generarContrasenaAleatoria();
+    const hash = await bcrypt.hash(contrasenaInicial, 10);
+    // Correo al que se envía la contraseña: el del rol con que se registra
+    const correoDestino = Administrador_Correo_Institucional || Docente_Correo_Institucional || Apoderado_Correo_Natural;
 
     let guardadoDisponibilidad = null;
     // El docente nuevo recibe un color aleatorio que lo identifica (se cambia en Docentes)
@@ -529,16 +540,26 @@ const createUsuario = async (req, res) => {
           docenteId: resultado.insertId, disponibilidad, responsableId: req.user.id,
         });
       }
+      // Último paso antes del commit: si el correo no sale, la cuenta no se crea
+      // (nadie conocería su contraseña).
+      await entregarContrasenaInicial({
+        para: correoDestino,
+        nombre: Usuario_Nombre_Completo.trim(),
+        rut: Usuario_RUT,
+        contrasena: contrasenaInicial,
+      });
       return resultado.insertId;
     });
 
     const [nuevo] = await db.query('SELECT * FROM usuario WHERE Usuario_Id = ?', [nuevoId]);
     const { Usuario_Contraseña: pwd, ...usuarioSinPwd } = nuevo[0];
+    const respuesta = { ...usuarioSinPwd, Contrasena_Enviada_A: enmascararCorreo(correoDestino) };
     res.status(201).json(guardadoDisponibilidad
-      ? { ...usuarioSinPwd, Disponibilidad_Laboral: guardadoDisponibilidad }
-      : usuarioSinPwd);
+      ? { ...respuesta, Disponibilidad_Laboral: guardadoDisponibilidad }
+      : respuesta);
   } catch (error) {
     if (error instanceof ErrorDisponibilidad) return res.status(error.status).json({ mensaje: error.message });
+    if (error instanceof ErrorEnvioContrasena) return res.status(error.status).json({ mensaje: error.message });
     console.error(error);
     res.status(500).json({ mensaje: 'Error al crear el usuario' });
   }

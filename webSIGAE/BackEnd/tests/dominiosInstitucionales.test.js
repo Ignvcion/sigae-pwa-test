@@ -60,8 +60,7 @@ describe('validarCorreoInstitucional', () => {
 
 describe('createUsuario: docente y administrador con cualquiera de los dos dominios', () => {
   const base = {
-    Usuario_RUT: '12345678-5', Usuario_Telefono: '912345678', Usuario_Nombre_Completo: 'Ana Pérez',
-    Usuario_Contraseña: 'Clave2026', Usuario_Estado_Cuenta: 1,
+    Usuario_RUT: '12345678-5', Usuario_Telefono: '912345678', Usuario_Nombre_Completo: 'Ana Pérez', Usuario_Estado_Cuenta: 1,
   };
 
   test.each(DOMINIOS_VALIDOS)('crea un docente con %s y lo guarda sin espacios', async (dominio) => {
@@ -117,8 +116,7 @@ describe('validateCrearUsuario (middleware de la ruta de creación)', () => {
     return true;
   }
   const base = {
-    Usuario_RUT: '12345678-5', Usuario_Telefono: '912345678', Usuario_Nombre_Completo: 'Ana Pérez',
-    Usuario_Contraseña: 'Clave2026', Usuario_Direccion_Calle: 'Los Aromos', Usuario_Direccion_Numero: '45',
+    Usuario_RUT: '12345678-5', Usuario_Telefono: '912345678', Usuario_Nombre_Completo: 'Ana Pérez', Usuario_Direccion_Calle: 'Los Aromos', Usuario_Direccion_Numero: '45',
     Usuario_Direccion_Comuna: 'Ñuñoa',
   };
 

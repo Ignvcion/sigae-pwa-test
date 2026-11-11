@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { registrarAdmin } from "../../services/api";
+import { registrarAdmin, textoContrasenaEnviada } from "../../services/api";
 import {
   validarRut, normalizarRut, validarNombreCompleto, validarCorreoInstitucional, DOMINIO_INSTITUCIONAL, TEXTO_DOMINIOS_INSTITUCIONALES,
-  validarTelefonoChileno, validarFortalezaContrasena, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
+  validarTelefonoChileno, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
   validarDireccion,
 } from "../../utils/validaciones";
 import CamposDireccion, { CAMPOS_DIRECCION, errorCampoDireccion } from "../../components/CamposDireccion";
@@ -21,7 +21,6 @@ function RegisterAdmin() {
     numero: "",
     depto: "",
     comuna: "",
-    password: "",
     estado: "Activo",
   });
 
@@ -47,8 +46,6 @@ function RegisterAdmin() {
           : "";
       case "telefono":
         return value && !validarTelefonoChileno(value) ? MENSAJE_TELEFONO : "";
-      case "password":
-        return value ? validarFortalezaContrasena(value) : "";
       default:
         return "";
     }
@@ -71,7 +68,6 @@ function RegisterAdmin() {
       rut: validarCampo("rut", formData.rut),
       correo: validarCampo("correo", formData.correo),
       telefono: validarCampo("telefono", formData.telefono),
-      password: validarCampo("password", formData.password),
       ...validarDireccion(formData),
     };
 
@@ -85,9 +81,9 @@ function RegisterAdmin() {
 
     try {
 
-      await registrarAdmin(formData);
+      const creado = await registrarAdmin(formData);
 
-      alert("Administrador registrado correctamente");
+      alert(`Administrador registrado correctamente.\n\n${textoContrasenaEnviada(creado)}`);
 
       navigate("/usuarios");
 
@@ -127,7 +123,7 @@ function RegisterAdmin() {
 
     <div className="page-container">
 
-      <div className="form-card">
+      <div className="form-card form-registro">
 
         <h1>Registrar Administrador</h1>
 
@@ -138,6 +134,10 @@ function RegisterAdmin() {
           </p>
         }
 
+
+        <p className="form-registro-aviso">
+          La contraseña se genera automáticamente y se envía al correo del usuario.
+        </p>
 
         <form onSubmit={handleSubmit}>
 
@@ -200,21 +200,6 @@ function RegisterAdmin() {
 
 
           <CamposDireccion valores={formData} errores={errores} onChange={handleChange} />
-
-
-
-          <div>
-            <input
-              type="password"
-              name="password"
-              placeholder="Contraseña (mín. 8 caracteres, una mayúscula y un número)"
-              value={formData.password}
-              onChange={handleChange}
-              className={errores.password ? "input-invalid" : ""}
-              required
-            />
-            {errores.password && <span className="input-error-msg">{errores.password}</span>}
-          </div>
 
 
           <select

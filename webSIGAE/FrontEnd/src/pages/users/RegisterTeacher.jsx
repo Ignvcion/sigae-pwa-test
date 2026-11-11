@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { registrarDocente, getEspecialidades, getOpcionesDisponibilidad } from "../../services/api";
+import { registrarDocente, getEspecialidades, getOpcionesDisponibilidad, textoContrasenaEnviada } from "../../services/api";
 import EtiquetasInput from "../../components/EtiquetasInput";
 import DisponibilidadSemanal, { errorTramos } from "../../components/DisponibilidadSemanal";
 import {
   validarRut, normalizarRut, validarNombreCompleto, validarCorreoInstitucional, DOMINIO_INSTITUCIONAL, TEXTO_DOMINIOS_INSTITUCIONALES,
-  validarTelefonoChileno, validarFortalezaContrasena, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
+  validarTelefonoChileno, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
   validarDireccion,
 } from "../../utils/validaciones";
 import { calcularCargaLectiva, textoReparto, errorHorasPIE } from "../../utils/cargaLectiva";
@@ -26,7 +26,6 @@ function RegisterTeacher() {
     numero: "",
     depto: "",
     comuna: "",
-    password: "",
     especialidades: [],
     cargaHoraria: "",
     horasPIE: "0",
@@ -65,8 +64,6 @@ function RegisterTeacher() {
           : "";
       case "telefono":
         return value && !validarTelefonoChileno(value) ? MENSAJE_TELEFONO : "";
-      case "password":
-        return value ? validarFortalezaContrasena(value) : "";
       case "cargaHoraria":
         return value && (isNaN(value) || Number(value) <= 0 || Number(value) > 44)
           ? "La carga horaria semanal debe ser un número entre 1 y 44 horas"
@@ -98,7 +95,6 @@ function RegisterTeacher() {
       rut: validarCampo("rut", formData.rut),
       correo: validarCampo("correo", formData.correo),
       telefono: validarCampo("telefono", formData.telefono),
-      password: validarCampo("password", formData.password),
       cargaHoraria: validarCampo("cargaHoraria", formData.cargaHoraria),
       horasPIE: validarCampo("horasPIE", formData.horasPIE),
       especialidades: validarCampo("especialidades", formData.especialidades),
@@ -122,9 +118,8 @@ function RegisterTeacher() {
 
       const advertencia = creado?.Disponibilidad_Laboral?.advertencia;
       alert(
-        advertencia
-          ? `Docente registrado correctamente.\n\n⚠ ${advertencia}`
-          : "Docente registrado correctamente"
+        `Docente registrado correctamente.\n\n${textoContrasenaEnviada(creado)}`
+        + (advertencia ? `\n\n⚠ ${advertencia}` : "")
       );
 
 
@@ -176,7 +171,7 @@ function RegisterTeacher() {
 
     <div className="page-container">
 
-      <div className="form-card">
+      <div className="form-card form-registro">
 
 
         <h1>
@@ -193,6 +188,10 @@ function RegisterTeacher() {
         }
 
 
+
+        <p className="form-registro-aviso">
+          La contraseña se genera automáticamente y se envía al correo del usuario.
+        </p>
 
         <form onSubmit={handleSubmit}>
 
@@ -259,21 +258,6 @@ function RegisterTeacher() {
 
 
           <CamposDireccion valores={formData} errores={errores} onChange={handleChange} />
-
-
-
-          <div>
-            <input
-              type="password"
-              name="password"
-              placeholder="Contraseña (mín. 8 caracteres, una mayúscula y un número)"
-              value={formData.password}
-              onChange={handleChange}
-              className={errores.password ? "input-invalid" : ""}
-              required
-            />
-            {errores.password && <span className="input-error-msg">{errores.password}</span>}
-          </div>
 
 
 

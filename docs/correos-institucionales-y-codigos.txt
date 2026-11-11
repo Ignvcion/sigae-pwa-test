@@ -68,6 +68,21 @@ Se usa en tres flujos:
     guarda al confirmarlo (PUT /api/usuarios/perfil/correo { codigo }), y
     queda verificado. Hasta entonces la cuenta sigue con el correo anterior.
 
+2.4 Contraseña inicial al registrar un usuario (BackEnd/utils/contrasenaInicial.js)
+    Los formularios de registro (administrador, docente, apoderado) ya no
+    piden contraseña. POST /api/usuarios genera una aleatoria de 12
+    caracteres (crypto, cumple la política: mayúscula, minúscula y número;
+    sin 0/O/1/l/I), la guarda con bcrypt y la envía desde
+    noreply@colegiojc.cl al correo del rol con que se registra (asunto
+    "Tu cuenta en SIGAE fue creada", con el RUT y la contraseña).
+    - Si llega Usuario_Contraseña en el cuerpo, se ignora.
+    - El correo se envía dentro de la transacción: si falla, la cuenta NO
+      se crea y se responde 503 (nadie conocería su contraseña).
+    - La respuesta no incluye la contraseña, solo Contrasena_Enviada_A con
+      el correo enmascarado (el formulario lo muestra al terminar).
+    - En el primer ingreso igual se pide el código de activación (2.2).
+    - Desarrollo sin SMTP: la contraseña aparece en la consola del backend.
+
 ======================================================================
 3. PRODUCCIÓN: ORDEN PARA ACTIVARLO
 ======================================================================

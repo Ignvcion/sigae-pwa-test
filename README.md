@@ -281,7 +281,7 @@ En `webSIGAE/BackEnd/.env`, con `chmod 600` y como dueño el usuario que corre p
 | `FRONTEND_URL` | `https://tu-dominio` (CORS) |
 | `CORS_ORIGINS` | Opcional; por defecto, `FRONTEND_URL` |
 | `UPLOADS_DIR` | `/var/sigae/uploads` (créala con permisos para el usuario de pm2) |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | Bot de códigos de verificación: la cuenta `noreply@colegiojc.cl` (`EMAIL_FROM="SIGAE <noreply@colegiojc.cl>"`). Con Google Workspace: `smtp.gmail.com`, puerto 465, `SMTP_SECURE=true` y una **contraseña de aplicación** de esa cuenta. AWS bloquea el puerto 25 en EC2. Ver `docs/correos-institucionales-y-codigos.txt` |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | Bot de códigos de verificación y de la contraseña inicial de los usuarios nuevos: la cuenta `noreply@colegiojc.cl` (`EMAIL_FROM="SIGAE <noreply@colegiojc.cl>"`). Con Google Workspace: `smtp.gmail.com`, puerto 465, `SMTP_SECURE=true` y una **contraseña de aplicación** de esa cuenta. AWS bloquea el puerto 25 en EC2. Ver `docs/correos-institucionales-y-codigos.txt` |
 
 `NODE_ENV=production` y `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` los fija `ecosystem.config.js`. Si falta algo, el backend no arranca y `pm2 logs sigae-api` dice qué variable falta (nunca muestra valores). En producción los logs tapan RUT, correos y tokens.
 

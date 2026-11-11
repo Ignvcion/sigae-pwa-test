@@ -2607,6 +2607,48 @@ body.bloques-panel-open .main-content {
   cursor: not-allowed;
 }
 
+/* Registro de usuarios: los campos de texto son fluidos (ocupan todo el ancho
+   de la tarjeta y se adaptan a la pantalla) en vez de quedar con el ancho fijo
+   del navegador, que cortaba los textos de ejemplo. */
+.form-card.form-registro {
+  width: 100%;
+  max-width: 720px;
+  box-sizing: border-box;
+}
+
+.form-registro form > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.form-registro form > div > input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.form-registro form > div > select,
+.form-registro form > div > textarea,
+.form-registro form > input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.form-registro form > select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font-size: 0.95rem;
+}
+
+.form-registro-aviso {
+  margin: -8px 0 16px;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+@media (max-width: 640px) {
+  .page-container:has(> .form-registro) {
+    padding: 16px;
+  }
+  .form-card.form-registro {
+    padding: 20px 16px;
+  }
+}
+
 /* Selector de archivo dentro de tarjetas: no debe salirse en pantallas angostas */
 .form-card input[type="file"] {
   max-width: 100%;

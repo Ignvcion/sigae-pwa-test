@@ -89,8 +89,7 @@ describe('RF04: especialidades del docente como etiquetas', () => {
   test('crear un docente sin especialidades responde 400', async () => {
     const req = {
       body: {
-        Usuario_RUT: '11111111-1', Usuario_Telefono: '912345678', Usuario_Nombre_Completo: 'Ana Pérez',
-        Usuario_Contraseña: 'Clave1234', Es_Docente: 1, Docente_Correo_Institucional: 'a@colegiojc.cl',
+        Usuario_RUT: '11111111-1', Usuario_Telefono: '912345678', Usuario_Nombre_Completo: 'Ana Pérez', Es_Docente: 1, Docente_Correo_Institucional: 'a@colegiojc.cl',
         Docente_Especialidades: [],
       },
       user: { id: 2 },

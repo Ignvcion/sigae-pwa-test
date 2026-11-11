@@ -49,11 +49,11 @@ describe('Glosario 6.1.2 - Validaciones de datos de entrada', () => {
   });
 
   describe('Número telefónico', () => {
-    test.each(['912345678', '+56912345678', '56912345678', ' 912345678 '])('acepta %p', (tel) => {
+    test.each(['912345678', '+56912345678', '56912345678', ' 912345678 ', '+56 9 1234 5678', '9 1234 5678', '56 912 345 678'])('acepta %p (los espacios no cuentan)', (tel) => {
       expect(validarTelefonoChileno(tel)).toBe(true);
     });
 
-    test.each(['12345', '9123456789', '+56 9 1234 5678', '9-1234-5678', '91234567a', '+1912345678', ''])(
+    test.each(['12345', '9123456789', '9 1234 567', '9-1234-5678', '91234567a', '+1912345678', '', '   '])(
       'rechaza %p',
       (tel) => {
         expect(validarTelefonoChileno(tel)).toBe(false);
@@ -64,6 +64,8 @@ describe('Glosario 6.1.2 - Validaciones de datos de entrada', () => {
       expect(normalizarTelefono('+56912345678')).toBe('912345678');
       expect(normalizarTelefono('56912345678')).toBe('912345678');
       expect(normalizarTelefono('912345678')).toBe('912345678');
+      expect(normalizarTelefono('+56 9 1234 5678')).toBe('912345678');
+      expect(normalizarTelefono(' 9 1234 5678 ')).toBe('912345678');
     });
   });
 
@@ -125,7 +127,6 @@ describe('validateCrearUsuario', () => {
     Usuario_RUT: '3483606-k',
     Usuario_Nombre_Completo: 'María Morales',
     Usuario_Telefono: '+56946789765',
-    Usuario_Contraseña: 'Segura123',
     Es_Docente: 1,
     Docente_Correo_Institucional: 'ma.morales@colegiojc.cl',
     Usuario_Direccion_Calle: 'Los Aromos',
@@ -137,7 +138,6 @@ describe('validateCrearUsuario', () => {
     Usuario_RUT: '5738925-7',
     Usuario_Nombre_Completo: 'Pedro Fernandez',
     Usuario_Telefono: '944706559',
-    Usuario_Contraseña: 'Segura123',
     Es_Apoderado: 1,
     Apoderado_Correo_Natural: 'pedro@gmail.com',
     Usuario_Direccion_Calle: 'Avenida Concha y Toro',
@@ -151,13 +151,22 @@ describe('validateCrearUsuario', () => {
     expect(llegoAlFinal).toBe(true);
   });
 
+  test('no pide contraseña (se genera y envía por correo) e ignora una enviada', async () => {
+    const conContrasena = await ejecutarCadena(validateCrearUsuario, { ...docenteValido, Usuario_Contraseña: '1234' });
+    expect(conContrasena.llegoAlFinal).toBe(true);
+  });
+
+  test('acepta el teléfono con espacios', async () => {
+    const { llegoAlFinal } = await ejecutarCadena(validateCrearUsuario, { ...docenteValido, Usuario_Telefono: '+56 9 4678 9765' });
+    expect(llegoAlFinal).toBe(true);
+  });
+
   test('deja pasar un apoderado válido con dirección estructurada', async () => {
     const { llegoAlFinal } = await ejecutarCadena(validateCrearUsuario, apoderadoValido);
     expect(llegoAlFinal).toBe(true);
   });
 
   test.each([
-    [{ Usuario_Contraseña: '1234' }, 'La contraseña debe tener al menos 8 caracteres'],
     [{ Usuario_Telefono: '12345' }, 'El número telefónico debe tener 9 dígitos, opcionalmente con prefijo +56'],
     [{ Usuario_Nombre_Completo: 'María M0rales' }, 'El nombre completo debe contener solo letras y espacios (nombre y apellido, máx. 100 caracteres)'],
   ])('rechaza un docente con %p', async (cambio, mensaje) => {
@@ -191,7 +200,6 @@ describe('validateCrearUsuario', () => {
       Usuario_RUT: '9343727-6',
       Usuario_Nombre_Completo: 'Carlos Gonzales',
       Usuario_Telefono: '979746782',
-      Usuario_Contraseña: 'Segura123',
       Es_Administrador: 1,
       Administrador_Correo_Institucional: 'ca.gonzales@colegiojc.cl',
     };
