@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getSemanaAtencion, guardarSemanaAtencion } from "../services/api";
 import EditorTramos from "./tramos/EditorTramos";
 import VistaBloques from "./tramos/VistaBloques";
-import { aMin, cubre, errorTramos, horasDelDia, redondear, sumarIntervalo, toca, tramosUnidos } from "./tramos/tramos";
+import { DURACIONES_SUGERIDAS, aMin, cubre, errorTramos, horasDelDia, redondear, sumarIntervalo, toca, tramosUnidos } from "./tramos/tramos";
 import "./DisponibilidadSemanal.css";
 
 // RF55 / CU87, CU88: el docente configura su horario de atención de apoderados en tramos
@@ -158,6 +158,7 @@ function HorarioAtencionSemanal({ onGuardado }) {
           ? { inicio: primeraDisp.hora_inicio, fin: primeraDisp.hora_fin < limites.maximo ? primeraDisp.hora_fin : limites.maximo }
           : { inicio: "14:00", fin: "16:00" }}
         vacio="Sin atención"
+        duraciones={datos.duracionesSugeridas || DURACIONES_SUGERIDAS}
         detalleDia={(d) => (citasDia(d) > 0 ? `${horasDelDia(tramos, d)} h · ${citasDia(d)} ${citasDia(d) === 1 ? "cita" : "citas"}` : "")}
       />
 

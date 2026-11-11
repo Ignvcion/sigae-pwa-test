@@ -12,6 +12,7 @@ const pool = require('../config/db');
 const { obtenerPeriodos } = require('../utils/periodos');
 const { condicionDesajustado } = require('../utils/bloquesDesajustados');
 const { registrarHistorial } = require('../utils/historial');
+const { opcionesAtencion } = require('../utils/horarioAtencion');
 const {
   DIAS_SEMANA, HORA_MINIMA, HORA_MAXIMA, aMinutos, aHora, unirTramos, cabeEnTramos,
   normalizarTramos, resumenSemanal, advertenciaHorasAdeudadas,
@@ -268,6 +269,8 @@ const getOpcionesDisponibilidad = async (req, res) => {
       jornada: await jornadaInstitucional(pool),
       limites: { minimo: aHora(HORA_MINIMA), maximo: aHora(HORA_MAXIMA) },
       bloques: await bloquesDeJornada(pool),
+      // RF55: el administrador puede dejar el horario de atención al registrar al docente
+      atencion: opcionesAtencion(),
     });
   } catch (error) {
     console.error('getOpcionesDisponibilidad:', error);

@@ -9,6 +9,10 @@ export const aMin = (h) => {
 export const aHora = (min) =>
   `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 
+// Horario de atención de apoderados: duraciones sugeridas de un tramo (1 hora y 2 horas).
+// El servidor las envía como `duracionesSugeridas`; estas son el respaldo.
+export const DURACIONES_SUGERIDAS = [60, 120];
+
 export const redondear = (h) => Math.round(h * 100) / 100;
 
 /** Tramos de un día como minutos, unidos si se tocan o se superponen. */

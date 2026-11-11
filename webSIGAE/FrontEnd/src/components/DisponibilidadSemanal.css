@@ -271,6 +271,34 @@
 }
 
 /* Horario de atención de apoderados (RF55) y estados extra de la vista por bloques */
+/* Duraciones sugeridas de un tramo (horario de atención: 1 hora, 2 horas) */
+.disp-semanal .disp-duraciones {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 2px;
+}
+
+.disp-semanal button.disp-duracion {
+  padding: 1px 7px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #fff;
+  color: #1e40af;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.disp-semanal button.disp-duracion:hover:not(.disp-duracion--activa) {
+  background: #dbeafe;
+}
+
+.disp-semanal button.disp-duracion--activa {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
 .disp-semanal .disp-tramo--atencion {
   border-color: #93c5fd;
   background: #eff6ff;

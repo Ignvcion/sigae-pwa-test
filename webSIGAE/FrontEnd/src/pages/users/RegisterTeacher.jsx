@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { registrarDocente, getEspecialidades, getOpcionesDisponibilidad, textoContrasenaEnviada } from "../../services/api";
 import EtiquetasInput from "../../components/EtiquetasInput";
 import DisponibilidadSemanal, { errorTramos } from "../../components/DisponibilidadSemanal";
+import HorarioAtencionRegistro, { erroresHorarioAtencion } from "../../components/HorarioAtencionRegistro";
 import {
   validarRut, normalizarRut, validarNombreCompleto, validarCorreoInstitucional, DOMINIO_INSTITUCIONAL, TEXTO_DOMINIOS_INSTITUCIONALES,
   validarTelefonoChileno, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
@@ -30,6 +31,7 @@ function RegisterTeacher() {
     cargaHoraria: "",
     horasPIE: "0",
     disponibilidad: [],
+    horarioAtencion: [],
     estado: "Activo",
   });
 
@@ -99,6 +101,13 @@ function RegisterTeacher() {
       horasPIE: validarCampo("horasPIE", formData.horasPIE),
       especialidades: validarCampo("especialidades", formData.especialidades),
       disponibilidad: opcionesDisp ? errorTramos(formData.disponibilidad, opcionesDisp.dias || []) : "",
+      horarioAtencion: opcionesDisp
+        ? erroresHorarioAtencion(formData.horarioAtencion, opcionesDisp.dias || [], {
+          limites: opcionesDisp.atencion?.limites,
+          duracionCitacion: opcionesDisp.atencion?.duracionCitacion,
+          disponibilidad: formData.disponibilidad,
+        })[0] || ""
+        : "",
       ...validarDireccion(formData),
     };
 
@@ -342,6 +351,31 @@ function RegisterTeacher() {
             ) : (
               <span className="etiquetas-ayuda">Cargando bloques horarios…</span>
             )}
+          </div>
+
+
+
+          <div className="campo-pwd">
+            <label>Horario de atención de apoderados</label>
+            <span className="etiquetas-ayuda">
+              Tramos en que el docente atiende apoderados; ellos solicitan citaciones de 30 minutos dentro de estos tramos.
+              Cada tramo sugiere una duración de 1 hora o 2 horas. Es opcional: el docente puede configurarlo después desde su perfil.
+            </span>
+            {opcionesDisp ? (
+              <HorarioAtencionRegistro
+                dias={opcionesDisp.dias || []}
+                opciones={opcionesDisp.atencion}
+                disponibilidad={formData.disponibilidad}
+                tramos={formData.horarioAtencion}
+                onChange={(horarioAtencion) => {
+                  setFormData({ ...formData, horarioAtencion });
+                  setErrores({ ...errores, horarioAtencion: "" });
+                }}
+              />
+            ) : (
+              <span className="etiquetas-ayuda">Cargando bloques horarios…</span>
+            )}
+            {errores.horarioAtencion && <span className="input-error-msg">{errores.horarioAtencion}</span>}
           </div>
 
 

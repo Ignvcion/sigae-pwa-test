@@ -44,6 +44,12 @@ const {
   entregarContrasenaInicial,
   ErrorEnvioContrasena,
 } = require('../utils/contrasenaInicial');
+const {
+  normalizarHorarioAtencion,
+  tramosFueraDeDisponibilidad,
+  guardarHorarioAtencionDocente,
+} = require('../utils/horarioAtencion');
+const { aHora } = require('../utils/disponibilidadLaboral');
 
 /** Ejecuta `fn(conn)` en una transacción y devuelve su resultado. */
 async function enTransaccion(fn) {
@@ -413,6 +419,23 @@ const createUsuario = async (req, res) => {
     disponibilidad = leida;
   }
 
+  // RF55: horario de atención de apoderados (opcional). Un docente nuevo no tiene clases,
+  // así que basta con las reglas del tramo y con quedar dentro de su disponibilidad laboral.
+  let horarioAtencion = null;
+  if (Es_Docente && req.body.Docente_Horario_Atencion !== undefined && req.body.Docente_Horario_Atencion !== null) {
+    const leido = normalizarHorarioAtencion(req.body.Docente_Horario_Atencion);
+    if (!leido.ok) return res.status(400).json({ mensaje: leido.mensaje });
+    const fuera = tramosFueraDeDisponibilidad(leido.tramos, disponibilidad?.tramos);
+    if (fuera.length > 0) {
+      const { tramo: t, libres } = fuera[0];
+      return res.status(400).json({
+        mensaje: `El tramo de atención ${t.dia} ${aHora(t.inicio)}–${aHora(t.fin)} queda fuera de la disponibilidad laboral `
+          + `del docente (${libres ? `ese día está disponible ${libres}` : 'ese día no tiene disponibilidad'})`,
+      });
+    }
+    horarioAtencion = leido.tramos;
+  }
+
   try {
 
     // Verificar si existe usuario con ese RUT
@@ -539,6 +562,9 @@ const createUsuario = async (req, res) => {
         guardadoDisponibilidad = await guardarDisponibilidadDocente(conn, {
           docenteId: resultado.insertId, disponibilidad, responsableId: req.user.id,
         });
+      }
+      if (horarioAtencion && horarioAtencion.length > 0) {
+        await guardarHorarioAtencionDocente(conn, resultado.insertId, horarioAtencion);
       }
       // Último paso antes del commit: si el correo no sale, la cuenta no se crea
       // (nadie conocería su contraseña).
