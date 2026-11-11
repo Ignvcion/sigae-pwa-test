@@ -290,7 +290,7 @@ export default function PanelConflictos({
           <div style={{ marginTop: 8 }}>
             {opciones.length === 0 ? (
               <p style={{ fontSize: "0.8rem", color: "#991b1b", margin: 0 }}>
-                No hay bloques de clase vigentes. Crea uno en "Bloques horarios".
+                No hay bloques de clase vigentes. Crea uno en Parámetros Institución, pestaña "Bloques horarios".
               </p>
             ) : (
               <>

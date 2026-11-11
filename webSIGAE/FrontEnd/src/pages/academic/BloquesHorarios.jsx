@@ -154,7 +154,7 @@ export default function BloquesHorarios() {
       {/* Encabezado */}
       <div style={s.header}>
         <div>
-          <h1 style={s.titulo}>Configuración Horaria Institucional</h1>
+          <h1 style={s.titulo}>Parámetros Institución</h1>
           <p style={s.subtitulo}>
             Parámetros institucionales, bloques horarios y eventos {/* CU52 · CU49 */}
           </p>

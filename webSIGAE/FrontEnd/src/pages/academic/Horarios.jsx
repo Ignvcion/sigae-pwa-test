@@ -612,7 +612,7 @@ export default function Horarios() {
       {/* Header */}
       <div style={s.header}>
         <div>
-          <h1 style={s.titulo}>{esAdmin ? "Gestión de Horarios" : "Mi Horario"}</h1>
+          <h1 style={s.titulo}>{esAdmin ? "Creador Horario" : "Mi Horario"}</h1>
           <p style={s.subtitulo}>
             {esAdmin
               ? "Programa bloques horarios por curso" /* CU54 */
@@ -1041,7 +1041,7 @@ function VistaBloqueGrid({
         <span style={s.emptyIcon}>📋</span>
         <p>
           No hay bloques horarios configurados. Ve a{" "}
-          <strong>Bloques Horarios</strong> para configurarlos primero.
+          <strong>Parámetros Institución</strong> (pestaña «Bloques horarios») para configurarlos primero.
         </p>
       </div>
     );
