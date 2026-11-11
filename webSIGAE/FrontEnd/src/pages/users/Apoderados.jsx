@@ -12,6 +12,17 @@ import {
 } from "../../services/api";
 import { etiquetaApoderado, inactivoPorFaltaDeAsociacion, puedeAsociarse } from "../../utils/apoderados";
 
+// CU33: operadores del filtro por cantidad de estudiantes asociados, con su lectura
+// ("> más de 2"). `valor` es lo que espera el backend.
+const OPERADORES_CANTIDAD = [
+  { valor: "=",  simbolo: "=", texto: "igual a" },
+  { valor: "!=", simbolo: "≠", texto: "distinto de" },
+  { valor: ">",  simbolo: ">", texto: "más de" },
+  { valor: "<",  simbolo: "<", texto: "menos de" },
+  { valor: ">=", simbolo: "≥", texto: "igual o más de" },
+  { valor: "<=", simbolo: "≤", texto: "igual o menos de" },
+];
+
 function Apoderados() {
   const { usuario } = useAuth();
   const esAdmin =
@@ -321,15 +332,13 @@ function Apoderados() {
         </span>
         <select
           className="usuarios-select"
+          aria-label="Operador de la cantidad de estudiantes asociados"
           value={operadorFiltro}
           onChange={(e) => cambiarOperador(e.target.value)}
         >
-          <option value="=">=</option>
-          <option value="!=">≠</option>
-          <option value=">">&gt;</option>
-          <option value="<">&lt;</option>
-          <option value=">=">&gt;=</option>
-          <option value="<=">&lt;=</option>
+          {OPERADORES_CANTIDAD.map((o) => (
+            <option key={o.valor} value={o.valor}>{o.simbolo} {o.texto}</option>
+          ))}
         </select>
         <input
           type="text"
