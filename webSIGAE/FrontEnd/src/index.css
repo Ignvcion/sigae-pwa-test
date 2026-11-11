@@ -1617,6 +1617,21 @@ select {
   align-items: center;
 }
 
+/* Gestión de Usuarios, Buscar Usuarios y Gestión de Apoderados: los selectores de la
+   barra de filtros van en línea con el buscador (el estilo global de <select> los
+   estiraba a todo el ancho) */
+.usuarios-filtros--en-linea > select {
+  width: auto;
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
+/* Filtros que se aplican solos al escribir: aviso discreto mientras se consulta */
+.usuarios-actualizando {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
 .usuarios-search {
   flex: 1;
   min-width: 220px;

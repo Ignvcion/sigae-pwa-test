@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch, getUsuariosPorFiltro } from "../../services/api";
@@ -11,6 +11,9 @@ function Usuarios() {
 
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Tras la primera carga, los filtros recargan sin reemplazar la pantalla (no se pierde el foco)
+  const [cargado, setCargado] = useState(false);
+  const ultimaPeticion = useRef(0);
   const [busqueda, setBusqueda] = useState("");
   const [filtroRol, setFiltroRol] = useState("Todos");
   const [filtroEstado, setFiltroEstado] = useState("Todos");
@@ -22,12 +25,16 @@ function Usuarios() {
   // CU29: listado con filtros avanzados por rol y estado de cuenta, resueltos en el backend
   // Pide el listado; el estado cambia solo al llegar la respuesta (callbacks), así el efecto
   // de montaje no provoca renders en cascada. cargarUsuarios() además limpia los avisos.
-  const pedirUsuarios = (rol, estado) =>
-    getUsuariosPorFiltro({
+  const pedirUsuarios = (rol, estado) => {
+    // Si se cambia un filtro antes de que llegue la respuesta anterior, esta se descarta
+    const peticion = ++ultimaPeticion.current;
+    const vigente = () => peticion === ultimaPeticion.current;
+    return getUsuariosPorFiltro({
       rol: rol === "Todos" ? undefined : rol,
       estado: estado === "Todos" ? undefined : (estado === "Activo" ? "1" : "0"),
     })
       .then((data) => {
+        if (!vigente()) return;
         if (Array.isArray(data)) {
           setUsuarios(data);
         } else {
@@ -37,10 +44,16 @@ function Usuarios() {
         }
       })
       .catch((error) => {
+        if (!vigente()) return;
         // CU29 - Excepción "Filtros fuera de privilegios" o "Problema técnico"
         setErrorCarga(error.message || "Ocurrió un problema técnico");
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!vigente()) return;
+        setLoading(false);
+        setCargado(true);
+      });
+  };
 
   const cargarUsuarios = (rol, estado) => {
     setLoading(true);
@@ -53,7 +66,15 @@ function Usuarios() {
     pedirUsuarios("Todos", "Todos");
   }, []);
 
-  const aplicarFiltros = () => cargarUsuarios(filtroRol, filtroEstado);
+  // Los filtros de rol y estado se aplican al elegirlos (sin botón "Filtrar")
+  const cambiarRol = (rol) => {
+    setFiltroRol(rol);
+    cargarUsuarios(rol, filtroEstado);
+  };
+  const cambiarEstado = (estado) => {
+    setFiltroEstado(estado);
+    cargarUsuarios(filtroRol, estado);
+  };
 
   const limpiarFiltros = () => {
     setFiltroRol("Todos");
@@ -122,7 +143,7 @@ const cambiarEstadoCuenta = async (u) => {
     );
   });
 
-  if (loading) {
+  if (!cargado) {
     return (
       <div className="usuarios-container">
         <p>Cargando usuarios...</p>
@@ -138,7 +159,7 @@ const cambiarEstadoCuenta = async (u) => {
       </div>
 
       {/* Filtros */}
-      <div className="usuarios-filtros">
+      <div className="usuarios-filtros usuarios-filtros--en-linea">
         <input
           type="text"
           className="usuarios-search"
@@ -149,7 +170,7 @@ const cambiarEstadoCuenta = async (u) => {
         <select
           className="usuarios-select"
           value={filtroRol}
-          onChange={(e) => setFiltroRol(e.target.value)}
+          onChange={(e) => cambiarRol(e.target.value)}
         >
           <option value="Todos">Todos los roles</option>
           <option value="Administrador">Administrador</option>
@@ -159,14 +180,14 @@ const cambiarEstadoCuenta = async (u) => {
         <select
           className="usuarios-select"
           value={filtroEstado}
-          onChange={(e) => setFiltroEstado(e.target.value)}
+          onChange={(e) => cambiarEstado(e.target.value)}
         >
           <option value="Todos">Todos los estados</option>
           <option value="Activo">Activo</option>
           <option value="Inactivo">Inactivo</option>
         </select>
-        <button type="button" className="btn-roles" onClick={aplicarFiltros}>Filtrar</button>
         <button type="button" className="btn-roles" onClick={limpiarFiltros}>Limpiar</button>
+        {loading && <span className="usuarios-actualizando" role="status">Actualizando…</span>}
       </div>
 
       {/* Tabla */}
