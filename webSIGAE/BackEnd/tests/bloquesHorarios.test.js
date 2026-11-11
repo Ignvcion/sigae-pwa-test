@@ -287,3 +287,48 @@ describe('Pruebas Unitarias - CU51: Eliminando Múltiples Bloques Horarios', () 
     expect(res.json).toHaveBeenCalledWith({ error: 'Ocurrió un error al eliminar' });
   });
 });
+
+// Base de producción recién creada (schema_base.sql + catalogos_base.sql): la tabla
+// parametro_institucional está vacía. El administrador debe poder crearlos desde la
+// pestaña "Parámetros institucionales" (antes la pantalla solo mostraba el error).
+describe('Parámetros institucionales sin configurar (primera vez)', () => {
+  const nuevoRes = () => ({ status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() });
+  const PARAMETROS = {
+    Parametro_Institucional_Inicio_Jornada: '08:00',
+    Parametro_Institucional_Fin_Jornada: '16:30',
+    Parametro_Institucional_Duracion_Bloque: '45',
+    Parametro_Institucional_Duracion_Recreo: '15',
+    Parametro_Institucional_Bloques_Maximos_Diarios: '8',
+  };
+
+  beforeEach(() => jest.clearAllMocks());
+
+  test('GET responde 404 con el código SIN_PARAMETROS', async () => {
+    pool.execute.mockResolvedValueOnce([[]]);
+    const res = nuevoRes();
+    await bloquesController.getParametros({}, res);
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ codigo: 'SIN_PARAMETROS' }));
+  });
+
+  test('PUT crea la fila cuando no existe (con el período vigente = año actual)', async () => {
+    pool.execute
+      .mockResolvedValueOnce([[]]) // no hay parámetros
+      .mockResolvedValueOnce([{ insertId: 1 }]); // INSERT
+    const res = nuevoRes();
+    await bloquesController.updateParametros({ body: { ...PARAMETROS } }, res);
+
+    const [sql, valores] = pool.execute.mock.calls[1];
+    expect(sql).toMatch(/INSERT INTO parametro_institucional/);
+    expect(valores).toEqual(['08:00', '16:30', 45, 15, 8, String(new Date().getFullYear())]);
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({ mensaje: 'Parámetros actualizados correctamente' });
+  });
+
+  test('PUT rechaza valores no numéricos sin escribir', async () => {
+    const res = nuevoRes();
+    await bloquesController.updateParametros({ body: { ...PARAMETROS, Parametro_Institucional_Duracion_Bloque: 'abc' } }, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(pool.execute).not.toHaveBeenCalled();
+  });
+});

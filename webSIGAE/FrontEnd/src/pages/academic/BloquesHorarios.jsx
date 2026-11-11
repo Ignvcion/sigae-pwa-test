@@ -208,8 +208,19 @@ export default function BloquesHorarios() {
 /* ══════════════════════════════════════════════════════════════════
    PESTAÑA 1 — Parámetros institucionales (CU52)
 ══════════════════════════════════════════════════════════════════ */
+// Formulario vacío: la primera vez (base de producción recién creada) no hay fila en
+// parametro_institucional y el administrador debe poder definirlos desde aquí.
+const PARAMETROS_VACIOS = {
+  Parametro_Institucional_Inicio_Jornada:          "",
+  Parametro_Institucional_Fin_Jornada:             "",
+  Parametro_Institucional_Duracion_Bloque:         "",
+  Parametro_Institucional_Duracion_Recreo:         "",
+  Parametro_Institucional_Bloques_Maximos_Diarios: "",
+};
+
 function TabParametros({ onJornadaCambiada }) {
   const [form, setForm]           = useState(null);
+  const [sinConfigurar, setSinConfigurar] = useState(false); // aún no existen los parámetros
   const [impacto, setImpacto]     = useState(null); // clases que quedarían fuera de la nueva jornada
   const [original, setOriginal]   = useState(null);
   const [loading, setLoading]     = useState(true);
@@ -221,7 +232,14 @@ function TabParametros({ onJornadaCambiada }) {
     (async () => {
       try {
         const res  = await fetch(`${API}/parametros`, { headers: authHeaders() });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 404) {
+          // Sin parámetros todavía: se muestra el formulario para crearlos
+          setSinConfigurar(true);
+          setForm(PARAMETROS_VACIOS);
+          setOriginal(PARAMETROS_VACIOS);
+          return;
+        }
         if (!res.ok) throw new Error(data.error);
         const f = {
           Parametro_Institucional_Inicio_Jornada:          hhmm(data.Parametro_Institucional_Inicio_Jornada),
@@ -259,7 +277,8 @@ function TabParametros({ onJornadaCambiada }) {
     setExito("");
     try {
       // Si la nueva jornada deja bloques fuera, se avisa antes de guardar
-      if (cambiaJornada && !confirmado) {
+      // (la primera configuración no tiene una jornada anterior que comparar)
+      if (cambiaJornada && !confirmado && !sinConfigurar) {
         const resImp  = await fetch(`${API}/parametros/impacto`, {
           method: "POST",
           headers: authHeaders(),
@@ -280,15 +299,19 @@ function TabParametros({ onJornadaCambiada }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+      const eraPrimeraVez = sinConfigurar;
       setOriginal(form);
       setImpacto(null);
+      setSinConfigurar(false);
       setExito(
-        impacto?.clases > 0
-          ? `Parámetros guardados. ${impacto.clases} clase(s) quedaron pendientes de reubicar en el panel de avisos.`
-          : "Parámetros guardados correctamente."
+        eraPrimeraVez
+          ? "Parámetros institucionales creados. Ya puedes registrar los bloques horarios."
+          : impacto?.clases > 0
+            ? `Parámetros guardados. ${impacto.clases} clase(s) quedaron pendientes de reubicar en el panel de avisos.`
+            : "Parámetros guardados correctamente."
       );
       setTimeout(() => setExito(""), 5000);
-      if (cambiaJornada) onJornadaCambiada?.();
+      if (cambiaJornada && !eraPrimeraVez) onJornadaCambiada?.();
     } catch (e) {
       setError(e.message || "Error al guardar");
     } finally {
@@ -316,6 +339,13 @@ function TabParametros({ onJornadaCambiada }) {
         </p>
       </div>
 
+      {sinConfigurar && (
+        <div style={s.avisoBanner} role="status">
+          ⚠ Aún no hay parámetros institucionales configurados. Completa la jornada, la duración de
+          bloques y recreos y el máximo de bloques diarios, y guarda para crearlos. Sin ellos no se
+          pueden registrar bloques horarios.
+        </div>
+      )}
       {error && <div style={s.errorBanner}>{error}</div>}
       {exito && <div style={s.exitoBanner}>✅ {exito}</div>}
 
@@ -405,9 +435,9 @@ function TabParametros({ onJornadaCambiada }) {
         <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
           <button type="submit" className="btn-primary" disabled={guardando || !hayCambios || !!impacto}
             style={{ opacity: !hayCambios ? 0.5 : 1 }}>
-            {guardando ? "Guardando..." : "Guardar parámetros"}
+            {guardando ? "Guardando..." : sinConfigurar ? "Crear parámetros" : "Guardar parámetros"}
           </button>
-          {hayCambios && (
+          {hayCambios && !sinConfigurar && (
             <button type="button" onClick={() => { setForm(original); setImpacto(null); }} style={s.btnSecundario}>
               Descartar cambios
             </button>
@@ -444,6 +474,7 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
   const [eliminando,   setEliminando]   = useState(null);
   const [vista,        setVista]        = useState("calendario");
   const [parametros,   setParametros]   = useState(null);
+  const [sinParametros, setSinParametros] = useState(false);
 
   /* CU51: eliminación múltiple de bloques (solo disponible en vista Lista) */
   const [modoSeleccion,   setModoSeleccion]   = useState(false);
@@ -466,10 +497,12 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
     ])
       .then(async ([rB, rP]) => {
         const dataBloques = await rB.json();
-        const dataParams  = await rP.json();
+        const dataParams  = await rP.json().catch(() => null);
         if (!rB.ok) throw new Error(dataBloques.error);
         setBloques(dataBloques);
-        setParametros(dataParams);
+        // 404: aún no hay parámetros institucionales (se crean en la primera pestaña)
+        setParametros(rP.ok ? dataParams : null);
+        setSinParametros(rP.status === 404);
         setError("");
       })
       .catch((e) => setError(e.message || "Error al cargar bloques"))
@@ -681,10 +714,20 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
               {modoSeleccion ? "Cancelar selección" : "☑ Seleccionar varios"}
             </button>
           )}
-          <button className="btn-primary" onClick={abrirCrear}>+ Nuevo bloque</button>
+          <button className="btn-primary" onClick={abrirCrear} disabled={sinParametros}
+            title={sinParametros ? "Primero configura los parámetros institucionales" : undefined}
+            style={sinParametros ? { opacity: 0.5, cursor: "not-allowed" } : undefined}>
+            + Nuevo bloque
+          </button>
         </div>
       </div>
 
+      {sinParametros && (
+        <div style={s.avisoBanner} role="status">
+          ⚠ Aún no hay parámetros institucionales. Configúralos en la pestaña
+          «Parámetros institucionales» antes de registrar bloques horarios.
+        </div>
+      )}
       {error && <div style={s.errorBanner}>{error}</div>}
       {exito && <div style={s.exitoBanner}>✅ {exito}</div>}
 
@@ -1981,6 +2024,8 @@ const s = {
   errorBanner: { color: "#dc2626", background: "#fee2e2", border: "1px solid #fecaca",
     padding: "0.7rem 1rem", borderRadius: 8, marginBottom: "1rem", fontSize: "0.9rem" },
   exitoBanner: { color: "#166534", background: "#dcfce7", border: "1px solid #bbf7d0",
+    padding: "0.7rem 1rem", borderRadius: 8, marginBottom: "1rem", fontSize: "0.9rem" },
+  avisoBanner: { color: "#92400e", background: "#fef3c7", border: "1px solid #fde68a",
     padding: "0.7rem 1rem", borderRadius: 8, marginBottom: "1rem", fontSize: "0.9rem" },
   loadingText: { color: "#6b7280", fontStyle: "italic" },
 
