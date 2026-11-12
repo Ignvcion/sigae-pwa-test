@@ -21,6 +21,7 @@ MainLayout
 │       ├── Enlaces comunes a todos los roles (Dashboard, Mi Perfil)
 │       ├── Bloque "Administración"   (esAdmin)
 │       ├── Bloque "Docente"          (esDocente)
+│       ├── Bloque "UTP"              (conUTP: etiqueta UTP, ver abajo)
 │       └── Bloque "Apoderado"        (esApoderado)
 └── <main> <Outlet /> </main>   ← contenido de la página actual
 ```
@@ -41,6 +42,17 @@ const esApoderado  = rolEfectivo === "Apoderado";
 - `esAdmin` es **true** tanto para un Administrador normal como para el Super Admin.
 - Dentro del bloque `esAdmin`, algunos enlaces (Gestión de Administradores, Gestión de
   Roles, Registrar Admin) se filtran además con `esSuperAdmin`.
+
+## Etiqueta UTP
+
+La etiqueta UTP (`utils/permisos.js`, en frontend y backend) se muestra junto al rol del
+badge: "Administrador · UTP" o "Docente · UTP".
+
+- Un **administrador con UTP** inicia sesión con el rol `UTP` (no `Administrador`): no ve
+  el bloque "Administración", solo el bloque "UTP".
+- Un **docente con UTP** ve su bloque "Docente" y, además, el bloque "UTP".
+- Los enlaces del bloque "UTP" están en `ENLACES_UTP` (`utils/permisos.js`), compartidos
+  con el dashboard. Sus rutas llevan `utp` en `RoleRoute` (`routes/AppRouter.jsx`).
 
 ## Convenciones al modificar el sidebar
 
