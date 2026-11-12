@@ -38,6 +38,7 @@ export async function descargarArchivo(url, nombrePorDefecto) {
   enlace.click();
   enlace.remove();
   setTimeout(() => URL.revokeObjectURL(enlace.href), 1000);
+  return res.headers;
 }
 
 // ── RF60: profesor jefe (CU95, CU96) y estudiantes del curso (CU97) ──
@@ -75,5 +76,10 @@ export const promoverCurso = (cursoId, cuerpo) => json("POST", `/api/promocion/c
 // ── Cambio de período ──
 export const getEstadoPeriodo = () => json("GET", "/api/promocion/periodos/estado");
 export const iniciarCierre = () => json("POST", "/api/promocion/periodos/iniciar-cierre", {});
-export const descargarRespaldo = () => descargarArchivo("/api/promocion/periodos/respaldo", "respaldo_cambio_periodo.xlsx");
+// Descarga el Excel; el backend además envía una copia a la cuenta de respaldos.
+// Devuelve "enviado", "error" o "sin-smtp" (X-Respaldo-Correo).
+export const descargarRespaldo = async () => {
+  const cabeceras = await descargarArchivo("/api/promocion/periodos/respaldo", "respaldo_cambio_periodo.xlsx");
+  return cabeceras?.get("X-Respaldo-Correo") || "sin-smtp";
+};
 export const iniciarNuevoPeriodo = () => json("POST", "/api/promocion/periodos/iniciar-nuevo", { confirmarRespaldo: true });

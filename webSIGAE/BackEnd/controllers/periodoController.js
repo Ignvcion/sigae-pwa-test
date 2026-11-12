@@ -10,7 +10,10 @@ const { obtenerPeriodos, periodoSiguienteDe } = require('../utils/periodos');
 const { registrarHistorial } = require('../utils/historial');
 const { ESTADOS } = require('../utils/situacionFinal');
 const { calcularLimpieza, conteo, datosRespaldo, ejecutarLimpieza } = require('../utils/limpiezaPeriodo');
+const crypto = require('crypto');
 const { CORREO_RESPALDOS } = require('../config/institucion');
+const { correoConfigurado, enviarRespaldo, escaparHTML } = require('../utils/mailer');
+const { armarCorreoRespaldoCierre } = require('../utils/respaldo');
 const { cursoConElectivosSQL, completitudElectivos } = require('../utils/electivos');
 
 /**
@@ -177,7 +180,7 @@ const valorCelda = (v) => (v instanceof Date ? v.toISOString().replace('T', ' ')
 // GET /api/promocion/periodos/respaldo   (Super Admin)
 // Excel con todo lo que se eliminará o desactivará al iniciar el nuevo período.
 // Contiene datos personales: se descarga solo para subirlo al Drive de respaldos
-// (respaldosigae@colegiojc.cl).
+// (respaldosigae@colegiojc.cl). Además se envía una copia por correo a esa cuenta.
 const descargarRespaldo = async (req, res) => {
   try {
     const { vigente, siguiente } = await obtenerPeriodos(pool);
@@ -207,10 +210,47 @@ const descargarRespaldo = async (req, res) => {
       hoja.addRow(columnas).font = { bold: true };
       filas.forEach((f) => hoja.addRow(columnas.map((c) => valorCelda(f[c]))));
     }
+    const archivo = `respaldo_cambio_periodo_${vigente}.xlsx`;
+    const contenido = Buffer.from(await libro.xlsx.writeBuffer());
+
+    // Copia automática a la cuenta de respaldos (utils/respaldo.js). Si el correo
+    // falla, la descarga sigue: el Super Admin puede subir el archivo a mano.
+    // X-Respaldo-Correo: enviado | error | sin-smtp (desarrollo)
+    let envio = 'sin-smtp';
+    if (correoConfigurado()) {
+      try {
+        const correo = armarCorreoRespaldoCierre({
+          archivo,
+          bytes: contenido.length,
+          sha256: crypto.createHash('sha256').update(contenido).digest('hex'),
+          vigente,
+          siguiente,
+          conteo: conteo(limpieza),
+          inicio: new Date(),
+          responsable: req.user?.rut || null,
+        }, escaparHTML);
+        await enviarRespaldo({
+          para: process.env.RESPALDO_CORREO || CORREO_RESPALDOS,
+          asunto: correo.asunto,
+          texto: correo.texto,
+          html: correo.html,
+          adjuntos: [{
+            filename: archivo,
+            content: contenido,
+            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          }],
+        });
+        envio = 'enviado';
+      } catch (error) {
+        console.error('descargarRespaldo (copia por correo):', error.message);
+        envio = 'error';
+      }
+    }
+
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="respaldo_cambio_periodo_${vigente}.xlsx"`);
-    await libro.xlsx.write(res);
-    return res.end();
+    res.setHeader('Content-Disposition', `attachment; filename="${archivo}"`);
+    res.setHeader('X-Respaldo-Correo', envio);
+    return res.send(contenido);
   } catch (error) {
     console.error('descargarRespaldo:', error);
     return res.status(500).json({ mensaje: 'No fue posible generar el respaldo' });

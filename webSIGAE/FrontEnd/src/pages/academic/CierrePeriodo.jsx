@@ -16,6 +16,15 @@ function CierrePeriodo() {
   const [ocupado, setOcupado] = useState(false);
   const [respaldoDescargado, setRespaldoDescargado] = useState(false);
   const [respaldoGuardado, setRespaldoGuardado] = useState(false);
+  // Copia por correo del respaldo a la cuenta de respaldos: enviado | error | sin-smtp
+  const [envioRespaldo, setEnvioRespaldo] = useState("");
+
+  const bajarRespaldo = async () => {
+    const envio = await descargarRespaldo();
+    setRespaldoDescargado(true);
+    setEnvioRespaldo(envio);
+    if (envio === "enviado") setRespaldoGuardado(true);
+  };
 
   const cargar = async () => {
     try {
@@ -169,15 +178,15 @@ function CierrePeriodo() {
           {esSuperAdmin ? (
             <>
               <p style={{ fontSize: "0.9rem" }}>
-                Descarga el respaldo y súbelo al Google Drive de la cuenta de respaldos{" "}
-                <strong>{CORREO_RESPALDOS}</strong>. Tiene datos personales de menores: no lo guardes en equipos
-                personales.
+                Descarga el respaldo: SIGAE envía además una copia por correo a la cuenta de respaldos{" "}
+                <strong>{CORREO_RESPALDOS}</strong>. Si el envío falla, súbelo a mano a su Google Drive. Tiene
+                datos personales de menores: no lo guardes en equipos personales.
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
                 <button
                   className="btn-volver"
                   disabled={ocupado}
-                  onClick={() => accion(async () => { await descargarRespaldo(); setRespaldoDescargado(true); })}
+                  onClick={() => accion(bajarRespaldo)}
                 >
                   Descargar respaldo
                 </button>
@@ -188,8 +197,18 @@ function CierrePeriodo() {
                     disabled={!respaldoDescargado && hayLimpieza}
                     onChange={(e) => setRespaldoGuardado(e.target.checked)}
                   />
-                  Subí el respaldo al Drive de {CORREO_RESPALDOS}
+                  El respaldo quedó guardado en la cuenta {CORREO_RESPALDOS}
                 </label>
+                {envioRespaldo === "enviado" && (
+                  <p className="msg-exito" style={{ width: "100%", margin: 0 }}>
+                    Se envió una copia del respaldo a {CORREO_RESPALDOS}.
+                  </p>
+                )}
+                {(envioRespaldo === "error" || envioRespaldo === "sin-smtp") && (
+                  <p className="msg-error" style={{ width: "100%", margin: 0 }}>
+                    No se pudo enviar la copia por correo: sube el archivo descargado al Drive de {CORREO_RESPALDOS}.
+                  </p>
+                )}
                 <button
                   className="btn-primary"
                   disabled={ocupado || !puedeIniciarNuevoPeriodo || !respaldoGuardado}
