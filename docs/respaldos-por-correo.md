@@ -33,15 +33,55 @@ sudo apt install -y mariadb-client
 
 Trae `mariadb-dump`, que el script usa para el volcado (si no está, usa `mysqldump`).
 
-### 1.2 Usuario de solo lectura para los respaldos (recomendado)
+### 1.2 Usuario de la base para el respaldo
 
-El usuario de la aplicación (`sigae_app`) puede escribir; para respaldar basta uno que
-solo lea. En la RDS, con el usuario administrador:
+**No es obligatorio crear uno nuevo.** Si no se configura `RESPALDO_DB_USER`, el
+script usa el usuario de la aplicación (`DB_USER`, normalmente `sigae_app`). Con sus
+permisos (`SELECT, INSERT, UPDATE, DELETE`) el volcado sale completo: el esquema no
+tiene vistas ni triggers y `--single-transaction` no necesita bloquear tablas
+(verificado). Se puede saltar al paso 1.3.
 
-```sql
-CREATE USER 'sigae_respaldo'@'%' IDENTIFIED BY '<contraseña larga y aleatoria>';
-GRANT SELECT, SHOW VIEW, TRIGGER, LOCK TABLES ON sigae.* TO 'sigae_respaldo'@'%';
-```
+**Opcional, más seguro: un usuario de solo lectura.** `CREATE USER` y `GRANT` son
+sentencias **SQL**: no se escriben en la terminal de Linux (ahí responde
+`command not found`) ni en la consola web de AWS, sino **dentro del cliente de
+MariaDB**, conectado a la RDS **con el usuario maestro** (el que se usó para cargar
+`schema_base.sql`, ver `docs/despliegue-produccion.txt` 4.2):
+
+1. En la consola de AWS › RDS › Bases de datos › la instancia:
+   - *Conectividad y seguridad* › **Punto de enlace** (endpoint), p. ej.
+     `sigae.xxxxxxxx.us-east-1.rds.amazonaws.com`.
+   - *Configuración* › **Nombre de usuario maestro** (por defecto `admin`).
+2. En la EC2 (por SSH), entrar al cliente con ese usuario; pide la contraseña maestra:
+
+   ```bash
+   mariadb -h <endpoint> -u <usuario-maestro> -p
+   ```
+
+   El indicador cambia a `MariaDB [(none)]>`. Recién ahí se pegan las sentencias,
+   cada una terminada en `;`:
+
+   ```sql
+   CREATE USER 'sigae_respaldo'@'%' IDENTIFIED BY '<contraseña larga y aleatoria>';
+   GRANT SELECT, SHOW VIEW, TRIGGER, LOCK TABLES ON sigae.* TO 'sigae_respaldo'@'%';
+   exit
+   ```
+
+   O en una sola línea desde la terminal de la EC2:
+
+   ```bash
+   mariadb -h <endpoint> -u <usuario-maestro> -p -e "CREATE USER 'sigae_respaldo'@'%' IDENTIFIED BY '<contraseña>'; GRANT SELECT, SHOW VIEW, TRIGGER, LOCK TABLES ON sigae.* TO 'sigae_respaldo'@'%';"
+   ```
+
+3. Comprobar: `mariadb -h <endpoint> -u sigae_respaldo -p -e "SHOW GRANTS"`.
+
+Errores frecuentes:
+
+| Mensaje | Causa |
+|---|---|
+| `CREATE: command not found` | Se escribió en la terminal de Linux, no dentro de `mariadb` |
+| `mariadb: command not found` | Falta el cliente: `sudo apt install -y mariadb-client` (paso 1.1) |
+| `Access denied for user 'sigae_app'` | Se conectó con el usuario de la aplicación: hay que usar el **maestro** |
+| `Can't connect to server` / se queda esperando | El grupo de seguridad de la RDS no admite la EC2 en el puerto 3306, o el endpoint está mal |
 
 (El grupo de seguridad de la RDS ya limita el acceso a la EC2.)
 
@@ -51,9 +91,9 @@ Las de la base (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_SSL`) y las de SMTP ya est�
 Se agregan:
 
 ```dotenv
-RESPALDO_DB_USER=sigae_respaldo
-RESPALDO_DB_PASSWORD=<la contraseña del paso 1.2>
-# Opcionales:
+# Opcionales (si no están, se usan DB_USER y DB_PASSWORD):
+# RESPALDO_DB_USER=sigae_respaldo
+# RESPALDO_DB_PASSWORD=<la contraseña del paso 1.2>
 # RESPALDO_CORREO=respaldosigae@colegiojc.cl   (destino; este es el valor por defecto)
 # RESPALDO_DIR=/var/sigae/respaldos            (carpeta temporal del archivo)
 # RESPALDO_MAX_MB=18                           (máximo del adjunto)
