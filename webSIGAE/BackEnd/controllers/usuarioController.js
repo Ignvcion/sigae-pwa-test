@@ -17,6 +17,7 @@ const {
   columnasDireccion,
   CAMPOS_DIRECCION,
   validarFortalezaContrasena,
+  validarRut,
 } = require('../middleware/validation');
 const { PERIODO_VIGENTE_SQL } = require('../utils/periodos');
 const { colorAleatorioDocente } = require('../utils/colores');
@@ -68,6 +69,10 @@ async function enTransaccion(fn) {
     conn.release();
   }
 }
+
+// Los Super Administradores se crean solo con scripts/crearSuperAdmin.js: ninguna
+// ruta de la aplicación crea uno ni convierte a un usuario en Super Admin.
+const MENSAJE_SOLO_SCRIPT_SUPER_ADMIN = 'Los Super Administradores se crean solo con el script del servidor (scripts/crearSuperAdmin.js)';
 
 const MENSAJE_TELEFONO_INVALIDO = 'El número telefónico debe tener 9 dígitos, opcionalmente con prefijo +56';
 
@@ -155,9 +160,12 @@ const REGEX_CORREO_GENERICO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // CU19: Editar datos personales del propio perfil (correo, teléfono y/o dirección)
 // PUT /api/usuarios/perfil  { correo, telefono, direccion: { calle, numero, depto, comuna } }
+// El Super Administrador puede además corregir su nombre y su RUT: { nombre, rut }.
+// Nadie más puede cambiarlos (el RUT es su usuario para iniciar sesión).
 const editarPerfilPropio = async (req, res) => {
   const userId = req.user.id;
   const datos = req.body || {};
+  const esSuperAdmin = req.user.administradorTipo === 'Super Admin';
 
   // CU19 - Excepción "Intento modificación campo protegido": Nombre y RUT son de solo
   // lectura en el formulario; si igual llegan en el body (bypass), se rechaza todo el
@@ -165,11 +173,29 @@ const editarPerfilPropio = async (req, res) => {
   const intentaCampoProtegido = CAMPOS_PROTEGIDOS_PERFIL.some((campo) =>
     Object.prototype.hasOwnProperty.call(datos, campo)
   );
-  if (intentaCampoProtegido) {
+  const cambiaIdentidad = datos.nombre !== undefined || datos.rut !== undefined;
+  if (intentaCampoProtegido || (cambiaIdentidad && !esSuperAdmin)) {
     return res.status(400).json({ mensaje: 'No está permitido modificar el nombre o el RUT desde tu perfil' });
   }
 
   const { correo, telefono, direccion } = datos;
+
+  // Super Administrador: nombre y RUT propios, validados antes de tocar la BD
+  let nombreNuevo;
+  let rutNuevo;
+  if (datos.nombre !== undefined) {
+    if (!validarNombreCompleto(String(datos.nombre ?? ''))) {
+      return res.status(400).json({ mensaje: 'El nombre completo debe contener solo letras y espacios (nombre y apellido, máx. 100 caracteres)' });
+    }
+    nombreNuevo = String(datos.nombre).trim().replace(/\s+/g, ' ');
+  }
+  if (datos.rut !== undefined) {
+    const rutLimpio = String(datos.rut ?? '').replace(/[\s.]/g, '').toLowerCase();
+    if (!validarRut(rutLimpio)) {
+      return res.status(400).json({ mensaje: 'RUT inválido (formato 12345678-9, verifique el dígito verificador)' });
+    }
+    rutNuevo = rutLimpio;
+  }
 
   // CU19 - Excepción "Formato de datos incorrecto": teléfono y dirección, validados antes de tocar la BD
   if (telefono !== undefined && !validarTelefonoChileno(telefono)) {
@@ -191,6 +217,23 @@ const editarPerfilPropio = async (req, res) => {
     const actual = rows[0];
 
     const columnaCorreo = columnaCorreoPrincipal(actual);
+
+    // Se vuelve a comprobar en la BD que sea Super Admin (el token pudo quedar desactualizado)
+    if ((nombreNuevo !== undefined || rutNuevo !== undefined)
+        && !(actual.Es_Administrador && actual.Administrador_Tipo === 'Super Admin')) {
+      return res.status(400).json({ mensaje: 'No está permitido modificar el nombre o el RUT desde tu perfil' });
+    }
+    if (rutNuevo !== undefined && rutNuevo === String(actual.Usuario_RUT).toLowerCase()) rutNuevo = undefined;
+    if (nombreNuevo !== undefined && nombreNuevo === actual.Usuario_Nombre_Completo) nombreNuevo = undefined;
+    if (rutNuevo !== undefined) {
+      const [duplicadoRut] = await db.query(
+        'SELECT Usuario_Id FROM usuario WHERE Usuario_RUT = ? AND Usuario_Id != ?',
+        [rutNuevo, userId]
+      );
+      if (duplicadoRut.length > 0) {
+        return res.status(400).json({ mensaje: 'El RUT ingresado ya pertenece a otra cuenta' });
+      }
+    }
 
     // CU19: el correo nuevo no se guarda todavía: se le envía un código desde
     // noreply@colegiojc.cl y se guarda al confirmarlo (confirmarCorreoPropio).
@@ -220,6 +263,14 @@ const editarPerfilPropio = async (req, res) => {
 
     const campos = [];
     const valores = [];
+    if (nombreNuevo !== undefined) {
+      campos.push('Usuario_Nombre_Completo = ?');
+      valores.push(nombreNuevo);
+    }
+    if (rutNuevo !== undefined) {
+      campos.push('Usuario_RUT = ?');
+      valores.push(rutNuevo);
+    }
     if (telefono !== undefined) {
       campos.push('Usuario_Telefono = ?');
       valores.push(normalizarTelefono(telefono));
@@ -239,6 +290,19 @@ const editarPerfilPropio = async (req, res) => {
     if (campos.length > 0) {
       valores.push(userId);
       await db.query(`UPDATE usuario SET ${campos.join(', ')} WHERE Usuario_Id = ?`, valores);
+      // El cambio de nombre o RUT del Super Admin queda en el historial
+      for (const [atributo, anterior, nuevo] of [
+        ['Usuario_Nombre_Completo', actual.Usuario_Nombre_Completo, nombreNuevo],
+        ['Usuario_RUT', actual.Usuario_RUT, rutNuevo],
+      ]) {
+        if (nuevo === undefined) continue;
+        await registrarHistorial(db, {
+          atributo, anterior, nuevo,
+          descripcion: `Super Administrador corrige su ${atributo === 'Usuario_RUT' ? 'RUT' : 'nombre'} desde su perfil`,
+          responsableId: userId,
+          usuarioId: userId,
+        });
+      }
     }
 
     let verificacionCorreo = null;
@@ -268,6 +332,9 @@ const editarPerfilPropio = async (req, res) => {
     const { Usuario_Contraseña, ...usuario } = actualizado[0];
 
     let mensaje = 'Cambios guardados correctamente';
+    if (rutNuevo !== undefined) {
+      mensaje = `Cambios guardados. Desde ahora inicias sesión con el RUT ${rutNuevo}.`;
+    }
     if (verificacionCorreo?.pendiente) {
       mensaje = `${campos.length > 0 ? 'Cambios guardados. ' : ''}Para cambiar tu correo, ingresa el código que enviamos a ${verificacionCorreo.correoEnmascarado}.`;
     } else if (verificacionCorreo) {
@@ -381,6 +448,10 @@ const createUsuario = async (req, res) => {
   // aleatoria y la envía al correo del usuario desde la cuenta no-reply.
   if (!Usuario_RUT || !Usuario_Telefono || !Usuario_Nombre_Completo) {
     return res.status(400).json({ mensaje: 'Faltan campos obligatorios (RUT, teléfono, nombre)' });
+  }
+
+  if (Administrador_Tipo === 'Super Admin') {
+    return res.status(403).json({ mensaje: MENSAJE_SOLO_SCRIPT_SUPER_ADMIN });
   }
 
   // Validar correo según rol
@@ -553,7 +624,7 @@ const createUsuario = async (req, res) => {
           Docente_Correo_Institucional    || null,
           Es_Administrador ? 1 : 0,
           // La etiqueta UTP no se asigna al registrar: la da el Super Administrador en Gestión de roles
-          Es_Administrador ? (Administrador_Tipo === 'Super Admin' ? 'Super Admin' : 'Administrador Normal') : null,
+          Es_Administrador ? 'Administrador Normal' : null,
           Administrador_Correo_Institucional || null,
           Es_Apoderado    ? 1 : 0,
           ...columnasDireccion(direccionDesdeColumnas(req.body)).map(([, valor]) => valor),
@@ -825,6 +896,10 @@ const updateRoles = async (req, res) => {
 
         // La etiqueta UTP no cambia aquí (se asigna con PUT /:id/etiqueta-utp): se
         // conserva mientras el usuario siga siendo Administrador o Docente.
+        // Nadie se convierte en Super Admin desde la aplicación (solo por script)
+        if (Administrador_Tipo === 'Super Admin' && usuario[0].Administrador_Tipo !== 'Super Admin') {
+            return res.status(403).json({ mensaje: MENSAJE_SOLO_SCRIPT_SUPER_ADMIN });
+        }
         const tipoPedido = usuario[0].Administrador_Tipo === TIPO_UTP
             ? TIPO_UTP
             : (Administrador_Tipo === TIPO_UTP ? null : Administrador_Tipo);
@@ -970,10 +1045,14 @@ const asignarRol = async (req, res) => {
     );
     const carga          = datosFila.Docente_Carga_Horaria_Semanal  || usuario.Docente_Carga_Horaria_Semanal;
     const correoAdmin    = datosFila.Administrador_Correo_Institucional || usuario.Administrador_Correo_Institucional;
-    // Un docente con la etiqueta UTP la conserva al pasar a administrador
-    const tipoAdmin      = ['Super Admin', 'Administrador Normal', TIPO_UTP].includes(datosFila.Administrador_Tipo)
-      ? datosFila.Administrador_Tipo
-      : (usuario.Administrador_Tipo || 'Administrador Normal');
+    // Un docente con la etiqueta UTP la conserva al pasar a administrador. Nunca se
+    // asigna "Super Admin" desde aquí: los Super Administradores se crean por script.
+    if (rol === 'Administrador' && datosFila.Administrador_Tipo === 'Super Admin') {
+      return res.status(403).json({ mensaje: MENSAJE_SOLO_SCRIPT_SUPER_ADMIN });
+    }
+    const tipoAdmin      = usuario.Administrador_Tipo === TIPO_UTP || datosFila.Administrador_Tipo === TIPO_UTP
+      ? TIPO_UTP
+      : 'Administrador Normal';
     const correoApo      = datosFila.Apoderado_Correo_Natural      || usuario.Apoderado_Correo_Natural;
     // Si se envía cualquier parte de la dirección, se toma la dirección enviada completa
     const direccionEnviada = Object.values(CAMPOS_DIRECCION).some((col) => datosFila[col] !== undefined);

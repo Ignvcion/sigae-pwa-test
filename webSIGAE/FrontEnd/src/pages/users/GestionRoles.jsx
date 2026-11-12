@@ -90,25 +90,14 @@ function CamposDocente({ datos, errores, onChange }) {
   );
 }
 
-function CamposAdmin({ datos, errores, onChange, esSuperAdmin }) {
+// El rol se asigna siempre como Administrador Normal (o con la etiqueta UTP si el
+// docente ya la tenía). Los Super Administradores se crean solo por script
+// (BackEnd/scripts/crearSuperAdmin.js), nunca desde la aplicación.
+function CamposAdmin({ datos, errores, onChange }) {
   return (
     <>
-      {esSuperAdmin && (
-        <div className="campo-pwd">
-          <label>Tipo de administrador</label>
-          <select
-            name="Administrador_Tipo"
-            value={datos.Administrador_Tipo || "Administrador Normal"}
-            onChange={onChange}
-          >
-            <option value="Administrador Normal">Administrador Normal</option>
-            <option value="Super Admin">Super Admin</option>
-            {/* Un docente con la etiqueta UTP la conserva al pasar a administrador */}
-            {datos.Administrador_Tipo === "UTP" && (
-              <option value="UTP">Administrador con etiqueta UTP</option>
-            )}
-          </select>
-        </div>
+      {datos.Administrador_Tipo === "UTP" && (
+        <p className="etiquetas-ayuda">El usuario conserva su etiqueta UTP: sus permisos de administrador quedarán limitados a los de la UTP.</p>
       )}
       <div className="campo-pwd">
         <label>Correo institucional</label>
@@ -411,7 +400,7 @@ function GestionRoles() {
       });
     } else if (nuevoRol === "Administrador") {
       setDatosRol({
-        Administrador_Tipo:                 seleccionado.Administrador_Tipo                 || "Administrador Normal",
+        Administrador_Tipo:                 seleccionado.Administrador_Tipo === "UTP" ? "UTP" : "Administrador Normal",
         Administrador_Correo_Institucional: seleccionado.Administrador_Correo_Institucional || "",
       });
     } else if (nuevoRol === "Apoderado") {
@@ -751,7 +740,7 @@ function GestionRoles() {
             <CamposDocente datos={datosRol} errores={errores} onChange={handleDatosChange} />
           )}
           {rolNuevo === "Administrador" && (
-            <CamposAdmin datos={datosRol} errores={errores} onChange={handleDatosChange} esSuperAdmin={esSuperAdmin} />
+            <CamposAdmin datos={datosRol} errores={errores} onChange={handleDatosChange} />
           )}
           {rolNuevo === "Apoderado" && (
             <CamposApoderado datos={datosRol} errores={errores} onChange={handleDatosChange} />
