@@ -50,6 +50,8 @@ const {
   guardarHorarioAtencionDocente,
 } = require('../utils/horarioAtencion');
 const { aHora } = require('../utils/disponibilidadLaboral');
+const { TIPO_UTP, tieneEtiquetaUTP, tipoTrasCambioDeRoles } = require('../utils/permisos');
+const { registrarHistorial, refPersona } = require('../utils/historial');
 
 /** Ejecuta `fn(conn)` en una transacción y devuelve su resultado. */
 async function enTransaccion(fn) {
@@ -174,8 +176,9 @@ const editarPerfilPropio = async (req, res) => {
     return res.status(400).json({ mensaje: 'Datos no cumplen con el formato' });
   }
   if (direccion !== undefined) {
+    // La dirección es opcional: puede quedar vacía; si se ingresa, va completa
     const errorDireccion = typeof direccion === 'object' && direccion !== null
-      ? validarDireccion(direccion)
+      ? validarDireccion(direccion, { opcional: true })
       : 'La dirección debe incluir calle, número y comuna';
     if (errorDireccion) {
       return res.status(400).json({ mensaje: errorDireccion });
@@ -360,7 +363,6 @@ const createUsuario = async (req, res) => {
     Usuario_RUT,
     Usuario_Telefono,
     Usuario_Nombre_Completo,
-    Usuario_Estado_Cuenta,
     // Docente
     Es_Docente,
     Docente_Carga_Horaria_Semanal,
@@ -540,7 +542,9 @@ const createUsuario = async (req, res) => {
           Usuario_RUT,
           normalizarTelefono(Usuario_Telefono),
           Usuario_Nombre_Completo.trim(),
-          Usuario_Estado_Cuenta !== undefined ? Usuario_Estado_Cuenta : 1,
+          // La cuenta se registra inactiva y se activa con el primer inicio de
+          // sesión (utils/primerIngreso.js); el formulario ya no elige el estado.
+          0,
           hash,
           null, // Glosario 6.1.2: la cuenta se crea sin fotografía; se carga luego desde el perfil
           Es_Docente      ? 1 : 0,
@@ -548,7 +552,8 @@ const createUsuario = async (req, res) => {
           especialidades ? especialidades.join(', ') : null,
           Docente_Correo_Institucional    || null,
           Es_Administrador ? 1 : 0,
-          Administrador_Tipo              || null,
+          // La etiqueta UTP no se asigna al registrar: la da el Super Administrador en Gestión de roles
+          Es_Administrador ? (Administrador_Tipo === 'Super Admin' ? 'Super Admin' : 'Administrador Normal') : null,
           Administrador_Correo_Institucional || null,
           Es_Apoderado    ? 1 : 0,
           ...columnasDireccion(direccionDesdeColumnas(req.body)).map(([, valor]) => valor),
@@ -579,7 +584,11 @@ const createUsuario = async (req, res) => {
 
     const [nuevo] = await db.query('SELECT * FROM usuario WHERE Usuario_Id = ?', [nuevoId]);
     const { Usuario_Contraseña: pwd, ...usuarioSinPwd } = nuevo[0];
-    const respuesta = { ...usuarioSinPwd, Contrasena_Enviada_A: enmascararCorreo(correoDestino) };
+    const respuesta = {
+      ...usuarioSinPwd,
+      Contrasena_Enviada_A: enmascararCorreo(correoDestino),
+      Aviso_Estado: 'La cuenta figura como inactiva hasta el primer inicio de sesión del usuario.',
+    };
     res.status(201).json(guardadoDisponibilidad
       ? { ...respuesta, Disponibilidad_Laboral: guardadoDisponibilidad }
       : respuesta);
@@ -707,12 +716,15 @@ const updateUsuario = async (req, res) => {
       }
       otrosDatos.Usuario_Telefono = normalizarTelefono(otrosDatos.Usuario_Telefono);
     }
-    const errorDireccion = validarDireccion(direccionDesdeColumnas(otrosDatos), { parcial: true });
+    const errorDireccion = validarDireccion(direccionDesdeColumnas(otrosDatos), { parcial: true, opcional: true });
     if (errorDireccion) {
       return res.status(400).json({ mensaje: errorDireccion });
     }
-    if (otrosDatos.Usuario_Direccion_Depto !== undefined && String(otrosDatos.Usuario_Direccion_Depto ?? '').trim() === '') {
-      otrosDatos.Usuario_Direccion_Depto = null;
+    // La dirección es opcional: los campos que llegan vacíos se guardan como NULL
+    for (const columna of Object.values(CAMPOS_DIRECCION)) {
+      if (otrosDatos[columna] !== undefined && String(otrosDatos[columna] ?? '').trim() === '') {
+        otrosDatos[columna] = null;
+      }
     }
 
     // Una contraseña nueva cumple las mismas reglas que al crear el usuario (8+ caracteres,
@@ -797,7 +809,7 @@ const updateRoles = async (req, res) => {
     try {
 
         const [usuario] = await db.query(
-            `SELECT Usuario_Id
+            `SELECT Usuario_Id, Administrador_Tipo
              FROM usuario
              WHERE Usuario_Id = ?`,
             [id]
@@ -810,6 +822,15 @@ const updateRoles = async (req, res) => {
             });
 
         }
+
+        // La etiqueta UTP no cambia aquí (se asigna con PUT /:id/etiqueta-utp): se
+        // conserva mientras el usuario siga siendo Administrador o Docente.
+        const tipoPedido = usuario[0].Administrador_Tipo === TIPO_UTP
+            ? TIPO_UTP
+            : (Administrador_Tipo === TIPO_UTP ? null : Administrador_Tipo);
+        const tipoFinal = tipoTrasCambioDeRoles({
+            Es_Administrador, Es_Docente, Administrador_Tipo: tipoPedido,
+        });
 
         // Un docente sin color recibe uno aleatorio
         const colorDocente = Es_Docente ? await colorAleatorioDocente(db) : null;
@@ -826,7 +847,7 @@ const updateRoles = async (req, res) => {
                 Es_Administrador,
                 Es_Docente,
                 Es_Apoderado,
-                Administrador_Tipo || null,
+                tipoFinal,
                 colorDocente,
                 id
             ]
@@ -949,7 +970,10 @@ const asignarRol = async (req, res) => {
     );
     const carga          = datosFila.Docente_Carga_Horaria_Semanal  || usuario.Docente_Carga_Horaria_Semanal;
     const correoAdmin    = datosFila.Administrador_Correo_Institucional || usuario.Administrador_Correo_Institucional;
-    const tipoAdmin      = datosFila.Administrador_Tipo            || usuario.Administrador_Tipo || 'Administrador Normal';
+    // Un docente con la etiqueta UTP la conserva al pasar a administrador
+    const tipoAdmin      = ['Super Admin', 'Administrador Normal', TIPO_UTP].includes(datosFila.Administrador_Tipo)
+      ? datosFila.Administrador_Tipo
+      : (usuario.Administrador_Tipo || 'Administrador Normal');
     const correoApo      = datosFila.Apoderado_Correo_Natural      || usuario.Apoderado_Correo_Natural;
     // Si se envía cualquier parte de la dirección, se toma la dirección enviada completa
     const direccionEnviada = Object.values(CAMPOS_DIRECCION).some((col) => datosFila[col] !== undefined);
@@ -991,7 +1015,8 @@ const asignarRol = async (req, res) => {
         return res.status(400).json({ mensaje: 'El correo del apoderado es obligatorio' });
       if (!validarCorreo(correoApo))
         return res.status(400).json({ mensaje: 'El correo del apoderado debe tener el formato usuario@dominio' });
-      const errorDireccion = validarDireccion(direccionApo);
+      // La dirección del apoderado es opcional; si se ingresa, va completa
+      const errorDireccion = validarDireccion(direccionApo, { opcional: true });
       if (errorDireccion)
         return res.status(400).json({ mensaje: errorDireccion });
       const [dup] = await db.query(
@@ -1059,6 +1084,90 @@ const asignarRol = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ mensaje: 'Error al asignar el rol' });
+  }
+};
+
+// Etiqueta UTP (utils/permisos.js): el Super Administrador la asigna o la retira a
+// un Administrador o a un Docente desde Gestión de roles.
+// PUT /api/usuarios/:id/etiqueta-utp   Body: { utp: true | false }
+// Las sesiones abiertas del usuario se cierran para que los nuevos permisos se
+// apliquen en su próximo inicio de sesión.
+const cambiarEtiquetaUTP = async (req, res) => {
+  const { id } = req.params;
+  const { utp } = req.body || {};
+  if (typeof utp !== 'boolean') {
+    return res.status(400).json({ mensaje: 'Indica si se asigna (true) o se retira (false) la etiqueta UTP' });
+  }
+  if (Number(id) === Number(req.user.id)) {
+    return res.status(403).json({ mensaje: 'No puedes cambiar tu propia etiqueta UTP' });
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.query(
+      `SELECT Usuario_Id, Usuario_RUT, Usuario_Nombre_Completo, Es_Administrador, Administrador_Tipo, Es_Docente
+         FROM usuario WHERE Usuario_Id = ? FOR UPDATE`,
+      [id]
+    );
+    if (rows.length === 0) {
+      await conn.rollback();
+      return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+    }
+    const usuario = rows[0];
+
+    if (usuario.Es_Administrador && usuario.Administrador_Tipo === 'Super Admin') {
+      await conn.rollback();
+      return res.status(400).json({ mensaje: 'Un Super Administrador no puede tener la etiqueta UTP' });
+    }
+    if (!usuario.Es_Administrador && !usuario.Es_Docente) {
+      await conn.rollback();
+      return res.status(400).json({ mensaje: 'La etiqueta UTP solo se asigna a un Administrador o a un Docente' });
+    }
+    const tiene = tieneEtiquetaUTP(usuario);
+    if (utp === tiene) {
+      await conn.rollback();
+      return res.status(409).json({
+        mensaje: utp ? 'El usuario ya tiene la etiqueta UTP' : 'El usuario no tiene la etiqueta UTP',
+      });
+    }
+
+    // Sin UTP: un administrador vuelve a ser Administrador Normal; un docente, sin tipo
+    const nuevoTipo = utp ? TIPO_UTP : (usuario.Es_Administrador ? 'Administrador Normal' : null);
+    await conn.query('UPDATE usuario SET Administrador_Tipo = ? WHERE Usuario_Id = ?', [nuevoTipo, id]);
+    await conn.query(
+      `UPDATE sesion SET Sesion_Estado = 0, Sesion_Fecha_Expiracion = NOW()
+        WHERE Usuario_Id = ? AND Sesion_Estado = 1`,
+      [id]
+    );
+    const rol = usuario.Es_Administrador ? 'Administrador' : 'Docente';
+    await registrarHistorial(conn, {
+      atributo: 'Etiqueta UTP',
+      anterior: tiene ? 'UTP' : null,
+      nuevo: utp ? 'UTP' : null,
+      descripcion: `Etiqueta UTP ${utp ? 'asignada a' : 'retirada de'} ${refPersona(usuario)} (${rol})`,
+      responsableId: req.user.id,
+      usuarioId: Number(id),
+    });
+    await conn.commit();
+
+    const efecto = utp
+      ? (usuario.Es_Administrador
+        ? 'Sus permisos quedan limitados a los de la UTP.'
+        : 'Conserva sus permisos de docente y suma los de la UTP.')
+      : (usuario.Es_Administrador
+        ? 'Recupera los permisos completos de administrador.'
+        : 'Conserva solo sus permisos de docente.');
+    return res.json({
+      mensaje: `Etiqueta UTP ${utp ? 'asignada' : 'retirada'}. ${efecto} Los cambios se aplican en su próximo inicio de sesión.`,
+      usuario: { Usuario_Id: Number(id), Administrador_Tipo: nuevoTipo, Etiqueta_UTP: utp },
+    });
+  } catch (error) {
+    await conn.rollback().catch(() => {});
+    console.error(error);
+    return res.status(500).json({ mensaje: 'No fue posible cambiar la etiqueta UTP, reintente más tarde' });
+  } finally {
+    conn.release();
   }
 };
 
@@ -1154,7 +1263,8 @@ const getDocentes = async (req, res) => {
         Usuario_Estado_Cuenta,
         Es_Docente,
         Es_Apoderado,
-        Es_Administrador
+        Es_Administrador,
+        Administrador_Tipo
       FROM usuario
       WHERE Es_Docente = 1
     `;
@@ -1489,6 +1599,7 @@ module.exports = {
   deleteUsuario,
   updateRoles,
   toggleEstado,
+  cambiarEtiquetaUTP, // Etiqueta UTP (Gestión de roles)
   getAdministradores, // CU2
   editarAdministrador, // CU3
   asignarRol,

@@ -11,6 +11,7 @@ const { codigoLimiter } = require('../middleware/rateLimiter');
 const {
   verifyToken,
   verifyAdmin,
+  verifyGestionAcademica,
   verifySuperAdmin,
   verifyPuedeCrearRol,
 } = require('../middleware/authMiddleware');
@@ -51,7 +52,8 @@ router.get('/', verifyToken, verifyAdmin, usuarioController.getUsuarios);
 router.get('/filtrar', verifyToken, verifyAdmin, usuarioController.getUsuariosPorFiltro);
 
 // CU30 y CU31: Listado y filtros de docentes — Super Admin/Admin
-router.get('/docentes', verifyToken, verifyAdmin, usuarioController.getDocentes);
+// Listado de docentes: también la etiqueta UTP (horario maestro y horarios por docente)
+router.get('/docentes', verifyToken, verifyGestionAcademica, usuarioController.getDocentes);
 
 // CU32 y CU33: Listado y filtros de apoderados — Super Admin/Admin
 router.get('/apoderados', verifyToken, verifyAdmin, usuarioController.getApoderados);
@@ -76,5 +78,7 @@ router.post('/:id/asignar-rol', verifyToken, verifyAdmin, usuarioController.asig
 
 // Solo SuperAdmin puede cambiar/revocar roles libremente
 router.put('/:id/roles', verifyToken, verifySuperAdmin, usuarioController.updateRoles);
+// Etiqueta UTP: la asigna o retira el Super Administrador (Gestión de roles)
+router.put('/:id/etiqueta-utp', verifyToken, verifySuperAdmin, usuarioController.cambiarEtiquetaUTP);
 
 module.exports = router;

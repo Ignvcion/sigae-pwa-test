@@ -6,6 +6,7 @@
 //   el cierre puede tener 2 en el vigente y 2 en el siguiente.
 // - Lo usan la designación manual (CU95/CU96) y la herencia al promover (RF61).
 const { registrarHistorial, refPersona } = require('./historial');
+const { columnaEsperaPrimerIngreso } = require('./primerIngreso');
 const { claseVigente } = require('./clasesEliminadas');
 
 const MAX_JEFATURAS = 2;
@@ -24,10 +25,11 @@ async function jefaturasDelDocente(conn, docenteId, periodo, { excluirCursoId = 
   return Array.isArray(filas) ? filas : [];
 }
 
-/** Docente apto para la jefatura: existe, tiene rol docente y la cuenta activa. */
+/** Docente para la jefatura (con Espera_Primer_Ingreso: ver utils/primerIngreso.js). */
 async function obtenerDocente(conn, docenteId, { bloquear = false } = {}) {
   const [filas] = await conn.query(
-    `SELECT Usuario_Id, Usuario_RUT, Usuario_Nombre_Completo, Es_Docente, Usuario_Estado_Cuenta
+    `SELECT Usuario_Id, Usuario_RUT, Usuario_Nombre_Completo, Es_Docente, Usuario_Estado_Cuenta,
+            ${columnaEsperaPrimerIngreso('usuario')}
        FROM usuario WHERE Usuario_Id = ?${bloquear ? ' FOR UPDATE' : ''}`,
     [docenteId]
   );

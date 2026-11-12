@@ -3,6 +3,7 @@
 // CU 62 — Exportando horario por curso
 
 const pool = require('../config/db');
+const { puedeGestionAcademica } = require('../utils/permisos');
 const { enPeriodoVigente, PERIODO_VIGENTE_SQL } = require('../utils/periodos');
 const { cursoConElectivosSQL } = require('../utils/electivos');
 const PDFDocument = require('pdfkit');
@@ -364,7 +365,7 @@ const exportarPorDocente = async (req, res) => {
   const { usuarioId } = req.params;
   const formato = (req.query.formato || 'pdf').toLowerCase();
   const { roles, id: solicitanteId } = req.user;
-  const esAdmin = roles.includes('Administrador');
+  const esAdmin = puedeGestionAcademica(req.user); // administración o etiqueta UTP
   const esDocente = roles.includes('Docente') && !esAdmin;
 
   if (!esAdmin && !(esDocente && Number(usuarioId) === solicitanteId)) {

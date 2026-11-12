@@ -4,6 +4,8 @@
 // hasta MAX_SUPLENTES suplentes (tabla apoderado_suplente). Ambos son "apoderados
 // asociados" para efectos de acceso a la información del estudiante (RNF04).
 
+const { cuentaUtilizable } = require('./primerIngreso');
+
 const MAX_SUPLENTES = 4;
 
 /**
@@ -72,8 +74,10 @@ async function obtenerApoderadosEstudiante(conn, estudianteId) {
 // Un apoderado que quedó sin estudiantes queda inactivo y marcado con el período
 // (usuario.Apoderado_Sin_Asociaciones_Desde, al iniciar un nuevo período). Una nueva
 // asociación lo reactiva. Una cuenta desactivada a mano (sin marca) no se reactiva.
+// Una cuenta recién registrada (inactiva hasta su primer ingreso, columna
+// Espera_Primer_Ingreso de utils/primerIngreso.js) también puede asociarse.
 const inactivoPorFaltaDeAsociacion = (u) => Boolean(u && !u.Usuario_Estado_Cuenta && u.Apoderado_Sin_Asociaciones_Desde);
-const puedeAsociarse = (u) => Boolean(u && (u.Usuario_Estado_Cuenta || inactivoPorFaltaDeAsociacion(u)));
+const puedeAsociarse = (u) => Boolean(u && (cuentaUtilizable(u) || inactivoPorFaltaDeAsociacion(u)));
 
 /** Reactiva (dentro de la transacción) a los apoderados marcados por falta de asociaciones. */
 async function reactivarApoderados(conn, usuarios) {

@@ -2,6 +2,7 @@
 // RF61: situación final de los estudiantes (CU98, CU99) y promoción curso a curso
 // o caso por caso (CU100 corregido). Reglas: docs/decisiones-rf60-rf61-periodos.txt.
 const ExcelJS = require('exceljs');
+const { cuentaUtilizable } = require('../utils/primerIngreso');
 const pool = require('../config/db');
 const { obtenerPeriodos } = require('../utils/periodos');
 const { registrarHistorial } = require('../utils/historial');
@@ -549,7 +550,7 @@ const promoverCurso = async (req, res) => {
     const destinoPromovidos = destinos.get('siguiente');
     if (destinoPromovidos && !destinoPromovidos.Curso_Profesor_Jefe_Usuario_Id && curso.Curso_Profesor_Jefe_Usuario_Id) {
       const jefe = await obtenerDocente(conn, curso.Curso_Profesor_Jefe_Usuario_Id);
-      if (jefe && jefe.Es_Docente && jefe.Usuario_Estado_Cuenta) {
+      if (jefe && jefe.Es_Docente && cuentaUtilizable(jefe)) {
         const r = await asignarJefatura(conn, {
           curso: destinoPromovidos, docente: jefe, responsableId: req.user.id,
           descripcion: `RF61: profesor jefe heredado de ${nombreCurso(curso)}`,
