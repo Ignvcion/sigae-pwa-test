@@ -102,9 +102,24 @@ Se agregan:
 
 ### 1.4 Probarlo una vez
 
+En el servidor el backend está en **`/opt/sigae/web-dev-SIGAE/webSIGAE/BackEnd`**. Su
+`.env` tiene permisos `600` y es del usuario que corre pm2 (no de `admin`), así que el
+script **debe correr como ese usuario**; si no, no puede leer el `.env` y falla al
+conectarse a la base. Para saber cuál es:
+
 ```bash
-cd /ruta/webSIGAE/BackEnd && node scripts/enviarRespaldo.js
+stat -c %U /opt/sigae/web-dev-SIGAE/webSIGAE/BackEnd/.env
 ```
+
+Con ese nombre (abajo, `<usuario-pm2>`):
+
+```bash
+cd /opt/sigae/web-dev-SIGAE/webSIGAE/BackEnd && sudo -u <usuario-pm2> /usr/bin/node scripts/enviarRespaldo.js
+```
+
+Si `scripts/enviarRespaldo.js` no existe, el servidor aún no tiene esta versión:
+primero `git pull` (y `npm ci`) como indica *Actualizaciones* en
+`docs/despliegue-produccion.txt`.
 
 Debe terminar con `Enviado a respaldosigae@colegiojc.cl` y el correo debe llegar a la
 cuenta de respaldos. Por defecto **no deja copia en el servidor** (tiene datos
@@ -129,7 +144,7 @@ Description=Respaldo diario de SIGAE por correo
 [Service]
 Type=oneshot
 User=<usuario-pm2>
-WorkingDirectory=/ruta/webSIGAE/BackEnd
+WorkingDirectory=/opt/sigae/web-dev-SIGAE/webSIGAE/BackEnd
 ExecStart=/usr/bin/node scripts/enviarRespaldo.js
 ```
 
@@ -153,11 +168,12 @@ systemctl list-timers sigae-respaldo.timer     # próxima ejecución
 journalctl -u sigae-respaldo.service           # registro de cada ejecución
 ```
 
-**Opción B — cron del usuario de pm2** (`crontab -e`). La EC2 está en UTC, así que
-06:17 UTC son las 03:17 en verano de Chile (04:17 en invierno; da igual a esa hora):
+**Opción B — cron del usuario de pm2** (`sudo crontab -u <usuario-pm2> -e`). La EC2
+está en UTC, así que 06:17 UTC son las 03:17 en verano de Chile (04:17 en invierno;
+da igual a esa hora). El registro va al home de ese usuario, donde sí puede escribir:
 
 ```cron
-17 6 * * * cd /ruta/webSIGAE/BackEnd && /usr/bin/node scripts/enviarRespaldo.js >> /var/log/sigae-respaldo.log 2>&1
+17 6 * * * cd /opt/sigae/web-dev-SIGAE/webSIGAE/BackEnd && /usr/bin/node scripts/enviarRespaldo.js >> $HOME/sigae-respaldo.log 2>&1
 ```
 
 ---

@@ -10,8 +10,8 @@
 //   node scripts/enviarRespaldo.js --conservar  además deja el archivo en RESPALDO_DIR
 //   node scripts/enviarRespaldo.js --sin-correo solo genera el archivo (prueba)
 //
-// Programado (cron del usuario de pm2, todos los días a las 03:17):
-//   17 3 * * * cd /ruta/webSIGAE/BackEnd && /usr/bin/node scripts/enviarRespaldo.js >> /var/log/sigae-respaldo.log 2>&1
+// En el servidor: /opt/sigae/web-dev-SIGAE/webSIGAE/BackEnd, como el usuario de pm2
+// (dueño del .env). Programado con un timer de systemd o cron: ver la guía.
 //
 // Variables del .env: DB_HOST, DB_PORT, DB_NAME, DB_SSL y las de SMTP (utils/mailer.js).
 // Opcionales: RESPALDO_DB_USER / RESPALDO_DB_PASSWORD (usuario de solo lectura;
