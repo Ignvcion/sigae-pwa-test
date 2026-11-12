@@ -2,8 +2,9 @@
 // Envío de correos por SMTP desde la cuenta no-reply del colegio
 // (noreply@colegiojc.cl): códigos de verificación para recuperar la contraseña
 // (CU14), confirmar un cambio de correo (CU19) y activar la cuenta en el primer
-// ingreso (ver utils/codigosVerificacion.js), y la contraseña inicial que SIGAE
-// genera al registrar a un usuario (ver utils/contrasenaInicial.js).
+// ingreso (ver utils/codigosVerificacion.js), la contraseña inicial que SIGAE
+// genera al registrar a un usuario (ver utils/contrasenaInicial.js) y los
+// respaldos que se envían a la cuenta de respaldos (ver utils/respaldo.js).
 //
 // Variables del .env:
 //   SMTP_HOST, SMTP_PORT (587 por defecto), SMTP_SECURE (true solo para el
@@ -48,6 +49,16 @@ function escaparHTML(texto) {
     .replace(/'/g, '&#39;');
 }
 
+// Pie de todos los correos automáticos: avisa que no se responda y que la
+// cuenta remitente (noreply@colegiojc.cl) no la revisa nadie.
+const PIE_AUTOMATICO = [
+  'Este correo fue enviado automáticamente por SIGAE. No respondas a este mensaje.',
+  'Nadie revisa esta cuenta.',
+];
+const pieTexto = () => PIE_AUTOMATICO.join('\n');
+const pieHTML = () => '<p style="color:#64748b;font-size:12px">'
+  + PIE_AUTOMATICO.map(escaparHTML).join('<br>') + '</p>';
+
 // Textos de cada tipo de código (la clave es el propósito guardado en
 // codigo_verificacion.Codigo_Verificacion_Proposito).
 const PLANTILLAS = {
@@ -79,7 +90,6 @@ async function enviarCodigoVerificacion({ para, nombre, codigo, minutos, proposi
   const plantilla = PLANTILLAS[proposito];
   if (!plantilla) throw new Error(`Propósito de código desconocido: ${proposito}`);
   const saludo = nombre ? `Hola ${nombre},` : 'Hola,';
-  const pie = 'Este correo fue enviado automáticamente por SIGAE. No respondas a este mensaje.';
 
   await obtenerTransporter().sendMail({
     from: process.env.EMAIL_FROM,
@@ -91,7 +101,7 @@ async function enviarCodigoVerificacion({ para, nombre, codigo, minutos, proposi
       + `Tu código de verificación es: ${codigo}\n\n`
       + `${plantilla.uso} Vence en ${minutos} minutos y sirve una sola vez.\n`
       + 'Nadie del colegio te pedirá este código: no lo compartas.\n\n'
-      + `${plantilla.siNoFuiste}\n\n${pie}\n`,
+      + `${plantilla.siNoFuiste}\n\n${pieTexto()}\n`,
     html: `<p>${escaparHTML(saludo)}</p>`
       + `<p>${escaparHTML(plantilla.motivo)}</p>`
       + '<p>Tu código de verificación es:</p>'
@@ -99,7 +109,7 @@ async function enviarCodigoVerificacion({ para, nombre, codigo, minutos, proposi
       + `<p>${escaparHTML(plantilla.uso)} Vence en ${Number(minutos)} minutos y sirve una sola vez.</p>`
       + '<p>Nadie del colegio te pedirá este código: no lo compartas.</p>'
       + `<p>${escaparHTML(plantilla.siNoFuiste)}</p>`
-      + `<p style="color:#64748b;font-size:12px">${escaparHTML(pie)}</p>`,
+      + pieHTML(),
   });
 }
 
@@ -113,7 +123,6 @@ async function enviarContrasenaInicial({ para, nombre, rut, contrasena }) {
   const uso = 'Inicia sesión con tu RUT y esta contraseña. En tu primer ingreso te enviaremos '
     + 'un código a este correo para activar la cuenta. Te recomendamos cambiar la contraseña '
     + 'desde "Mi Perfil" o con "¿Olvidaste tu contraseña?".';
-  const pie = 'Este correo fue enviado automáticamente por SIGAE. No respondas a este mensaje.';
 
   await obtenerTransporter().sendMail({
     from: process.env.EMAIL_FROM,
@@ -124,7 +133,7 @@ async function enviarContrasenaInicial({ para, nombre, rut, contrasena }) {
       + `RUT: ${rut}\nContraseña: ${contrasena}\n\n`
       + `${uso}\n`
       + 'Nadie del colegio te pedirá tu contraseña: no la compartas.\n\n'
-      + `${pie}\n`,
+      + `${pieTexto()}\n`,
     html: `<p>${escaparHTML(saludo)}</p>`
       + `<p>${escaparHTML(motivo)}</p>`
       + `<p>RUT: <strong>${escaparHTML(rut)}</strong></p>`
@@ -132,8 +141,33 @@ async function enviarContrasenaInicial({ para, nombre, rut, contrasena }) {
       + `<p style="font-size:22px;font-weight:bold;letter-spacing:2px;font-family:monospace">${escaparHTML(contrasena)}</p>`
       + `<p>${escaparHTML(uso)}</p>`
       + '<p>Nadie del colegio te pedirá tu contraseña: no la compartas.</p>'
-      + `<p style="color:#64748b;font-size:12px">${escaparHTML(pie)}</p>`,
+      + pieHTML(),
   });
 }
 
-module.exports = { correoConfigurado, enviarCodigoVerificacion, enviarContrasenaInicial, PLANTILLAS };
+/**
+ * Envía un respaldo a la cuenta de respaldos del colegio (config/institucion.js),
+ * con el archivo adjunto y el detalle en el cuerpo. `adjuntos`: [{ filename, path |
+ * content, contentType }]. Lanza el error de SMTP si el envío falla.
+ */
+async function enviarRespaldo({ para, asunto, texto, html, adjuntos = [] }) {
+  await obtenerTransporter().sendMail({
+    from: process.env.EMAIL_FROM,
+    to: para,
+    subject: asunto,
+    headers: { 'Auto-Submitted': 'auto-generated', 'X-Auto-Response-Suppress': 'All' },
+    text: `${texto}\n\n${pieTexto()}\n`,
+    html: `${html}${pieHTML()}`,
+    attachments: adjuntos,
+  });
+}
+
+module.exports = {
+  correoConfigurado,
+  enviarCodigoVerificacion,
+  enviarContrasenaInicial,
+  enviarRespaldo,
+  escaparHTML,
+  PIE_AUTOMATICO,
+  PLANTILLAS,
+};
