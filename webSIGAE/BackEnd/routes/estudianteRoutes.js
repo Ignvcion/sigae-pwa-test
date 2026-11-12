@@ -3,7 +3,7 @@ const router  = express.Router();
 
 const estudianteController = require('../controllers/estudianteController');
 const apoderadosEstudianteController = require('../controllers/apoderadosEstudianteController');
-const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
+const { verifyToken, verifyAdmin, verifyGestionAcademica } = require('../middleware/authMiddleware');
 
 router.get('/',               verifyToken,             estudianteController.getEstudiantes);
 // CU36: búsqueda por nombre completo o RUT — debe estar ANTES de /:id
@@ -26,7 +26,8 @@ router.put('/:estudianteId/apoderado', verifyToken, verifyAdmin, estudianteContr
 // CU90 (RF57): apoderado titular y hasta 4 suplentes del estudiante
 router.get('/:estudianteId/apoderados', verifyToken, verifyAdmin, apoderadosEstudianteController.getApoderadosEstudiante);
 router.put('/:estudianteId/apoderados', verifyToken, verifyAdmin, apoderadosEstudianteController.designarApoderados);
-router.put('/:id', verifyToken, verifyAdmin, estudianteController.updateEstudiante);
+// CU38: la etiqueta UTP también asigna estudiantes a cursos (solo curso, estado y ruta)
+router.put('/:id', verifyToken, verifyGestionAcademica, estudianteController.updateEstudiante);
 router.delete('/:id', verifyToken, verifyAdmin, estudianteController.deleteEstudiante);
 
 module.exports = router;

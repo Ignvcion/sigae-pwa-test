@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { puedeGestionAcademica } from "../../utils/permisos";
 import SelectorColor, { PuntoColor } from "../../components/SelectorColor";
 import { colorAleatorio, nombreColor } from "../../utils/colores";
 import { fijarColor } from "../../hooks/useColores";
@@ -118,7 +119,7 @@ function FormAsignatura({ inicial, onGuardar, onCancelar, guardando, error, usad
 }
 
 function Asignaturas() {
-  const { usuario } = useAuth();
+  const { usuario, rolActivo } = useAuth();
   const token = localStorage.getItem("token");
 
   const [asignaturas, setAsignaturas] = useState([]);
@@ -132,7 +133,7 @@ function Asignaturas() {
   const [busqueda, setBusqueda]       = useState("");
 
   const esSuperAdmin = usuario?.administradorTipo === "Super Admin";
-  const esAdmin = esSuperAdmin || usuario?.roles?.includes("Administrador");
+  const esAdmin = esSuperAdmin || puedeGestionAcademica(usuario, rolActivo); // también la etiqueta UTP
 
   // Pide las asignaturas y actualiza el estado solo al llegar la respuesta (en callbacks),
   // así puede llamarse desde el efecto de montaje. `cargando` parte en true; recargar()

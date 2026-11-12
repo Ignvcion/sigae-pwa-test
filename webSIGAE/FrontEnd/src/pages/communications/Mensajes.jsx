@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
 import {
@@ -442,6 +443,17 @@ function Mensajes() {
   useEffect(() => {
     cargarConversaciones();
   }, [cargarConversaciones]);
+
+  // CU101: ?conversacion=ID (desde una notificación) abre esa conversación
+  const [searchParams, setSearchParams] = useSearchParams();
+  const conversacionPedida = Number(searchParams.get('conversacion')) || null;
+  useEffect(() => {
+    if (!conversacionPedida || conversaciones.length === 0) return;
+    const pedida = conversaciones.find((c) => c.Conversacion_Id === conversacionPedida);
+    setSearchParams({}, { replace: true });
+    if (pedida) seleccionarConversacion(pedida);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al llegar la conversación pedida
+  }, [conversacionPedida, conversaciones]);
 
   useEffect(() => {
     if (rol !== 'Docente') return;

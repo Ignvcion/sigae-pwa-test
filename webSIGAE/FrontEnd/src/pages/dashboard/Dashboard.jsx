@@ -5,6 +5,7 @@ import { apiFetch, getAsignacionesDocente, getCitaciones, getConversaciones } fr
 import EstadoCitacionBadge from "../../components/citaciones/EstadoCitacionBadge";
 import { MOSTRAR_MIS_CURSOS } from "../../config/funcionalidades";
 import { esCancelada, fechaISO, formatearFecha, hoyISO } from "../../utils/citaciones";
+import { enlacesUTP, esAdministradorUTP, tieneUTPActiva } from "../../utils/permisos";
 
 /* ── Grupo de navegación ───────────────────────────── */
 function NavGroup({ titulo, icono, color, links }) {
@@ -383,6 +384,34 @@ function DashboardApoderado({ nombre }) {
   );
 }
 
+/* ── Funciones de la etiqueta UTP ──────────────────── */
+// Administrador con UTP: solo estas funciones. Docente con UTP: se suman a su dashboard.
+function ModuloUTP({ usuario, rolActivo }) {
+  return (
+    <div className="nav-sections">
+      <h2>Funciones de la UTP</h2>
+      <div className="nav-sections-grid">
+        <NavGroup
+          titulo="Gestión curricular y horarios"
+          icono="🧭"
+          color="#7c3aed"
+          links={enlacesUTP(usuario, rolActivo)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DashboardUTP({ usuario, rolActivo }) {
+  return (
+    <div className="dashboard-container">
+      <h1>Dashboard SIGAE</h1>
+      <p>Bienvenido al Sistema de Gestión Académica Escolar — Administrador · UTP</p>
+      <ModuloUTP usuario={usuario} rolActivo={rolActivo} />
+    </div>
+  );
+}
+
 /* ── Componente principal ──────────────────────────── */
 function Dashboard() {
   const { usuario, rolActivo } = useAuth();
@@ -397,6 +426,17 @@ function Dashboard() {
   const esApoderado = rolEfectivo === "Apoderado";
 
   if (esAdmin)     return <DashboardAdmin esSuperAdmin={esSuperAdmin} />;
+  if (esAdministradorUTP(usuario, rolActivo)) return <DashboardUTP usuario={usuario} rolActivo={rolActivo} />;
+  if (esDocente && tieneUTPActiva(usuario, rolActivo)) {
+    return (
+      <>
+        <DashboardDocente nombre={usuario?.nombre} docenteId={usuario?.id} />
+        <div className="dashboard-container">
+          <ModuloUTP usuario={usuario} rolActivo={rolActivo} />
+        </div>
+      </>
+    );
+  }
   if (esDocente)   return <DashboardDocente nombre={usuario?.nombre} docenteId={usuario?.id} />;
   if (esApoderado) return <DashboardApoderado nombre={usuario?.nombre} />;
 

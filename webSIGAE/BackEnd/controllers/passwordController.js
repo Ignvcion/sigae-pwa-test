@@ -3,6 +3,8 @@
 // Flujo: check-recovery-emails (RUT → correos enmascarados) → forgot-password
 // (envía el código al correo elegido) → reset-password (RUT + código + nueva
 // contraseña). Reglas del código en utils/codigosVerificacion.js.
+// Una cuenta recién registrada (inactiva hasta su primer ingreso) también puede
+// recuperar su contraseña: ver utils/primerIngreso.js.
 const bcrypt = require('bcrypt');
 const pool = require('../config/db');
 const { validarFortalezaContrasena } = require('../middleware/validation');
@@ -14,6 +16,7 @@ const {
   verificarCodigo,
   responderErrorCodigo,
 } = require('../utils/codigosVerificacion');
+const { columnaEsperaPrimerIngreso, cuentaUtilizable } = require('../utils/primerIngreso');
 
 const MSG_GENERICO = 'Si los datos son correctos, recibirás un código de verificación en tu correo.';
 
@@ -32,13 +35,14 @@ const checkRecoveryEmails = async (req, res) => {
       `SELECT Usuario_Id, Usuario_Estado_Cuenta,
               Administrador_Correo_Institucional,
               Docente_Correo_Institucional,
-              Apoderado_Correo_Natural
+              Apoderado_Correo_Natural,
+              ${columnaEsperaPrimerIngreso('usuario')}
        FROM usuario WHERE Usuario_RUT = ?`,
       [rut]
     );
 
     // Respuesta genérica para no revelar existencia de RUT
-    if (rows.length === 0 || !rows[0].Usuario_Estado_Cuenta) {
+    if (rows.length === 0 || !cuentaUtilizable(rows[0])) {
       return res.json({ correos: [] });
     }
 
@@ -78,13 +82,14 @@ const forgotPassword = async (req, res) => {
       `SELECT Usuario_Id, Usuario_Nombre_Completo, Usuario_Estado_Cuenta,
               Administrador_Correo_Institucional,
               Docente_Correo_Institucional,
-              Apoderado_Correo_Natural
+              Apoderado_Correo_Natural,
+              ${columnaEsperaPrimerIngreso('usuario')}
        FROM usuario WHERE Usuario_RUT = ?`,
       [rut]
     );
 
     // Respuesta genérica para no revelar si el RUT existe
-    if (rows.length === 0 || !rows[0].Usuario_Estado_Cuenta) {
+    if (rows.length === 0 || !cuentaUtilizable(rows[0])) {
       return res.json({ message: MSG_GENERICO, minutos: MINUTOS_VALIDEZ });
     }
 
@@ -153,10 +158,11 @@ const resetPassword = async (req, res) => {
 
   try {
     const [rows] = await pool.execute(
-      'SELECT Usuario_Id, Usuario_Estado_Cuenta FROM usuario WHERE Usuario_RUT = ?',
+      `SELECT Usuario_Id, Usuario_Estado_Cuenta, ${columnaEsperaPrimerIngreso('usuario')}
+         FROM usuario WHERE Usuario_RUT = ?`,
       [rut]
     );
-    if (rows.length === 0 || !rows[0].Usuario_Estado_Cuenta) {
+    if (rows.length === 0 || !cuentaUtilizable(rows[0])) {
       // Mismo mensaje que un código sin emitir: no revela si el RUT existe
       return res.status(400).json({ error: 'No hay un código vigente. Pide uno nuevo.' });
     }

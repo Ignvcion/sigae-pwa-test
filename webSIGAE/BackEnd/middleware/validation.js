@@ -75,8 +75,8 @@ function validarFortalezaContrasena(pwd) {
 }
 
 // Dirección particular: calle, número y comuna obligatorios; depto/casa opcional.
-// Aplica a todo usuario (Super Admin, Administrador, Docente y Apoderado) y a la
-// ficha del estudiante, cada uno con sus propias columnas.
+// Para los usuarios (Super Admin, Administrador, Docente y Apoderado) la dirección
+// completa es opcional ({ opcional: true }); en la ficha del estudiante es obligatoria.
 // Con { parcial: true } solo se validan los campos presentes (edición campo a campo).
 // Devuelve el mensaje de error o null si es válida.
 const CAMPOS_DIRECCION = {
@@ -94,8 +94,16 @@ const CAMPOS_DIRECCION_ESTUDIANTE = {
   comuna: 'Estudiante_Comuna',
 };
 
-function validarDireccion({ calle, numero, depto, comuna } = {}, { parcial = false } = {}) {
+function validarDireccion({ calle, numero, depto, comuna } = {}, { parcial = false, opcional = false } = {}) {
   const vacio = (v) => v === undefined || v === null || String(v).trim() === '';
+
+  // Dirección opcional (usuarios): puede quedar completamente vacía. Si se ingresa
+  // algo, calle, número y comuna son obligatorios. En una edición parcial solo
+  // cuenta como "vacía" si llegan los campos obligatorios, todos sin valor.
+  if (opcional && [calle, numero, depto, comuna].every(vacio)) {
+    const llegaronTodos = [calle, numero, comuna].every((v) => v !== undefined);
+    if (!parcial || llegaronTodos) return null;
+  }
 
   if (!parcial || calle !== undefined) {
     if (vacio(calle)) return 'La calle es obligatoria';
@@ -188,10 +196,10 @@ const validateCrearUsuario = [
       }
       return true;
     }),
-  // La dirección es obligatoria para todo usuario, sin importar su rol
+  // La dirección es opcional para todo usuario; si se ingresa, va completa
   body('Usuario_Direccion_Calle')
     .custom((value, { req }) => {
-      const error = validarDireccion(direccionDesdeColumnas(req.body));
+      const error = validarDireccion(direccionDesdeColumnas(req.body), { opcional: true });
       if (error) throw new Error(error);
       return true;
     }),

@@ -4,6 +4,7 @@
 //   PUT /api/usuarios/:id/pie            administración  { horasPIE, periodo?, bloques: [{ dia, bloqueId }] }
 // Sin periodo se usa el vigente; durante el cierre también se puede preparar el siguiente.
 const pool = require('../config/db');
+const { puedeGestionAcademica } = require('../utils/permisos');
 const { obtenerPeriodos } = require('../utils/periodos');
 const { calcularCargaLectiva, clasesLectivas } = require('../utils/cargaLectiva');
 const { aMinutos, hhmm, seSuperponen } = require('../utils/disponibilidadDocente');
@@ -97,7 +98,8 @@ async function resumenPIE(db, docente, periodo) {
 // GET /api/usuarios/:id/pie
 const getPIE = async (req, res) => {
   const id = Number(req.params.id);
-  if (!esAdmin(req.user) && Number(req.user.id) !== id) {
+  // Lectura: administración, etiqueta UTP (horarios por docente) o el propio docente
+  if (!puedeGestionAcademica(req.user) && Number(req.user.id) !== id) {
     return res.status(403).json({ mensaje: 'Solo la administración o el propio docente pueden ver sus horas P.I.E.' });
   }
   try {

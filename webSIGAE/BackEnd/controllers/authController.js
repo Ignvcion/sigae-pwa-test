@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const pool = require('../config/db');
 const { hashToken } = require('../utils/sesion');
+const { tieneEtiquetaUTP, ROL_UTP } = require('../utils/permisos');
+const { columnaEsperaPrimerIngreso, cuentaUtilizable } = require('../utils/primerIngreso');
 
 const {
   PROPOSITOS,
@@ -18,7 +20,8 @@ const COLUMNAS_LOGIN = `Usuario_Id, Usuario_RUT, Usuario_Contraseña,
               Usuario_Nombre_Completo, Usuario_Estado_Cuenta, Usuario_Correo_Verificado,
               Es_Administrador, Administrador_Tipo, Administrador_Correo_Institucional,
               Es_Docente, Docente_Correo_Institucional,
-              Es_Apoderado, Apoderado_Correo_Natural`;
+              Es_Apoderado, Apoderado_Correo_Natural,
+              ${columnaEsperaPrimerIngreso('usuario')}`;
 
 /** Correo principal de la cuenta (según el rol): a él se envía el código de activación. */
 const correoPrincipal = (user) =>
@@ -32,16 +35,22 @@ async function iniciarSesion(req, res, user) {
   const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip || req.socket?.remoteAddress;
   const dispositivo = (req.headers['user-agent'] || 'desconocido').substring(0, 100);
 
+  // Etiqueta UTP (utils/permisos.js): un administrador con UTP entra con el rol
+  // 'UTP' en vez de 'Administrador', así que sus permisos quedan limitados a los
+  // de la UTP. Un docente con UTP conserva el rol 'Docente' y suma esos permisos.
+  const utp = tieneEtiquetaUTP(user);
   const roles = [];
-  if (user.Es_Administrador) roles.push('Administrador');
+  if (user.Es_Administrador) roles.push(utp ? ROL_UTP : 'Administrador');
   if (user.Es_Docente) roles.push('Docente');
   if (user.Es_Apoderado) roles.push('Apoderado');
+  const administradorTipo = user.Es_Administrador && !utp ? (user.Administrador_Tipo || null) : null;
 
   const payload = {
     id: user.Usuario_Id,
     rut: user.Usuario_RUT,
     roles,
-    administradorTipo: user.Administrador_Tipo || null
+    administradorTipo,
+    utp,
   };
   // RNF05: el JWT vive 30 min como techo máximo; la sesión real se
   // desliza en authMiddleware.verifyToken en cada request autenticado,
@@ -61,6 +70,14 @@ async function iniciarSesion(req, res, user) {
     [hashToken(token), expiracion, ip, dispositivo, expiracion, user.Usuario_Id]
   );
 
+  // Primer inicio de sesión: la cuenta se registró inactiva y aquí pasa a activa
+  if (!user.Usuario_Estado_Cuenta) {
+    await pool.execute(
+      'UPDATE usuario SET Usuario_Estado_Cuenta = 1 WHERE Usuario_Id = ? AND Usuario_Estado_Cuenta = 0',
+      [user.Usuario_Id]
+    );
+  }
+
   return res.json({
     user: {
       id: user.Usuario_Id,
@@ -68,7 +85,8 @@ async function iniciarSesion(req, res, user) {
       rut: user.Usuario_RUT,
       correo: correoPrincipal(user),
       roles,
-      administradorTipo: user.Administrador_Tipo || null
+      administradorTipo,
+      utp,
     },
     token
   });
@@ -109,7 +127,8 @@ const login = async (req, res) => {
 
     const user = rows[0];
 
-    if (!user.Usuario_Estado_Cuenta) {
+    // Una cuenta inactiva solo entra si espera su primer ingreso (utils/primerIngreso.js)
+    if (!cuentaUtilizable(user)) {
       return res.status(401).json({ error: 'Cuenta deshabilitada, contacte al administrador' });
     }
 
@@ -133,12 +152,12 @@ const login = async (req, res) => {
   }
 };
 
-/** Usuario dueño del desafío, si la cuenta sigue activa y sin verificar; si no, null. */
+/** Usuario dueño del desafío, si la cuenta sigue activa (o espera su primer ingreso); si no, null. */
 async function usuarioDelDesafio(fila) {
   if (!fila) return null;
   const [rows] = await pool.execute(`SELECT ${COLUMNAS_LOGIN} FROM usuario WHERE Usuario_Id = ?`, [fila.Usuario_Id]);
   const user = rows[0];
-  if (!user || !user.Usuario_Estado_Cuenta) return null;
+  if (!cuentaUtilizable(user)) return null;
   return user;
 }
 

@@ -25,7 +25,6 @@ function RegisterGuardian() {
     numero:"",
     depto:"",
     comuna:"",
-    estado:"Activo",
 
   });
 
@@ -37,7 +36,7 @@ function RegisterGuardian() {
 
   const validarCampo = (name, value, datos = formData) => {
     if (CAMPOS_DIRECCION.includes(name)) {
-      return errorCampoDireccion(name, value, datos);
+      return errorCampoDireccion(name, value, datos, true);
     }
     switch (name) {
       case "nombre":
@@ -79,7 +78,7 @@ function RegisterGuardian() {
       rut: validarCampo("rut", formData.rut),
       correo: validarCampo("correo", formData.correo),
       telefono: validarCampo("telefono", formData.telefono),
-      ...validarDireccion(formData),
+      ...validarDireccion(formData, { opcional: true }),
     };
 
     if (Object.values(nuevosErrores).some((msg) => msg)) {
@@ -188,6 +187,7 @@ function RegisterGuardian() {
 
         <p className="form-registro-aviso">
           La contraseña se genera automáticamente y se envía al correo del usuario.
+          La cuenta queda inactiva hasta el primer inicio de sesión del usuario.
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -254,27 +254,11 @@ function RegisterGuardian() {
 
 
 
-          <CamposDireccion valores={formData} errores={errores} onChange={handleChange} />
+          {/* Dirección opcional: si se ingresa, va completa (calle, número y comuna) */}
+          <CamposDireccion valores={formData} errores={errores} onChange={handleChange} opcional />
 
 
 
-          <select
-            name="estado"
-            value={formData.estado}
-            onChange={handleChange}
-          >
-
-            <option value="Activo">
-              Activo
-            </option>
-
-
-            <option value="Inactivo">
-              Inactivo
-            </option>
-
-
-          </select>
 
 
 

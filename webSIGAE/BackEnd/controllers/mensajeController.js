@@ -1,5 +1,6 @@
 // Módulo de mensajería interna docente-apoderado (CU73 / RF47).
 const pool = require('../config/db');
+const { notificarMensaje, marcarLeidasConversacion } = require('../utils/notificaciones');
 const { claseVigente } = require('../utils/clasesEliminadas');
 const { enPeriodoVigente } = require('../utils/periodos');
 const {
@@ -428,6 +429,15 @@ const enviarMensaje = async (req, res) => {
       [contenido, acceso.rol, conversacionId]
     );
 
+    // CU101: la contraparte recibe la notificación del mensaje
+    await notificarMensaje(pool, {
+      mensajeId: resultado.insertId,
+      conversacionId,
+      destinatarioId: acceso.rol === 'Docente'
+        ? acceso.conversacion.Apoderado_Usuario_Id
+        : acceso.conversacion.Docente_Usuario_Id,
+    });
+
     return res.status(201).json({
       mensaje: 'Mensaje enviado correctamente',
       mensajeId: resultado.insertId
@@ -475,6 +485,8 @@ const marcarMensajesLeidos = async (req, res) => {
       `,
       [conversacionId, acceso.rol]
     );
+    // CU101: al abrir la conversación, sus notificaciones quedan leídas
+    await marcarLeidasConversacion(pool, { usuarioId: req.user.id, conversacionId });
 
     return res.json({
       mensaje: 'Mensajes marcados como leídos',

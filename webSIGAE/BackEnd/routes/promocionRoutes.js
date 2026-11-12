@@ -2,7 +2,7 @@
 // docs/decisiones-rf60-rf61-periodos.txt (puntos 4 a 6).
 const express = require('express');
 const multer = require('multer');
-const { verifyToken, verifyAdmin, verifySuperAdmin } = require('../middleware/authMiddleware');
+const { verifyToken, verifyAdmin, verifyGestionAcademica, verifySuperAdmin } = require('../middleware/authMiddleware');
 const promocion = require('../controllers/promocionController');
 const periodo = require('../controllers/periodoController');
 
@@ -22,7 +22,8 @@ const conExcel = (req, res, next) => subirExcel(req, res, (err) => {
 router.use(verifyToken);
 
 // Cambio de período (antes de /cursos/:cursoId)
-router.get('/periodos/estado', verifyAdmin, periodo.getEstado);
+// El estado del cierre lo leen también la etiqueta UTP (períodos de cursos y horarios)
+router.get('/periodos/estado', verifyGestionAcademica, periodo.getEstado);
 router.post('/periodos/iniciar-cierre', verifySuperAdmin, periodo.iniciarCierre);
 router.get('/periodos/respaldo', verifySuperAdmin, periodo.descargarRespaldo);
 router.post('/periodos/iniciar-nuevo', verifySuperAdmin, periodo.iniciarNuevoPeriodo);

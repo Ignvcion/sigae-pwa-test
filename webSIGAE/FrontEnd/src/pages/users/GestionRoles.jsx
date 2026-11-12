@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch, getEspecialidades } from "../../services/api";
+import { tieneEtiquetaUTP } from "../../utils/permisos";
 import EtiquetasInput, { separarEtiquetas } from "../../components/EtiquetasInput";
 import {
   normalizarTexto,
@@ -29,6 +30,8 @@ function BadgesRol({ u }) {
       badges.push(<span key="adm" className="badge-rol badge-admin">Administrador</span>);
   }
   if (u.Es_Docente)   badges.push(<span key="doc" className="badge-rol badge-docente">Docente</span>);
+  // Etiqueta UTP: junto al rol de administrador o docente
+  if (tieneEtiquetaUTP(u)) badges.push(<span key="utp" className="badge-rol badge-utp" title="Etiqueta UTP">UTP</span>);
   if (u.Es_Apoderado) badges.push(<span key="apo" className="badge-rol badge-apoderado">Apoderado</span>);
   return badges.length > 0
     ? <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>{badges}</div>
@@ -87,21 +90,14 @@ function CamposDocente({ datos, errores, onChange }) {
   );
 }
 
-function CamposAdmin({ datos, errores, onChange, esSuperAdmin }) {
+// El rol se asigna siempre como Administrador Normal (o con la etiqueta UTP si el
+// docente ya la tenía). Los Super Administradores se crean solo por script
+// (BackEnd/scripts/crearSuperAdmin.js), nunca desde la aplicación.
+function CamposAdmin({ datos, errores, onChange }) {
   return (
     <>
-      {esSuperAdmin && (
-        <div className="campo-pwd">
-          <label>Tipo de administrador</label>
-          <select
-            name="Administrador_Tipo"
-            value={datos.Administrador_Tipo || "Administrador Normal"}
-            onChange={onChange}
-          >
-            <option value="Administrador Normal">Administrador Normal</option>
-            <option value="Super Admin">Super Admin</option>
-          </select>
-        </div>
+      {datos.Administrador_Tipo === "UTP" && (
+        <p className="etiquetas-ayuda">El usuario conserva su etiqueta UTP: sus permisos de administrador quedarán limitados a los de la UTP.</p>
       )}
       <div className="campo-pwd">
         <label>Correo institucional</label>
@@ -167,6 +163,9 @@ function CamposApoderado({ datos, errores, onChange }) {
 function GestionRoles() {
   const { id: idParam } = useParams();
   const { usuario: usuarioLogueado } = useAuth();
+  // Etiqueta UTP: la asigna o retira el Super Administrador
+  const [loadingUTP, setLoadingUTP]             = useState(false);
+  const [msgUTP, setMsgUTP]                     = useState({ tipo: "", texto: "" });
   const esSuperAdmin = usuarioLogueado?.administradorTipo === "Super Admin";
 
   const [busqueda, setBusqueda]                 = useState("");
@@ -220,6 +219,7 @@ function GestionRoles() {
     setMsgExito("");
     setMsgError("");
     setMsgGestion({ tipo: "", texto: "" });
+    setMsgUTP({ tipo: "", texto: "" });
   };
 
   /* Carga inicial */
@@ -299,6 +299,49 @@ function GestionRoles() {
     finally { setLoadingGestion(false); }
   };
 
+  /* Etiqueta UTP: grupo de permisos sobre un Administrador (los limita) o un Docente (los amplía) */
+  const puedeTenerUTP = Boolean(
+    seleccionado &&
+    (seleccionado.Es_Docente || (seleccionado.Es_Administrador && seleccionado.Administrador_Tipo !== "Super Admin")) &&
+    seleccionado.Usuario_Id !== usuarioLogueado?.id
+  );
+  const conUTP = tieneEtiquetaUTP(seleccionado);
+
+  const cambiarEtiquetaUTP = async (asignar) => {
+    if (!seleccionado) return;
+    const nombre = seleccionado.Usuario_Nombre_Completo;
+    const efecto = seleccionado.Es_Administrador
+      ? (asignar
+        ? "• Sus permisos de administrador se limitarán a los de la UTP: planes y asignaturas, electivos, cursos, horarios, estudiantes y eventos institucionales.\n• No podrá gestionar usuarios, bloques horarios ni parámetros institucionales."
+        : "• Recuperará los permisos completos de administrador.")
+      : (asignar
+        ? "• Conservará sus permisos de docente y sumará los de la UTP."
+        : "• Conservará solo sus permisos de docente.");
+    const pregunta = `¿${asignar ? "Asignar" : "Retirar"} la etiqueta UTP ${asignar ? "a" : "de"} ${nombre}?\n\n${efecto}\n• Sus sesiones abiertas se cerrarán para aplicar el cambio.`;
+    if (!window.confirm(pregunta)) return;
+    setLoadingUTP(true);
+    setMsgUTP({ tipo: "", texto: "" });
+    try {
+      const res = await apiFetch(`/api/usuarios/${seleccionado.Usuario_Id}/etiqueta-utp`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ utp: asignar }),
+      });
+      if (!res) return;
+      const data = await res.json();
+      if (!res.ok) {
+        setMsgUTP({ tipo: "error", texto: data.mensaje || "No fue posible cambiar la etiqueta UTP" });
+      } else {
+        setMsgUTP({ tipo: "exito", texto: data.mensaje });
+        await refreshSeleccionado();
+      }
+    } catch {
+      setMsgUTP({ tipo: "error", texto: "Error de conexión al servidor" });
+    } finally {
+      setLoadingUTP(false);
+    }
+  };
+
   /* Roles que aún puede recibir este usuario (con exclusividad Admin) */
   const esAdminUser = !!seleccionado?.Es_Administrador;
   const rolesDisponibles = seleccionado
@@ -317,7 +360,8 @@ function GestionRoles() {
       const direccion = Object.fromEntries(
         Object.entries(COLUMNAS_DIRECCION).map(([col, clave]) => [clave, (col === name ? value : datos[col]) || ""])
       );
-      return validarDireccion(direccion)[COLUMNAS_DIRECCION[name]] || "";
+      // La dirección del apoderado es opcional; si se ingresa, va completa
+      return validarDireccion(direccion, { opcional: true })[COLUMNAS_DIRECCION[name]] || "";
     }
     if (name === "Docente_Especialidades")
       return value.length === 0 ? "Agrega al menos una especialidad" : "";
@@ -356,7 +400,7 @@ function GestionRoles() {
       });
     } else if (nuevoRol === "Administrador") {
       setDatosRol({
-        Administrador_Tipo:                 seleccionado.Administrador_Tipo                 || "Administrador Normal",
+        Administrador_Tipo:                 seleccionado.Administrador_Tipo === "UTP" ? "UTP" : "Administrador Normal",
         Administrador_Correo_Institucional: seleccionado.Administrador_Correo_Institucional || "",
       });
     } else if (nuevoRol === "Apoderado") {
@@ -549,6 +593,44 @@ function GestionRoles() {
               </p>
             )}
 
+            {/* ── Etiqueta UTP (solo Super Administrador) ── */}
+            {esSuperAdmin && puedeTenerUTP && (
+              <div style={{ marginTop: "32px", borderTop: "1px solid #e2e8f0", paddingTop: "24px" }}>
+                <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "4px", color: "#1e293b" }}>
+                  Etiqueta UTP
+                </h3>
+                <p style={{ color: "#64748b", fontSize: "0.88rem", marginBottom: "16px" }}>
+                  {seleccionado.Es_Administrador
+                    ? "En un administrador, la etiqueta limita sus permisos a los de la UTP."
+                    : "En un docente, la etiqueta suma los permisos de la UTP a los de docente."}
+                </p>
+                {msgUTP.texto && (
+                  <div className={msgUTP.tipo === "exito" ? "msg-exito" : "msg-error-form"} style={{ marginBottom: "16px" }}>
+                    {msgUTP.texto}
+                  </div>
+                )}
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px",
+                  padding: "10px 16px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#f8fafc",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span className="badge-rol badge-utp">UTP</span>
+                    <span style={{ fontSize: "0.85rem", color: conUTP ? "#16a34a" : "#64748b", fontWeight: 500 }}>
+                      {conUTP ? "Asignada" : "Sin etiqueta"}
+                    </span>
+                  </div>
+                  <button
+                    className={conUTP ? "btn-desactivar" : "btn-reactivar"}
+                    style={{ fontSize: "0.82rem", padding: "5px 12px" }}
+                    disabled={loadingUTP}
+                    onClick={() => cambiarEtiquetaUTP(!conUTP)}
+                  >
+                    {conUTP ? "Retirar etiqueta" : "Asignar etiqueta"}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* ── Panel gestión de roles activos (CU 21/22/23/24) ── */}
             {(() => {
               const rolesActivos = [
@@ -658,7 +740,7 @@ function GestionRoles() {
             <CamposDocente datos={datosRol} errores={errores} onChange={handleDatosChange} />
           )}
           {rolNuevo === "Administrador" && (
-            <CamposAdmin datos={datosRol} errores={errores} onChange={handleDatosChange} esSuperAdmin={esSuperAdmin} />
+            <CamposAdmin datos={datosRol} errores={errores} onChange={handleDatosChange} />
           )}
           {rolNuevo === "Apoderado" && (
             <CamposApoderado datos={datosRol} errores={errores} onChange={handleDatosChange} />

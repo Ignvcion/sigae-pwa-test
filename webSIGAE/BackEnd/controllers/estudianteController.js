@@ -3,6 +3,8 @@
 // no tiene login. Es solo una ficha con información académica.
 
 const db = require('../config/db');
+const { puedeGestionAcademica, esAdministrador, esUTP } = require('../utils/permisos');
+const { columnaEsperaPrimerIngreso, cuentaUtilizable } = require('../utils/primerIngreso');
 const { registrarHistorial, refPersona, buscarPersonas } = require('../utils/historial');
 const { claseVigente } = require('../utils/clasesEliminadas');
 const { cursoNoArchivado } = require('../utils/periodos');
@@ -27,7 +29,7 @@ const getEstudiantes = async (req, res) => {
 
   try {
     const { roles, id: userId } = req.user;
-    const esAdmin = roles.includes('Administrador');
+    const esAdmin = puedeGestionAcademica(req.user); // administración o etiqueta UTP
     const esDocente = roles.includes('Docente') && !esAdmin;
 
     // Actor(es) del CU34: Super Administrador, Administrador, Docente (no Apoderado)
@@ -126,7 +128,7 @@ const getEstudiantes = async (req, res) => {
 // Endpoint: GET /api/estudiantes/buscar?criterio=...
 const buscarEstudiantes = async (req, res) => {
   const { roles, id: userId } = req.user;
-  const esAdmin = roles.includes('Administrador');
+  const esAdmin = puedeGestionAcademica(req.user); // administración o etiqueta UTP
   const esDocente = roles.includes('Docente') && !esAdmin;
 
   // Actor(es) del CU36: Super Administrador, Administrador, Docente (no Apoderado)
@@ -306,11 +308,23 @@ const CAMPOS_EDITABLES_ESTUDIANTE = new Set([
   ...Object.values(CAMPOS_DIRECCION_ESTUDIANTE),
 ]);
 
+// Etiqueta UTP: asigna estudiantes a cursos; solo cambia curso, estado académico y ruta
+const CAMPOS_ESTUDIANTE_UTP = new Set(['Curso_Id', 'Estudiante_Estado_Academico', 'Estudiante_Ruta_Formacion']);
+
 // CU38: Editar curso asociado y estado académico (y otros campos editables) de un estudiante
 const updateEstudiante = async (req, res) => {
   const { id } = req.params;
   const datos = { ...req.body };
   delete datos.Estudiante_Id;
+
+  if (esUTP(req.user) && !esAdministrador(req.user)) {
+    const ajenos = Object.keys(datos).filter((k) => CAMPOS_EDITABLES_ESTUDIANTE.has(k) && !CAMPOS_ESTUDIANTE_UTP.has(k));
+    if (ajenos.length > 0) {
+      return res.status(403).json({
+        mensaje: 'Con la etiqueta UTP solo puedes cambiar el curso, el estado académico y la ruta de formación del estudiante',
+      });
+    }
+  }
 
   const datosFiltrados = Object.fromEntries(
     Object.entries(datos).filter(([k]) => CAMPOS_EDITABLES_ESTUDIANTE.has(k))
@@ -476,7 +490,8 @@ const asignarApoderado = async (req, res) => {
   const conn = await db.getConnection();
   try {
     const [apoderado] = await conn.query(
-      `SELECT Usuario_Id, Usuario_Nombre_Completo, Es_Apoderado, Usuario_Estado_Cuenta, Apoderado_Sin_Asociaciones_Desde
+      `SELECT Usuario_Id, Usuario_Nombre_Completo, Es_Apoderado, Usuario_Estado_Cuenta, Apoderado_Sin_Asociaciones_Desde,
+              ${columnaEsperaPrimerIngreso('usuario')}
        FROM usuario WHERE Usuario_Id = ?`,
       [apoderadoId]
     );
@@ -566,7 +581,8 @@ const eliminarTodasAsociacionesApoderado = async (req, res) => {
   try {
     // 1. Validar existencia y estado del apoderado
     const [apoderado] = await db.query(
-      'SELECT Usuario_Id, Usuario_RUT, Usuario_Nombre_Completo, Usuario_Estado_Cuenta, Es_Apoderado FROM usuario WHERE Usuario_Id = ?',
+      `SELECT Usuario_Id, Usuario_RUT, Usuario_Nombre_Completo, Usuario_Estado_Cuenta, Es_Apoderado,
+              ${columnaEsperaPrimerIngreso('usuario')} FROM usuario WHERE Usuario_Id = ?`,
       [apoderadoId]
     );
 
@@ -574,7 +590,7 @@ const eliminarTodasAsociacionesApoderado = async (req, res) => {
       return res.status(404).json({ mensaje: 'Apoderado no encontrado' });
     }
 
-    if (!apoderado[0].Usuario_Estado_Cuenta) {
+    if (!cuentaUtilizable(apoderado[0])) {
       return res.status(400).json({ mensaje: 'La cuenta del apoderado está inactiva' });
     }
 
@@ -826,7 +842,8 @@ const editarAsociaciones = async (req, res) => {
     // Si se asigna un nuevo apoderado (no se está eliminando), validar que exista y esté activo
     if (apoderadoId !== null) {
       const [apoderado] = await db.query(
-        'SELECT Usuario_Id, Usuario_Estado_Cuenta, Apoderado_Sin_Asociaciones_Desde FROM usuario WHERE Usuario_Id = ? AND Es_Apoderado = 1',
+        `SELECT Usuario_Id, Usuario_Estado_Cuenta, Apoderado_Sin_Asociaciones_Desde, ${columnaEsperaPrimerIngreso('usuario')}
+           FROM usuario WHERE Usuario_Id = ? AND Es_Apoderado = 1`,
         [apoderadoId]
       );
       if (apoderado.length === 0) {
@@ -936,7 +953,7 @@ const getDetalleEstudiante = async (req, res) => {
 const getEstudiantesCursoDocente = async (req, res) => {
   try {
     const { roles, id: userId } = req.user;
-    const esAdmin = roles.includes('Administrador');
+    const esAdmin = puedeGestionAcademica(req.user); // administración o etiqueta UTP
     const esDocente = roles.includes('Docente');
 
     if (!esAdmin && !esDocente) {

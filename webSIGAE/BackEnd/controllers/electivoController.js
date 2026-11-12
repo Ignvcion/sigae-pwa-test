@@ -11,6 +11,7 @@
 //     DELETE /api/electivos/clases/:id
 //   Vistas: GET /api/electivos/curso/:cursoId (horario del curso; con ?ruta= filtra la del estudiante)
 const pool = require('../config/db');
+const { cuentaUtilizableSQL } = require('../utils/primerIngreso');
 const { obtenerPeriodos } = require('../utils/periodos');
 const { claseVigente } = require('../utils/clasesEliminadas');
 const { condicionDesajustado } = require('../utils/bloquesDesajustados');
@@ -144,7 +145,7 @@ async function validarFilasPlan(db, filas) {
   const docentesIds = [...new Set(normalizadas.flatMap((f) => f.docentes))];
   if (docentesIds.length > 0) {
     const [activos] = await db.query(
-      'SELECT Usuario_Id FROM usuario WHERE Usuario_Id IN (?) AND Es_Docente = 1 AND Usuario_Estado_Cuenta = 1',
+      `SELECT Usuario_Id FROM usuario WHERE Usuario_Id IN (?) AND Es_Docente = 1 AND ${cuentaUtilizableSQL('usuario')}`,
       [docentesIds]
     );
     if (activos.length !== docentesIds.length) throw new ErrorElectivo(400, 'Los docentes habilitados deben ser docentes activos');
@@ -179,7 +180,7 @@ const getPlan = async (req, res) => {
     );
     const [docentes] = await pool.query(
       `SELECT Usuario_Id, Usuario_Nombre_Completo, Docente_Especialidad FROM usuario
-        WHERE Es_Docente = 1 AND Usuario_Estado_Cuenta = 1 ORDER BY Usuario_Nombre_Completo`
+        WHERE Es_Docente = 1 AND ${cuentaUtilizableSQL('usuario')} ORDER BY Usuario_Nombre_Completo`
     );
     const anterior = String(Number(periodo) - 1);
     const [[hayAnterior]] = await pool.query(
@@ -300,7 +301,7 @@ const clonarPlan = async (req, res) => {
     }
     const [r] = await conn.query('INSERT INTO plan_electivos (Plan_Electivos_Periodo_Lectivo) VALUES (?)', [hacia]);
     // Solo se copian los docentes que siguen activos
-    const [activos] = await conn.query('SELECT Usuario_Id FROM usuario WHERE Es_Docente = 1 AND Usuario_Estado_Cuenta = 1');
+    const [activos] = await conn.query(`SELECT Usuario_Id FROM usuario WHERE Es_Docente = 1 AND ${cuentaUtilizableSQL('usuario')}`);
     const idsActivos = new Set(activos.map((a) => Number(a.Usuario_Id)));
     await insertarFilas(conn, r.insertId, origen.asignaturas.map((a) => ({
       asignaturaId: a.Asignatura_Id,
@@ -443,7 +444,7 @@ const programarElectivo = async (req, res) => {
     }
     const [[docente]] = await conn.query(
       `SELECT Usuario_Id, Usuario_Nombre_Completo, Docente_Especialidad, Docente_Carga_Horaria_Semanal
-         FROM usuario WHERE Usuario_Id = ? AND Es_Docente = 1 AND Usuario_Estado_Cuenta = 1`,
+         FROM usuario WHERE Usuario_Id = ? AND Es_Docente = 1 AND ${cuentaUtilizableSQL('usuario')}`,
       [docenteId]
     );
     if (!docente) throw new ErrorElectivo(422, 'El docente no está activo');

@@ -1,5 +1,5 @@
 const express = require('express');
-const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
+const { verifyToken, verifyAdmin, verifyGestionAcademica } = require('../middleware/authMiddleware');
 const {
   getParametros, updateParametros,
   getBloques, createBloque, updateBloque, deleteBloque, deleteMultiplesBloques,
@@ -34,12 +34,13 @@ router.delete('/multiples',     verifyAdmin, deleteMultiplesBloques);
 router.put('/:id',              verifyAdmin, updateBloque);
 router.delete('/:id',           verifyAdmin, deleteBloque);
 
-// Eventos institucionales (CU70, CU71, CU72) — solo admin para escritura
+// Eventos institucionales (CU70, CU71, CU72) — escritura: administración y etiqueta UTP.
+// Los parámetros, los bloques y las clases por reubicar siguen siendo solo de la administración.
 router.get('/eventos',                    getEventos);
 router.get('/eventos/:id/afectados',      getBloquesAfectadosPorEvento);
 router.get('/eventos/:id',                getEventoDetalle);
-router.post('/eventos',                   verifyAdmin, createEvento);
-router.put('/eventos/:id',                verifyAdmin, updateEvento);
-router.delete('/eventos/:id',             verifyAdmin, deleteEvento);
+router.post('/eventos',                   verifyGestionAcademica, createEvento);
+router.put('/eventos/:id',                verifyGestionAcademica, updateEvento);
+router.delete('/eventos/:id',             verifyGestionAcademica, deleteEvento);
 
 module.exports = router;

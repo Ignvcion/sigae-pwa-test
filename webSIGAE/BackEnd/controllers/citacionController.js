@@ -5,6 +5,7 @@ const { claseVigente } = require('../utils/clasesEliminadas');
 const { buscarClaseEnTramo, describirClase } = require('../utils/disponibilidadDocente');
 const { esApoderadoDelEstudiante } = require('../utils/apoderadosEstudiante');
 const { finDeCitacion, cerrarPorCitacion, moverPorCitacion } = require('../utils/recepcionMensajes');
+const { TIPOS, notificarCitacion, marcarLeidasCitacion } = require('../utils/notificaciones');
 
 const ESTADO_PENDIENTE  = 'Pendiente de confirmación';
 const ESTADO_CONFIRMADA = 'Confirmada';
@@ -257,6 +258,8 @@ const getDetalleCitacion = async (req, res) => {
     if (!citacion) {
       return res.status(404).json({ mensaje: 'La citación seleccionada no existe o no está disponible' });
     }
+    // CU101: al ver el detalle, sus notificaciones quedan leídas
+    await marcarLeidasCitacion(pool, { usuarioId: req.user.id, citacionId: citacion.Citacion_Id });
     return res.json(citacion);
   } catch (error) {
     console.error(error);
@@ -365,6 +368,10 @@ const crearCitacion = async (req, res) => {
     );
 
     const citacion = await buscarCitacionDelUsuario(resultado.insertId, req.user);
+    // CU101: el apoderado citado recibe la notificación
+    await notificarCitacion(pool, {
+      citacionId: resultado.insertId, tipo: TIPOS.CITACION_NUEVA, usuarioIds: [apoderadoId], actorId: docenteId,
+    });
     return res.status(201).json({ mensaje: 'Citación creada, pendiente de confirmación', citacion });
   } catch (error) {
     console.error(error);
@@ -415,6 +422,8 @@ const confirmarCitacion = async (req, res) => {
       responsableId: userId,
     });
     await conn.commit();
+    // CU101: la contraparte recibe la notificación del cambio de estado
+    await notificarCitacion(pool, { citacionId: citacion.Citacion_Id, tipo: TIPOS.CITACION_CONFIRMADA, usuarioIds: [citacion.Docente_Usuario_Id, citacion.Apoderado_Usuario_Id], actorId: userId });
 
     // Paso 9: el cambio de estado queda visible para la contraparte en su agenda y en el historial
     return res.json({
@@ -474,6 +483,7 @@ const cancelarCitacion = async (req, res) => {
     // RF54 / CU86 Excepción 2: si se habilitaron respuestas desde esta citación, se cierran
     await cerrarPorCitacion(conn, citacion.Citacion_Id);
     await conn.commit();
+    await notificarCitacion(pool, { citacionId: citacion.Citacion_Id, tipo: TIPOS.CITACION_CANCELADA, usuarioIds: [citacion.Docente_Usuario_Id, citacion.Apoderado_Usuario_Id], actorId: userId });
 
     return res.json({ mensaje: 'Citación cancelada correctamente' });
   } catch (error) {
@@ -551,6 +561,7 @@ const reprogramarCitacion = async (req, res) => {
     // RF54 / CU86: las respuestas habilitadas desde esta citación duran hasta el nuevo tramo
     await moverPorCitacion(conn, citacion.Citacion_Id, Citacion_Fecha, Citacion_Tramo_Horario);
     await conn.commit();
+    await notificarCitacion(pool, { citacionId: citacion.Citacion_Id, tipo: TIPOS.CITACION_REPROGRAMADA, usuarioIds: [citacion.Docente_Usuario_Id, citacion.Apoderado_Usuario_Id], actorId: userId });
 
     return res.json({
       mensaje: 'Citación reprogramada. Queda pendiente hasta la confirmación de la contraparte.',

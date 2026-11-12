@@ -10,6 +10,7 @@ import {
   getNivelesEducativos,
 } from "../../services/api";
 import DetalleBloqueModal from "../../components/horarios/DetalleBloqueModal";
+import { puedeGestionAcademica } from "../../utils/permisos";
 import EtiquetaPeriodo, { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
@@ -51,8 +52,7 @@ const lista = (resultado) =>
 // Las consultas no modifican la planificación institucional.
 function ConsultaHorarios() {
   const { usuario, rolActivo } = useAuth();
-  const rolEfectivo = rolActivo || usuario?.roles?.[0];
-  const esAdmin = rolEfectivo === "Administrador" || usuario?.administradorTipo === "Super Admin";
+  const esAdmin = puedeGestionAcademica(usuario, rolActivo); // administración o etiqueta UTP
 
   const [pestana, setPestana] = useState("filtrar");
 

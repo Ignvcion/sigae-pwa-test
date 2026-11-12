@@ -1,4 +1,6 @@
 const pool = require('../config/db');
+const { puedeGestionAcademica } = require('../utils/permisos');
+const { cuentaUtilizableSQL } = require('../utils/primerIngreso');
 const {
   calcularCargaLectiva, clasesLectivas, datosCarga, mensajeExcede,
   verificarCargaLectiva, docentesConPIEEnBloque, MENSAJE_BLOQUE_PIE,
@@ -23,8 +25,10 @@ const getHorarios = async (req, res) => {
   try {
     const { curso_id, incluir_eliminadas } = req.query;
     const { id: userId, roles } = req.user;
-    const esDocente = roles.includes('Docente') && !roles.includes('Administrador');
-    const conEliminadas = ['1', 'true'].includes(String(incluir_eliminadas)) && roles.includes('Administrador');
+    // Administración y etiqueta UTP ven todos los cursos; un docente, solo sus clases
+    const gestion = puedeGestionAcademica(req.user);
+    const esDocente = roles.includes('Docente') && !gestion;
+    const conEliminadas = ['1', 'true'].includes(String(incluir_eliminadas)) && gestion;
 
     let query = `
       SELECT
@@ -203,7 +207,7 @@ const getDocentes = async (req, res) => {
       `SELECT Usuario_Id, Usuario_Nombre_Completo, Docente_Especialidad,
               Docente_Carga_Horaria_Semanal
        FROM usuario
-       WHERE Es_Docente = 1 AND Usuario_Estado_Cuenta = 1
+       WHERE Es_Docente = 1 AND ${cuentaUtilizableSQL('usuario')}
        ORDER BY Usuario_Nombre_Completo`
     );
     res.json(rows);
@@ -232,7 +236,7 @@ const getDocentesDisponibles = async (req, res) => {
       `SELECT Usuario_Id, Usuario_Nombre_Completo, Docente_Especialidad,
               Docente_Carga_Horaria_Semanal, Docente_Horas_PIE
        FROM usuario
-       WHERE Es_Docente = 1 AND Usuario_Estado_Cuenta = 1
+       WHERE Es_Docente = 1 AND ${cuentaUtilizableSQL('usuario')}
        ORDER BY Usuario_Nombre_Completo`
     );
 
@@ -1106,7 +1110,7 @@ const getResumenCursos = async (req, res) => {
 const getAsignacionesDocente = async (req, res) => {
   try {
     const { roles, id: userId } = req.user;
-    const esAdmin = roles.includes('Administrador');
+    const esAdmin = puedeGestionAcademica(req.user); // administración o etiqueta UTP
     const esDocenteSinAdmin = roles.includes('Docente') && !esAdmin;
 
     // Solo el propio Docente o un Administrador/SuperAdmin pueden consultar esta información
@@ -1195,7 +1199,7 @@ const getAsignacionesDocente = async (req, res) => {
 const getHorarioDocente = async (req, res) => {
   try {
     const { roles, id: userId } = req.user;
-    const esAdmin = roles.includes('Administrador');
+    const esAdmin = puedeGestionAcademica(req.user); // administración o etiqueta UTP
     const esDocenteSinAdmin = roles.includes('Docente') && !esAdmin;
 
     // Solo el propio Docente o un Administrador/SuperAdmin pueden consultar esta información
@@ -1689,9 +1693,9 @@ const getBloquesLibres = async (req, res) => {
 const getDetalleBloqueHorario = async (req, res) => {
   try {
     const roles = req.user?.roles || [];
-    const esAdmin = roles.includes('Administrador');
+    const esAdmin = puedeGestionAcademica(req.user); // administración o etiqueta UTP
 
-    // Solo Admin, o un docente sobre sus propias clases (se valida tras la consulta)
+    // Solo Admin (o UTP), o un docente sobre sus propias clases (se valida tras la consulta)
     if (!esAdmin && !roles.includes('Docente')) {
       return res.status(403).json({ mensaje: 'No tienes permiso para consultar esta información' });
     }
@@ -1908,7 +1912,7 @@ async function analizarCambiosHorario(db, ids, cambios, { bloquear = false } = {
   if (cambiaDoc) {
     const [rows] = await db.query(
       `SELECT Usuario_Id, Usuario_Nombre_Completo FROM usuario
-       WHERE Usuario_Id = ? AND Es_Docente = 1 AND Usuario_Estado_Cuenta = 1`,
+       WHERE Usuario_Id = ? AND Es_Docente = 1 AND ${cuentaUtilizableSQL('usuario')}`,
       [cambios.Usuario_Id]
     );
     if (rows.length === 0) return { invalido: true };
@@ -2283,7 +2287,7 @@ const getOpcionesEdicion = async (req, res) => {
     const [docentes] = await pool.execute(
       `SELECT Usuario_Id, Usuario_Nombre_Completo, Docente_Especialidad
        FROM usuario
-       WHERE Es_Docente = 1 AND Usuario_Estado_Cuenta = 1
+       WHERE Es_Docente = 1 AND ${cuentaUtilizableSQL('usuario')}
        ORDER BY Usuario_Nombre_Completo`
     );
     res.json({ bloques, asignaturas, docentes });

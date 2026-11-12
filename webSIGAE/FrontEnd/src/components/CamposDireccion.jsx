@@ -11,23 +11,25 @@ const DEFINICION = [
   { name: "comuna", placeholder: "Comuna (ej: Puente Alto)",          maxLength: 60,  required: true },
 ];
 
-// Mensaje de error de un campo de dirección considerando el resto de la dirección
-export function errorCampoDireccion(name, value, datos) {
-  return validarDireccion({ ...datos, [name]: value })[name] || "";
+// Mensaje de error de un campo de dirección considerando el resto de la dirección.
+// opcional: la dirección del usuario puede quedar vacía (si se ingresa, va completa).
+export function errorCampoDireccion(name, value, datos, opcional = false) {
+  return validarDireccion({ ...datos, [name]: value }, { opcional })[name] || "";
 }
 
-function CamposDireccion({ valores, errores = {}, onChange }) {
+// opcional: dirección del usuario (registro de administrador, docente y apoderado)
+function CamposDireccion({ valores, errores = {}, onChange, opcional = false }) {
   return DEFINICION.map((campo) => (
     <div key={campo.name}>
       <input
         type="text"
         name={campo.name}
-        placeholder={campo.placeholder}
+        placeholder={opcional && campo.required ? campo.placeholder.replace(/ \(ej:/, " (opcional, ej:") : campo.placeholder}
         maxLength={campo.maxLength}
         value={valores[campo.name] || ""}
         onChange={onChange}
         className={errores[campo.name] ? "input-invalid" : ""}
-        required={campo.required}
+        required={campo.required && !opcional}
       />
       {errores[campo.name] && <span className="input-error-msg">{errores[campo.name]}</span>}
     </div>

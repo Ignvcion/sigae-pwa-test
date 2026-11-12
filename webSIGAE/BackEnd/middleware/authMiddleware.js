@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const { hashToken } = require('../utils/sesion');
+const { puedeGestionAcademica } = require('../utils/permisos');
 
 const verifyToken = async (req, res, next) => {
 
@@ -108,6 +109,23 @@ const verifyAdmin = (req, res, next) => {
 
 };
 
+// Gestión académica: administrador completo o usuario con la etiqueta UTP
+// (asignaturas, planes, electivos, cursos, horarios y eventos institucionales).
+// Un administrador con UTP no pasa verifyAdmin: sus permisos se limitan a estos.
+const verifyGestionAcademica = (req, res, next) => {
+
+  if (!puedeGestionAcademica(req.user)) {
+
+    return res.status(403).json({
+      error: 'No tienes permisos'
+    });
+
+  }
+
+  next();
+
+};
+
 const verifySuperAdmin = (req, res, next) => {
 
   if (req.user?.administradorTipo !== 'Super Admin') {
@@ -139,6 +157,7 @@ const verifyPuedeCrearRol = (req, res, next) => {
 module.exports = {
   verifyToken,
   verifyAdmin,
+  verifyGestionAcademica,
   verifySuperAdmin,
-  verifyPuedeCrearRol,   // ← agrega esta línea
+  verifyPuedeCrearRol,
 };

@@ -1,6 +1,8 @@
 #!/bin/bash
 # RNF11: respaldo automático de la base de datos completa (mysqldump),
-# con una frecuencia mínima de una vez cada 24 horas.
+# con una frecuencia mínima de una vez cada 24 horas. SOLO DESARROLLO: en
+# producción se usa scripts/enviarRespaldo.js, que además lo envía por correo
+# a la cuenta de respaldos (docs/respaldos-por-correo.md).
 #
 # Uso manual:
 #   ./scripts/backup.sh

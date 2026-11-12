@@ -21,7 +21,6 @@ function RegisterAdmin() {
     numero: "",
     depto: "",
     comuna: "",
-    estado: "Activo",
   });
 
   const [errores, setErrores] = useState({});
@@ -30,7 +29,7 @@ function RegisterAdmin() {
 
 
   const validarCampo = (name, value, datos = formData) => {
-    if (CAMPOS_DIRECCION.includes(name)) return errorCampoDireccion(name, value, datos);
+    if (CAMPOS_DIRECCION.includes(name)) return errorCampoDireccion(name, value, datos, true);
     switch (name) {
       case "nombre":
         return value && !validarNombreCompleto(value)
@@ -68,7 +67,7 @@ function RegisterAdmin() {
       rut: validarCampo("rut", formData.rut),
       correo: validarCampo("correo", formData.correo),
       telefono: validarCampo("telefono", formData.telefono),
-      ...validarDireccion(formData),
+      ...validarDireccion(formData, { opcional: true }),
     };
 
     if (Object.values(nuevosErrores).some((msg) => msg)) {
@@ -137,6 +136,7 @@ function RegisterAdmin() {
 
         <p className="form-registro-aviso">
           La contraseña se genera automáticamente y se envía al correo del usuario.
+          La cuenta queda inactiva hasta el primer inicio de sesión del usuario.
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -199,24 +199,10 @@ function RegisterAdmin() {
           </div>
 
 
-          <CamposDireccion valores={formData} errores={errores} onChange={handleChange} />
+          {/* Dirección opcional: si se ingresa, va completa (calle, número y comuna) */}
+          <CamposDireccion valores={formData} errores={errores} onChange={handleChange} opcional />
 
 
-          <select
-            name="estado"
-            value={formData.estado}
-            onChange={handleChange}
-          >
-
-            <option value="Activo">
-              Activo
-            </option>
-
-            <option value="Inactivo">
-              Inactivo
-            </option>
-
-          </select>
 
 
           <button disabled={loading}>

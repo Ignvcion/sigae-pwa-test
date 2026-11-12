@@ -69,6 +69,16 @@ export function AuthProvider({ children }) {
     return usuarioData.roles;
   };
 
+  // Actualiza datos del usuario en sesión (p. ej. el Super Admin corrige su nombre o RUT)
+  const actualizarUsuario = (cambios) => {
+    setUsuario((actual) => {
+      if (!actual) return actual;
+      const nuevo = { ...actual, ...cambios };
+      localStorage.setItem("usuario", JSON.stringify(nuevo));
+      return nuevo;
+    });
+  };
+
   const seleccionarRol = (rol) => {
     setRolActivo(rol);
     localStorage.setItem("rolActivo", rol);
@@ -94,7 +104,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ usuario, token, rolActivo, login, logout, seleccionarRol }}
+      value={{ usuario, token, rolActivo, login, logout, seleccionarRol, actualizarUsuario }}
     >
       {children}
     </AuthContext.Provider>

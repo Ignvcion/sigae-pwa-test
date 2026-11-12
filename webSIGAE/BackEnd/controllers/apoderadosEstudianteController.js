@@ -3,6 +3,7 @@
 // El titular es estudiante.Apoderado_Usuario_Id (el mismo campo de la asociación de CU7/CU39)
 // y los suplentes, hasta MAX_SUPLENTES, se guardan en apoderado_suplente.
 const pool = require('../config/db');
+const { columnaEsperaPrimerIngreso } = require('../utils/primerIngreso');
 const { esDocenteVinculadoAlCurso } = require('../utils/jefatura');
 const { MAX_SUPLENTES, obtenerApoderadosEstudiante, puedeAsociarse, reactivarApoderados } = require('../utils/apoderadosEstudiante');
 const { registrarHistorial, refPersona, refPersonas } = require('../utils/historial');
@@ -76,7 +77,7 @@ const designarApoderados = async (req, res) => {
     const ids = [titularId, ...suplenteIds];
     const [usuarios] = await pool.query(
       `SELECT Usuario_Id, Usuario_RUT, Usuario_Nombre_Completo, Es_Apoderado, Usuario_Estado_Cuenta,
-              Apoderado_Sin_Asociaciones_Desde
+              Apoderado_Sin_Asociaciones_Desde, ${columnaEsperaPrimerIngreso('usuario')}
          FROM usuario WHERE Usuario_Id IN (?)`,
       [ids]
     );

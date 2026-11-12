@@ -2,6 +2,8 @@
 // RF60: profesor jefe de curso (CU95, CU96) y estudiantes de un curso (CU97).
 // Reglas en utils/jefatura.js y docs/decisiones-rf60-rf61-periodos.txt (punto 3).
 const pool = require('../config/db');
+const { puedeGestionAcademica } = require('../utils/permisos');
+const { cuentaUtilizable } = require('../utils/primerIngreso');
 const { claseVigente } = require('../utils/clasesEliminadas');
 const { obtenerPeriodos } = require('../utils/periodos');
 const { registrarHistorial, refPersona } = require('../utils/historial');
@@ -73,7 +75,7 @@ const designarProfesorJefe = async (req, res) => {
       return res.status(404).json({ mensaje: 'Docente no encontrado' });
     }
     // CU95 Excepción 1: el docente seleccionado está inactivo
-    if (!docente.Usuario_Estado_Cuenta) {
+    if (!cuentaUtilizable(docente)) {
       await conn.rollback();
       return res.status(400).json({ mensaje: `La cuenta de ${docente.Usuario_Nombre_Completo} está inactiva` });
     }
@@ -205,7 +207,7 @@ async function docenteTieneRelacion(conn, docenteId, cursoId) {
 const getEstudiantesDeCurso = async (req, res) => {
   const cursoId = Number(req.params.id);
   if (!idValido(cursoId)) return res.status(400).json({ mensaje: 'Curso no válido' });
-  const admin = esAdministrador(req.user);
+  const admin = puedeGestionAcademica(req.user); // administración o etiqueta UTP
   const docente = (req.user?.roles || []).includes('Docente');
   if (!admin && !docente) {
     return res.status(403).json({ mensaje: 'No tienes permiso para ver los estudiantes de este curso' });

@@ -9,6 +9,7 @@
 //        (tramos vacío = sin restricción). Ver guardarDisponibilidadDocente.
 // Las reglas están en utils/disponibilidadLaboral.js.
 const pool = require('../config/db');
+const { puedeGestionAcademica } = require('../utils/permisos');
 const { obtenerPeriodos } = require('../utils/periodos');
 const { condicionDesajustado } = require('../utils/bloquesDesajustados');
 const { registrarHistorial } = require('../utils/historial');
@@ -145,7 +146,8 @@ async function resolverPeriodo(db, pedido) {
 const getDisponibilidad = async (req, res) => {
   const { id } = req.params;
   if (!idValido(id)) return res.status(400).json({ mensaje: 'Docente no válido' });
-  const esAdmin = (req.user?.roles || []).includes('Administrador');
+  // Lectura: administración, etiqueta UTP (horarios por docente) o el propio docente
+  const esAdmin = puedeGestionAcademica(req.user);
   if (!esAdmin && Number(req.user?.id) !== Number(id)) {
     return res.status(403).json({ mensaje: 'Solo puedes ver tu propia disponibilidad laboral' });
   }

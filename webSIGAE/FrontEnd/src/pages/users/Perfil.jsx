@@ -8,7 +8,8 @@ import HorarioAtencionSemanal from "../../components/HorarioAtencionSemanal";
 import { apiFetch, getAsignacionesDocente, getEstudiantesAsociados, getDetalleEstudiante, editarPerfilPropio, confirmarCorreoPropio, actualizarFotoPerfil } from "../../services/api";
 import { CampoCodigo, AvisoDevCodigo, textoReenviar } from "../../components/CodigoVerificacion";
 import useEspera from "../../hooks/useEspera";
-import { validarTelefonoChileno, validarDireccion, formatearDireccion, COLUMNAS_DIRECCION_ESTUDIANTE, MENSAJE_TELEFONO } from "../../utils/validaciones";
+import { tieneEtiquetaUTP } from "../../utils/permisos";
+import { validarTelefonoChileno, validarDireccion, formatearDireccion, COLUMNAS_DIRECCION_ESTUDIANTE, MENSAJE_TELEFONO, validarRut, normalizarRut, validarNombreCompleto } from "../../utils/validaciones";
 
 // CU20: placeholder cuando el usuario no tiene fotografía de perfil registrada
 const FOTO_PERFIL_PLACEHOLDER =
@@ -22,7 +23,9 @@ const FOTO_PERFIL_PLACEHOLDER =
   );
 
 function Perfil() {
-  const { usuario } = useAuth();
+  const { usuario, actualizarUsuario } = useAuth();
+  // El Super Administrador puede corregir su propio nombre y RUT (nadie más)
+  const puedeEditarIdentidad = usuario?.administradorTipo === "Super Admin";
   const { id: idParam } = useParams();
   const idObjetivo = idParam || usuario?.id;
   const esPerfilPropio = !idParam || String(idParam) === String(usuario?.id);
@@ -66,7 +69,7 @@ function Perfil() {
 
   // CU19: editar datos personales del propio perfil (correo, teléfono y/o dirección)
   const [editandoPerfil, setEditandoPerfil] = useState(false);
-  const [formPerfil, setFormPerfil] = useState({ correo: "", telefono: "", calle: "", numero: "", depto: "", comuna: "" });
+  const [formPerfil, setFormPerfil] = useState({ nombre: "", rut: "", correo: "", telefono: "", calle: "", numero: "", depto: "", comuna: "" });
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [msgExitoPerfil, setMsgExitoPerfil] = useState("");
   const [msgErrorPerfil, setMsgErrorPerfil] = useState("");
@@ -187,6 +190,8 @@ function Perfil() {
     const roles = [];
     if (datos.Es_Administrador) roles.push("Administrador");
     if (datos.Es_Docente) roles.push("Docente");
+    // Etiqueta UTP: se muestra junto al rol de administrador o docente
+    if (tieneEtiquetaUTP(datos)) roles.push("UTP");
     if (datos.Es_Apoderado) roles.push("Apoderado");
     return roles;
   };
@@ -200,6 +205,7 @@ function Perfil() {
     }
     if (rol === "Docente") return <span key="docente" className="badge-rol badge-docente">Docente</span>;
     if (rol === "Apoderado") return <span key="apoderado" className="badge-rol badge-apoderado">Apoderado</span>;
+    if (rol === "UTP") return <span key="utp" className="badge-rol badge-utp" title="Etiqueta UTP">UTP</span>;
     return null;
   };
 
@@ -264,6 +270,8 @@ function Perfil() {
   // CU19: editar datos personales del propio perfil
   const abrirEdicionPerfil = () => {
     setFormPerfil({
+      nombre: datos?.Usuario_Nombre_Completo || "",
+      rut: datos?.Usuario_RUT || "",
       correo: datos?.Administrador_Correo_Institucional || datos?.Docente_Correo_Institucional || datos?.Apoderado_Correo_Natural || "",
       telefono: datos?.Usuario_Telefono || "",
       calle: datos?.Usuario_Direccion_Calle || "",
@@ -287,18 +295,37 @@ function Perfil() {
     setMsgErrorPerfil("");
     setMsgExitoPerfil("");
 
+    // Super Administrador: nombre y RUT propios
+    const nombreNuevo = formPerfil.nombre.trim();
+    const rutNuevo = normalizarRut(formPerfil.rut || "");
+    const cambiaNombre = puedeEditarIdentidad && nombreNuevo !== (datos?.Usuario_Nombre_Completo || "");
+    const cambiaRut = puedeEditarIdentidad && rutNuevo.toLowerCase() !== String(datos?.Usuario_RUT || "").toLowerCase();
+    if (cambiaNombre && !validarNombreCompleto(nombreNuevo)) {
+      setMsgErrorPerfil("Ingrese nombre y apellido, solo letras y espacios (ej: Juan Pérez)");
+      return;
+    }
+    if (cambiaRut) {
+      if (!validarRut(rutNuevo)) {
+        setMsgErrorPerfil("RUT inválido. Formato esperado: 12345678-9");
+        return;
+      }
+      if (!window.confirm(`Tu RUT pasará a ser ${rutNuevo}. Desde ahora iniciarás sesión con ese RUT. ¿Continuar?`)) return;
+    }
+
     // CU19 - Excepción "Formato de datos incorrecto": se valida antes de enviar
     if (!validarTelefonoChileno(formPerfil.telefono)) {
       setMsgErrorPerfil(MENSAJE_TELEFONO);
       return;
     }
-    // La dirección aplica a todo usuario: obligatoria para el apoderado; en los demás
-    // roles se valida y se envía solo si se ingresó
+    // La dirección es opcional para todo usuario: se envía si se ingresó o si ya había
+    // una (dejar todos los campos vacíos la borra); si se ingresa, va completa
     const { calle, numero, depto, comuna } = formPerfil;
+    const teniaDireccion = [datos?.Usuario_Direccion_Calle, datos?.Usuario_Direccion_Numero, datos?.Usuario_Direccion_Comuna]
+      .some((v) => String(v || "").trim() !== "");
     const incluyeDireccion =
-      !!datos?.Es_Apoderado || [calle, numero, depto, comuna].some((v) => String(v || "").trim() !== "");
+      teniaDireccion || [calle, numero, depto, comuna].some((v) => String(v || "").trim() !== "");
     if (incluyeDireccion) {
-      const erroresDireccion = Object.values(validarDireccion(formPerfil));
+      const erroresDireccion = Object.values(validarDireccion(formPerfil, { opcional: true }));
       if (erroresDireccion.length > 0) {
         setMsgErrorPerfil(erroresDireccion[0]);
         return;
@@ -311,8 +338,13 @@ function Perfil() {
       const payload = { telefono: formPerfil.telefono };
       if (tieneCorreo) payload.correo = formPerfil.correo;
       if (incluyeDireccion) payload.direccion = { calle, numero, depto, comuna };
+      if (cambiaNombre) payload.nombre = nombreNuevo;
+      if (cambiaRut) payload.rut = rutNuevo;
 
       const data = await editarPerfilPropio(payload);
+      if (data.usuario) {
+        actualizarUsuario({ nombre: data.usuario.Usuario_Nombre_Completo, rut: data.usuario.Usuario_RUT });
+      }
       recargarDatos();
       if (data.verificacionCorreo?.pendiente) {
         // El correo cambia al ingresar el código (tarjeta "Confirmar nuevo correo")
@@ -719,14 +751,40 @@ function Perfil() {
           <div className="perfil-card" id="editar-perfil-propio">
             <h2>Editar Perfil</h2>
             <form className="cambiar-pwd-form" onSubmit={handleGuardarPerfil}>
-              <div className="campo-pwd">
-                <label>Nombre Completo</label>
-                <input value={datos?.Usuario_Nombre_Completo || ""} readOnly disabled />
-              </div>
-              <div className="campo-pwd">
-                <label>RUT</label>
-                <input value={datos?.Usuario_RUT || ""} readOnly disabled />
-              </div>
+              {puedeEditarIdentidad ? (
+                <>
+                  <div className="campo-pwd">
+                    <label htmlFor="nombrePerfil">Nombre Completo</label>
+                    <input
+                      id="nombrePerfil"
+                      maxLength={100}
+                      value={formPerfil.nombre}
+                      onChange={(e) => setFormPerfil((f) => ({ ...f, nombre: e.target.value }))}
+                    />
+                  </div>
+                  <div className="campo-pwd">
+                    <label htmlFor="rutPerfil">RUT</label>
+                    <input
+                      id="rutPerfil"
+                      placeholder="12345678-9"
+                      value={formPerfil.rut}
+                      onChange={(e) => setFormPerfil((f) => ({ ...f, rut: normalizarRut(e.target.value) }))}
+                    />
+                    <span className="etiquetas-ayuda">Es tu usuario para iniciar sesión: si lo cambias, ingresarás con el nuevo RUT.</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="campo-pwd">
+                    <label>Nombre Completo</label>
+                    <input value={datos?.Usuario_Nombre_Completo || ""} readOnly disabled />
+                  </div>
+                  <div className="campo-pwd">
+                    <label>RUT</label>
+                    <input value={datos?.Usuario_RUT || ""} readOnly disabled />
+                  </div>
+                </>
+              )}
               {!!(datos?.Es_Administrador || datos?.Es_Docente || datos?.Es_Apoderado) && (
                 <div className="campo-pwd">
                   <label htmlFor="correoPerfil">Correo</label>

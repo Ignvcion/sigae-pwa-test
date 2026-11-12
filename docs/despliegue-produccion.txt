@@ -303,12 +303,18 @@ diagnóstico. Lo que aún no se conoce está marcado como [POR DEFINIR].)
     esquema.
   - /var/sigae/uploads: NO la cubren los snapshots; respaldarla aparte.
     [POR DEFINIR] Cómo (p. ej. cron diario hacia S3).
+  - Base de datos por correo: scripts/enviarRespaldo.js envía cada día un
+    volcado comprimido a respaldosigae@colegiojc.cl, con fecha, hora, SHA-256
+    y cómo cargarlo. Requiere mariadb-client en la EC2 y un timer/cron; usa
+    sigae_app salvo que se configure un usuario de solo lectura
+    (RESPALDO_DB_USER, opcional). Ver docs/respaldos-por-correo.md.
   - Cierre de período (Gestión Académica › Cierre de Período): el super
-    administrador descarga un Excel con lo que se va a eliminar y lo sube al
-    Drive de respaldosigae@colegiojc.cl. Tiene datos personales de menores:
-    no se guarda en equipos personales.
+    administrador descarga un Excel con lo que se va a eliminar; SIGAE envía
+    además una copia por correo a respaldosigae@colegiojc.cl (si falla, se
+    sube a mano a su Drive). Tiene datos personales de menores: no se guarda
+    en equipos personales.
   - scripts/backup.sh no se usa en producción (ignora DB_PORT y DB_SSL y
-    pide permisos que sigae_app no tiene).
+    pide permisos que sigae_app no tiene): lo reemplaza enviarRespaldo.js.
 
 ======================================================================
 12. ACTUALIZACIONES

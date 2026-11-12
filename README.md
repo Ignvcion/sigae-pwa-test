@@ -118,6 +118,8 @@ Toda la documentación, salvo este README, está en `docs/`. No agregues archivo
 | [`docs/navegacion-sidebar.md`](docs/navegacion-sidebar.md) | Cómo funciona el sidebar (`MainLayout.jsx`), reglas para agregar enlaces y pendientes conocidos. |
 | [`docs/tabla-historial.md`](docs/tabla-historial.md) | Estado de la tabla de auditoría `historial` y cómo se escriben sus valores. |
 | [`docs/despliegue-produccion.txt`](docs/despliegue-produccion.txt) | Todo lo conocido del despliegue en Amazon (EC2 + RDS): orden de pasos, sparse-checkout, carga de la base, `.env`, primer super administrador, Nginx, respaldos y checklist final. |
+| [`docs/notificaciones.md`](docs/notificaciones.md) | Notificaciones de mensajes y citaciones (CU101): qué las genera, a quién llegan y su API. |
+| [`docs/respaldos-por-correo.md`](docs/respaldos-por-correo.md) | Respaldo diario de la base y copia del Excel del cierre de período enviados por correo a `respaldosigae@colegiojc.cl`: puesta en marcha, filtro de Gmail, copia a Drive y cómo cargar un respaldo. |
 | [`docs/mailer-smtp-produccion.md`](docs/mailer-smtp-produccion.md) | Cómo dejar funcionando el envío de códigos por correo en producción (Google Workspace, SPF/DKIM/DMARC, prueba desde la EC2 y diagnóstico de errores). |
 | [`docs/decisiones-rf60-rf61-periodos.txt`](docs/decisiones-rf60-rf61-periodos.txt) | Acuerdos del Incremento 4 que van más allá del mockup: profesor jefe, situación final, promoción, períodos lectivos y limpieza de datos. |
 
@@ -308,7 +310,8 @@ El backend escucha solo en `127.0.0.1:3000`; únicamente Nginx llega a él.
 
 - La RDS: snapshots automáticos (y uno manual antes de cualquier cambio de esquema).
 - **`/var/sigae/uploads` no la cubren los snapshots de la RDS**: respáldala aparte.
-- Al cambiar de período (Gestión Académica › Cierre de Período), el super administrador descarga un Excel con todo lo que se va a eliminar (cursos de dos períodos atrás, sus egresados y retirados con su historial, y apoderados sin estudiantes) y lo sube al Google Drive de la cuenta de respaldos **`respaldosigae@colegiojc.cl`**. Tiene datos personales de menores: no se guarda en equipos personales.
+- Al cambiar de período (Gestión Académica › Cierre de Período), el super administrador descarga un Excel con todo lo que se va a eliminar (cursos de dos períodos atrás, sus egresados y retirados con su historial, y apoderados sin estudiantes) y SIGAE envía una copia por correo a la cuenta de respaldos **`respaldosigae@colegiojc.cl`** (si el envío falla, se sube a mano a su Google Drive). Tiene datos personales de menores: no se guarda en equipos personales.
+- **Respaldo diario por correo:** `scripts/enviarRespaldo.js` envía cada día un volcado comprimido de la base a `respaldosigae@colegiojc.cl`, con fecha, hora, SHA-256 y cómo cargarlo en caso de contingencia. Puesta en marcha (cliente de MariaDB, usuario de solo lectura, timer, filtro de Gmail y copia a Drive): [`docs/respaldos-por-correo.md`](docs/respaldos-por-correo.md).
 
 ### Actualizar el backend
 

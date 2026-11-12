@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch, getUsuariosPorFiltro } from "../../services/api";
 import { normalizarTexto } from "../../utils/validaciones";
+import { tieneEtiquetaUTP } from "../../utils/permisos";
 
 function Usuarios() {
   const { usuario } = useAuth();
@@ -126,6 +127,8 @@ const cambiarEstadoCuenta = async (u) => {
       }
     }
     if (u.Es_Docente) badges.push(<span key="doc" className="badge-rol badge-docente">Docente</span>);
+    // Etiqueta UTP: junto al rol de administrador o docente
+    if (tieneEtiquetaUTP(u)) badges.push(<span key="utp" className="badge-rol badge-utp" title="Etiqueta UTP">UTP</span>);
     if (u.Es_Apoderado) badges.push(<span key="apo" className="badge-rol badge-apoderado">Apoderado</span>);
     return badges.length > 0 ? badges : <span style={{ color: "#94a3b8" }}>Sin roles</span>;
   };

@@ -146,7 +146,12 @@ function Administradores() {
             {administradores.map((a, idx) => (
               <tr key={a.Usuario_Id}>
                 <td>{idx + 1}</td>
-                <td>{a.Usuario_Nombre_Completo}</td>
+                <td>
+                  {a.Usuario_Nombre_Completo}
+                  {a.Administrador_Tipo === "UTP" && (
+                    <span className="badge-rol badge-utp" title="Etiqueta UTP" style={{ marginLeft: "6px" }}>UTP</span>
+                  )}
+                </td>
                 <td>{a.Administrador_Correo_Institucional || "—"}</td>
                 <td>{a.Usuario_Telefono || "—"}</td>
                 <td>

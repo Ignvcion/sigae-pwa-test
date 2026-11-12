@@ -1,5 +1,5 @@
 const express = require('express');
-const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
+const { verifyToken, verifyGestionAcademica } = require('../middleware/authMiddleware');
 const {
   getHorarios,
   getCursos,
@@ -40,6 +40,8 @@ const {
 const router = express.Router();
 
 // Todos los endpoints requieren autenticación
+// Horarios: la escritura, las consultas globales y las suspensiones son de la
+// administración y de la etiqueta UTP (utils/permisos.js).
 router.use(verifyToken);
 
 // Datos de apoyo para formularios
@@ -53,10 +55,10 @@ router.get('/docentes-disponibles',  getDocentesDisponibles);
 
 // CU68 / RF44: Filtrar grilla horaria reactivamente — Super Admin/Admin
 // (expone el horario de toda la institución)
-router.get('/filtrar', verifyAdmin, filtrarHorarios);
+router.get('/filtrar', verifyGestionAcademica, filtrarHorarios);
 
 // CU67 / RF43: Consultar bloques horarios libres — Super Admin/Admin
-router.get('/bloques-libres', verifyAdmin, getBloquesLibres);
+router.get('/bloques-libres', verifyGestionAcademica, getBloquesLibres);
 
 // CU69, CU71 / RF45: Detalle informativo de un bloque horario
 // (Admin, o el docente de esa clase: la autorización se resuelve en el controlador)
@@ -72,36 +74,36 @@ router.get('/docente/:docenteId/horario', getHorarioDocente);
 router.get('/estudiante/:estudianteId/horario', getHorarioEstudiante);
 
 // CU57: vista consolidada del horario de toda la institución — solo Super Admin/Admin
-router.get('/maestro', verifyAdmin, getHorarioMaestro);
+router.get('/maestro', verifyGestionAcademica, getHorarioMaestro);
 
 // Exportación de horarios (CU60, CU61, CU62) — Super Admin/Admin.
-router.get('/exportar/maestro',            verifyAdmin, exportarMaestro);
+router.get('/exportar/maestro',            verifyGestionAcademica, exportarMaestro);
 router.get('/exportar/docente/:usuarioId', exportarPorDocente);
-router.get('/exportar/curso/:cursoId',     verifyAdmin, exportarPorCurso);
+router.get('/exportar/curso/:cursoId',     verifyGestionAcademica, exportarPorCurso);
 
 // CRUD horario — solo admin puede crear/editar (CU54)
 // Edición masiva de bloques programados — Super Admin/Admin.
 // Deben ir antes de '/:id' para no ser capturadas por el parámetro.
 // CU63: Reasignando docente en múltiples bloques
-router.post('/reasignar-docente/validar', verifyAdmin, validarReasignacion);
-router.put('/reasignar-docente',          verifyAdmin, reasignarDocente);
+router.post('/reasignar-docente/validar', verifyGestionAcademica, validarReasignacion);
+router.put('/reasignar-docente',          verifyGestionAcademica, reasignarDocente);
 // CU64: Modificando múltiples bloques horarios
-router.get('/opciones-edicion',           verifyAdmin, getOpcionesEdicion);
-router.post('/multiples/validar',         verifyAdmin, validarCambiosMultiples);
-router.put('/multiples',                  verifyAdmin, modificarMultiplesBloques);
+router.get('/opciones-edicion',           verifyGestionAcademica, getOpcionesEdicion);
+router.post('/multiples/validar',         verifyGestionAcademica, validarCambiosMultiples);
+router.put('/multiples',                  verifyGestionAcademica, modificarMultiplesBloques);
 
 // CU65 / CU66 — Suspensión de bloques y de jornada por evento institucional
-router.post('/suspender-bloques', verifyAdmin, suspenderBloques);
-router.post('/suspender-jornada', verifyAdmin, suspenderJornadaCompleta);
+router.post('/suspender-bloques', verifyGestionAcademica, suspenderBloques);
+router.post('/suspender-jornada', verifyGestionAcademica, suspenderJornadaCompleta);
 
 // CRUD horario — solo admin puede crear/editar (CU54); la lectura permite
 // el filtrado por rol ya implementado dentro de getHorarios.
 router.get('/',            getHorarios);
-router.post('/',           verifyAdmin, createHorario);
-router.put('/:id',         verifyAdmin, updateHorario);
-router.patch('/:id/estado', verifyAdmin, cambiarEstado);
+router.post('/',           verifyGestionAcademica, createHorario);
+router.put('/:id',         verifyGestionAcademica, updateHorario);
+router.patch('/:id/estado', verifyGestionAcademica, cambiarEstado);
 // Eliminar una clase la deja en el listado de eliminadas; desde ahí se restaura
-router.delete('/:id',          verifyAdmin, eliminarHorario);
-router.patch('/:id/restaurar', verifyAdmin, restaurarHorario);
+router.delete('/:id',          verifyGestionAcademica, eliminarHorario);
+router.patch('/:id/restaurar', verifyGestionAcademica, restaurarHorario);
 
 module.exports = router;

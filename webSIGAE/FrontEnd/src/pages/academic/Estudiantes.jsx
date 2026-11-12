@@ -14,6 +14,7 @@ import {
   COLUMNAS_DIRECCION_ESTUDIANTE,
 } from "../../utils/validaciones";
 import { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
+import { esAdministradorCompleto, puedeGestionAcademica } from "../../utils/permisos";
 
 // Campos de la dirección separada del estudiante (Incremento 3)
 const CAMPOS_DIRECCION_FICHA = [
@@ -30,9 +31,11 @@ const ESTADOS_ACADEMICOS = ["Regular", "Irregular", "En práctica", "Egresado", 
 const RUTAS_FORMACION = ["Científica", "Humanística", "Técnica"];
 
 function Estudiantes() {
-  const { usuario } = useAuth();
-  const esAdmin =
-    usuario?.roles?.includes("Administrador") || usuario?.administradorTipo === "Super Admin";
+  const { usuario, rolActivo } = useAuth();
+  // Edición de la ficha: administración y etiqueta UTP. La UTP asigna estudiantes a
+  // cursos: solo cambia curso, estado académico y ruta (sin dirección ni apoderados).
+  const esAdmin = puedeGestionAcademica(usuario, rolActivo);
+  const esAdminCompleto = esAdministradorCompleto(usuario, rolActivo);
 
   const [estudiantes, setEstudiantes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -99,6 +102,8 @@ function Estudiantes() {
     pedirEstudiantes({}, true);
     if (esAdmin) {
       getCursos().then(setCursosOpciones).catch(() => {});
+    }
+    if (esAdminCompleto) {
       getApoderados().then((data) => setApoderadosOpciones(Array.isArray(data) ? data : [])).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -175,8 +180,9 @@ function Estudiantes() {
     setMsgErrorForm("");
     setMsgExitoForm("");
 
-    // Dirección: se valida y envía si se ingresó (fichas antiguas pueden no tenerla)
-    const incluyeDireccion = CAMPOS_DIRECCION_FICHA.some(({ clave }) => String(form[clave]).trim() !== "");
+    // Dirección: se valida y envía si se ingresó (fichas antiguas pueden no tenerla).
+    // La etiqueta UTP no edita la dirección.
+    const incluyeDireccion = esAdminCompleto && CAMPOS_DIRECCION_FICHA.some(({ clave }) => String(form[clave]).trim() !== "");
     if (incluyeDireccion) {
       const erroresDireccion = Object.values(validarDireccion(form));
       if (erroresDireccion.length > 0) {
@@ -341,9 +347,11 @@ function Estudiantes() {
                           <button className="btn-roles" onClick={() => abrirEdicion(e)}>
                             Editar ficha
                           </button>
-                          <button className="btn-roles" onClick={() => abrirEdicionAsociacion(e)}>
-                            Apoderados
-                          </button>
+                          {esAdminCompleto && (
+                            <button className="btn-roles" onClick={() => abrirEdicionAsociacion(e)}>
+                              Apoderados
+                            </button>
+                          )}
                         </div>
                       </td>
                     )}
@@ -419,8 +427,8 @@ function Estudiantes() {
                 <span className="etiquetas-ayuda">Solo para 2°, 3° y 4° medio. La Técnica no afecta horarios ni electivos.</span>
               </div>
 
-              {/* Incremento 3: dirección separada del estudiante */}
-              {CAMPOS_DIRECCION_FICHA.map(({ clave, label, maxLength }) => (
+              {/* Incremento 3: dirección separada del estudiante (no la edita la etiqueta UTP) */}
+              {esAdminCompleto && CAMPOS_DIRECCION_FICHA.map(({ clave, label, maxLength }) => (
                 <div className="campo-pwd" key={clave}>
                   <label>{label}</label>
                   <input

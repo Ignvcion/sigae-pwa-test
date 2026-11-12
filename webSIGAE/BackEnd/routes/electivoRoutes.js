@@ -1,9 +1,9 @@
 // routes/electivoRoutes.js
 // Electivos de 3° y 4° medio: plan del período (CU108) y programación en bloques
-// compartidos (CU106). La gestión es del Administrador y Super Administrador; los
+// compartidos (CU106). La gestión es del Administrador, el Super Administrador y la etiqueta UTP; los
 // electivos se ven además en los horarios del curso, del docente y del estudiante.
 const express = require('express');
-const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
+const { verifyToken, verifyGestionAcademica } = require('../middleware/authMiddleware');
 const {
   getPlan,
   crearPlan,
@@ -17,7 +17,8 @@ const {
 
 const router = express.Router();
 
-router.use(verifyToken, verifyAdmin);
+// Administración y etiqueta UTP (utils/permisos.js)
+router.use(verifyToken, verifyGestionAcademica);
 
 // CU108: plan de electivos del período
 router.get('/plan',          getPlan);

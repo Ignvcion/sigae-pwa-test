@@ -195,7 +195,7 @@ describe('validateCrearUsuario', () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ mensaje }));
   });
 
-  test('exige la dirección a un administrador', async () => {
+  test('la dirección es opcional, pero si se ingresa debe ir completa', async () => {
     const admin = {
       Usuario_RUT: '9343727-6',
       Usuario_Nombre_Completo: 'Carlos Gonzales',
@@ -204,7 +204,9 @@ describe('validateCrearUsuario', () => {
       Administrador_Correo_Institucional: 'ca.gonzales@colegiojc.cl',
     };
     const sinDireccion = await ejecutarCadena(validateCrearUsuario, admin);
-    expect(sinDireccion.llegoAlFinal).toBe(false);
+    expect(sinDireccion.llegoAlFinal).toBe(true);
+    const incompleta = await ejecutarCadena(validateCrearUsuario, { ...admin, Usuario_Direccion_Calle: 'Av. Matta' });
+    expect(incompleta.llegoAlFinal).toBe(false);
     const conDireccion = await ejecutarCadena(validateCrearUsuario, {
       ...admin,
       Usuario_Direccion_Calle: 'Av. Matta',

@@ -1,9 +1,11 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { etiquetaRol } from "../../utils/permisos";
 
 // Descripción de cada perfil para ayudar a elegir con cuál ingresar
 const INFO_ROLES = {
   Administrador: { icono: "🛡️", detalle: "Usuarios, cursos, planes y horarios" },
+  UTP:           { icono: "🧭", detalle: "Planes, asignaturas, electivos, horarios y eventos" },
   Docente:       { icono: "📚", detalle: "Tus clases, horario, citaciones y mensajes" },
   Apoderado:     { icono: "👪", detalle: "Horario de tus alumnos, citaciones y mensajes" },
 };
@@ -62,7 +64,7 @@ function SelectRole() {
               >
                 <span className="role-button-icono" aria-hidden="true">{info.icono}</span>
                 <span className="role-button-texto">
-                  <strong>{rol}</strong>
+                  <strong>{etiquetaRol(rol, usuario)}</strong>
                   {info.detalle && <small>{info.detalle}</small>}
                 </span>
                 <span className="role-button-flecha" aria-hidden="true">→</span>

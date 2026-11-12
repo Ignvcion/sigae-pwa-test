@@ -1,0 +1,90 @@
+SIGAE - Etiqueta UTP, cuenta inactiva hasta el primer ingreso y dirección opcional
+(sin cambios en la base de datos)
+
+======================================================================
+1. ETIQUETA UTP (Gestión de roles)
+======================================================================
+
+1.1 UTP es una etiqueta (grupo de permisos), no un rol. La asigna o la retira
+    el SUPER ADMINISTRADOR en Gestión de roles, a un Administrador o a un
+    Docente. Se muestra junto al rol: "Administrador · UTP" / "Docente · UTP".
+    API: PUT /api/usuarios/:id/etiqueta-utp  { utp: true | false }
+    Al cambiarla se cierran las sesiones abiertas del usuario y queda en el
+    historial. Un Super Administrador no puede tenerla.
+
+1.2 Sin columnas nuevas: se guarda en usuario.Administrador_Tipo = 'UTP'.
+      - Administrador con UTP: Es_Administrador = 1, Administrador_Tipo = 'UTP'.
+      - Docente con UTP: Es_Docente = 1, Es_Administrador = 0, Administrador_Tipo = 'UTP'.
+    La etiqueta se conserva mientras el usuario sea Administrador o Docente
+    (al quitarle esos roles se borra). Reglas: BackEnd/utils/permisos.js.
+
+1.3 Administrador con UTP: sus permisos SE PODAN. Inicia sesión con el rol
+    'UTP' (no 'Administrador'), así que toda verificación de administrador
+    (verifyAdmin y las de los controladores) lo rechaza por defecto.
+    Docente con UTP: sus permisos SE EXTIENDEN. Conserva el rol 'Docente' y la
+    sesión lleva utp = true.
+
+1.4 Permisos de la UTP (middleware verifyGestionAcademica):
+      - Velar por los Planes y Programas: asignaturas (crear, editar, color) y
+        planes educativos (registrar, clonar, editar).
+      - Cambios de Plan Electivo: plan de electivos y programación de
+        electivos; ruta de formación de los estudiantes. La restricción de la
+        "primera quincena del año escolar" NO se valida en el sistema.
+      - Mantener a disposición de los docentes: horario maestro, horario por
+        docente y por curso, consulta de horarios, bloques libres, detalle de
+        bloque y exportaciones.
+      - Calendario de actividades curriculares: eventos institucionales y
+        suspensión de bloques o jornadas. En Parámetros institucionales solo
+        se ve la pestaña de eventos: no ve ni toca los parámetros ni los
+        bloques horarios (ni las clases por reubicar).
+      - Apoyo: creador de horarios (crear, editar, eliminar y restaurar clases,
+        edición masiva, reasignación), cursos y sus asignaturas, y asignación
+        de estudiantes a cursos (en la ficha solo curso, estado académico y
+        ruta; no dirección ni apoderados).
+    NO incluye: usuarios, registros, roles, apoderados, jefaturas, situación
+    final, promoción, cierre de período, citaciones de la institución ni
+    calendario de evaluaciones.
+
+======================================================================
+2. CUENTA INACTIVA HASTA EL PRIMER INICIO DE SESIÓN
+======================================================================
+
+2.1 El registro ya no elige el estado: toda cuenta nueva queda INACTIVA
+    (Usuario_Estado_Cuenta = 0). El aviso del registro lo dice: "La cuenta
+    figura como inactiva hasta el primer inicio de sesión del usuario".
+
+2.2 Sin columnas nuevas (BackEnd/utils/primerIngreso.js), una cuenta inactiva
+    "espera su primer ingreso" si nunca ha tenido una sesión (tabla `sesion`)
+    y no fue inactivada por quedar sin estudiantes asociados
+    (Apoderado_Sin_Asociaciones_Desde). Esa cuenta:
+      - puede iniciar sesión (con el código de activación al correo) y
+        recuperar su contraseña; al completar el primer ingreso pasa a ACTIVA;
+      - se puede asignar como una activa: asociar estudiantes a un apoderado,
+        asignar clases, electivos o jefaturas a un docente.
+
+2.3 Limitación conocida (decidida): si la administración desactiva a mano una
+    cuenta que nunca ha iniciado sesión, esa cuenta igual podrá hacer su
+    primer ingreso (no hay cómo distinguirla sin una columna nueva).
+
+2.4 PRODUCCIÓN: antes de publicar, revisar si hay cuentas desactivadas que
+    nunca iniciaron sesión; con este cambio podrían entrar:
+
+    SELECT u.Usuario_Id, u.Usuario_RUT, u.Usuario_Nombre_Completo
+      FROM usuario u
+     WHERE u.Usuario_Estado_Cuenta = 0
+       AND u.Apoderado_Sin_Asociaciones_Desde IS NULL
+       AND NOT EXISTS (SELECT 1 FROM sesion s WHERE s.Usuario_Id = u.Usuario_Id);
+
+======================================================================
+3. DIRECCIÓN OPCIONAL
+======================================================================
+
+3.1 La dirección particular de los usuarios (registro, perfil, edición y
+    asignación del rol apoderado) es opcional, igual que el número de
+    departamento/casa. Si se ingresa, calle, número y comuna van completos.
+    Dejar todos los campos vacíos la borra.
+3.2 La dirección de la ficha del estudiante sigue siendo obligatoria.
+3.3 Reglas: validarDireccion(..., { opcional: true }) en
+    BackEnd/middleware/validation.js y FrontEnd/src/utils/validaciones.js.
+
+Pruebas: BackEnd/tests/utpEstadoInicial.test.js.

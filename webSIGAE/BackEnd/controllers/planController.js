@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { cuentaUtilizableSQL } = require('../utils/primerIngreso');
 
 const MSG_DUPLICADA = (nombre, tramo) => `Ya existe una asignatura "${nombre}" en el tramo ${tramo}`;
 const MSG_ELECTIVA_EN_PLAN = (nombre) =>
@@ -320,7 +321,7 @@ const clonarPlan = async (req, res) => {
        JOIN asignatura a  ON a.Asignatura_Id = ha.Asignatura_Id
        JOIN curso      c  ON c.Curso_Id      = ha.Curso_Id
        JOIN incluyeasig ia ON ia.Asignatura_Id = ha.Asignatura_Id AND ia.Plan_Educativo_Id = ?
-       WHERE (u.Es_Docente = 0 OR u.Usuario_Estado_Cuenta = 0) AND ${claseVigente('ha')}`,
+       WHERE (u.Es_Docente = 0 OR NOT ${cuentaUtilizableSQL('u')}) AND ${claseVigente('ha')}`,
       [plan_origen_id]
     );
 

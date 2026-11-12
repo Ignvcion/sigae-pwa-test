@@ -1497,6 +1497,7 @@ select {
 .perfil-campo .badge-admin      { color: #1e40af; }
 .perfil-campo .badge-docente    { color: #166534; }
 .perfil-campo .badge-apoderado  { color: #92400e; }
+.perfil-campo .badge-utp        { color: #6d28d9; }
 
 .perfil-roles {
   display: flex;
@@ -1516,6 +1517,8 @@ select {
 .badge-superadmin { background: #0f172a; color: white; }
 .badge-docente { background: #dcfce7; color: #166534; }
 .badge-apoderado { background: #fef3c7; color: #92400e; }
+/* Etiqueta UTP (grupo de permisos), junto al rol */
+.badge-utp { background: #ede9fe; color: #6d28d9; }
 
 .badge-activo { background: #dcfce7; color: #166534; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
 .badge-inactivo { background: #fee2e2; color: #991b1b; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
@@ -2993,4 +2996,145 @@ button.btn-enlace:disabled {
   background: #fef2f2;
   border-color: #fecaca;
   color: #991b1b;
+}
+
+/* ── CU101: campana de notificaciones (sidebar) ───────────────────── */
+.notificaciones {
+  margin-top: 10px;
+}
+
+.notificaciones-boton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-top: 0;
+}
+
+.notificaciones-boton:hover {
+  background: #273449;
+}
+
+.notificaciones-contador {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #ef4444;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Fijo junto al sidebar: el sidebar tiene overflow y recortaría un panel absoluto */
+.notificaciones-panel {
+  position: fixed;
+  top: 20px;
+  left: 270px;
+  z-index: 2000;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  background: white;
+  color: #0f172a;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.25);
+}
+
+.notificaciones-encabezado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.notificaciones-vacio {
+  padding: 16px 14px;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.notificaciones-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.notificacion-item {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
+  background: white;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  margin-top: 0;
+  border-radius: 0;
+}
+
+.notificacion-item:hover {
+  background: #f8fafc;
+}
+
+.notificacion-no-leida {
+  background: #eff6ff;
+}
+
+.notificacion-icono {
+  font-size: 1.1rem;
+}
+
+.notificacion-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.notificacion-titulo {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.notificacion-no-leida .notificacion-titulo::after {
+  content: " •";
+  color: #2563eb;
+}
+
+.notificacion-detalle {
+  font-size: 0.82rem;
+  color: #475569;
+  overflow-wrap: anywhere;
+}
+
+.notificacion-fecha {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+@media (max-width: 768px) {
+  .notificaciones-panel {
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
+}
+
+body.horarios-panel-open .sidebar .notificaciones,
+body.horarios-listado-open .sidebar .notificaciones {
+  display: none;
 }
