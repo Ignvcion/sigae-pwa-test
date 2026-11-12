@@ -66,6 +66,7 @@ const especialidadRoutes = require('./routes/especialidadRoutes');
 const evaluacionRoutes = require('./routes/evaluacionRoutes');
 const electivoRoutes = require('./routes/electivoRoutes');
 const colorRoutes = require('./routes/colorRoutes');
+const notificacionRoutes = require('./routes/notificacionRoutes');
 
 app.use('/api/auth',        authRoutes);
 app.use('/api/usuarios',    usuarioRoutes);
@@ -83,6 +84,7 @@ app.use('/api/especialidades', especialidadRoutes);
 app.use('/api/evaluaciones', evaluacionRoutes);
 app.use('/api/electivos', electivoRoutes);
 app.use('/api/colores', colorRoutes);
+app.use('/api/notificaciones', notificacionRoutes);
 
 // 404
 app.use((req, res) => {

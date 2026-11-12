@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../pages/context/AuthContext";
 import { MOSTRAR_MIS_CURSOS } from "../config/funcionalidades";
-import { etiquetaRol, enlacesUTP, tieneUTPActiva } from "../utils/permisos";
+import { etiquetaRol, enlacesUTP, tieneUTPActiva, esAdministradorUTP } from "../utils/permisos";
+import CampanaNotificaciones from "../components/CampanaNotificaciones";
 
 function MainLayout() {
   const { usuario, rolActivo, logout } = useAuth();
@@ -99,6 +100,9 @@ function MainLayout() {
               <div className="rol-badge">
                 {rolEfectivo ? etiquetaRol(rolEfectivo, usuario) : "Usuario"}
               </div>
+
+              {/* CU101: notificaciones de mensajes y citaciones (no aplica al administrador con UTP) */}
+              {!esAdministradorUTP(usuario, rolActivo) && <CampanaNotificaciones rol={rolEfectivo} />}
             </div>
           )}
 

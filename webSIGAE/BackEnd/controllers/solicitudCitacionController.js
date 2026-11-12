@@ -4,6 +4,7 @@
 // estudiante y un tramo libre dentro del horario de atención del docente (RF55). La solicitud
 // queda "Pendiente de confirmación" hasta que el docente la acepta (CU75).
 const pool = require('../config/db');
+const { TIPOS, notificarCitacion } = require('../utils/notificaciones');
 const { claseVigente } = require('../utils/clasesEliminadas');
 const {
   aMinutos,
@@ -338,6 +339,10 @@ const solicitarCitacion = async (req, res) => {
     );
 
     const citacion = await buscarCitacionDelUsuario(resultado.insertId, req.user);
+    // CU101: el docente recibe la notificación de la solicitud
+    await notificarCitacion(pool, {
+      citacionId: resultado.insertId, tipo: TIPOS.SOLICITUD_CITACION, usuarioIds: [docenteId], actorId: apoderadoId,
+    });
     return res.status(201).json({
       mensaje: 'Solicitud de citación enviada. Queda pendiente hasta que el docente la confirme.',
       citacion,

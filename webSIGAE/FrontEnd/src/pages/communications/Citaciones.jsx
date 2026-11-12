@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getCitaciones, getCitacionesPendientes, getEstudiantes } from "../../services/api";
 import {
@@ -68,7 +68,20 @@ function Citaciones() {
   const [solicitudAbierta, setSolicitudAbierta] = useState(false);
   const [estudiantes, setEstudiantes] = useState([]);
   const [msgSinEstudiantes, setMsgSinEstudiantes] = useState("");
-  const [detalleId, setDetalleId] = useState(null);
+  // CU101: ?citacion=ID (desde una notificación) abre directamente el detalle
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [detalleId, setDetalleIdEstado] = useState(() => Number(searchParams.get("citacion")) || null);
+  const setDetalleId = (id) => {
+    setDetalleIdEstado(id);
+    if (!id && searchParams.has("citacion")) setSearchParams({}, { replace: true });
+  };
+  // Si llega otra notificación estando en la página, se abre esa citación
+  const citacionPedida = Number(searchParams.get("citacion")) || null;
+  const [citacionAbierta, setCitacionAbierta] = useState(citacionPedida);
+  if (citacionPedida && citacionPedida !== citacionAbierta) {
+    setCitacionAbierta(citacionPedida);
+    setDetalleIdEstado(citacionPedida);
+  }
 
   // CU78 pasos 1–4 (agenda) y CU75 getCitacionesPendientes(): se consultan juntas y el estado
   // se actualiza solo al recibir la respuesta

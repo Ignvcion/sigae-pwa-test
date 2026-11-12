@@ -118,6 +118,7 @@ Toda la documentación, salvo este README, está en `docs/`. No agregues archivo
 | [`docs/navegacion-sidebar.md`](docs/navegacion-sidebar.md) | Cómo funciona el sidebar (`MainLayout.jsx`), reglas para agregar enlaces y pendientes conocidos. |
 | [`docs/tabla-historial.md`](docs/tabla-historial.md) | Estado de la tabla de auditoría `historial` y cómo se escriben sus valores. |
 | [`docs/despliegue-produccion.txt`](docs/despliegue-produccion.txt) | Todo lo conocido del despliegue en Amazon (EC2 + RDS): orden de pasos, sparse-checkout, carga de la base, `.env`, primer super administrador, Nginx, respaldos y checklist final. |
+| [`docs/notificaciones.md`](docs/notificaciones.md) | Notificaciones de mensajes y citaciones (CU101): qué las genera, a quién llegan y su API. |
 | [`docs/respaldos-por-correo.md`](docs/respaldos-por-correo.md) | Respaldo diario de la base y copia del Excel del cierre de período enviados por correo a `respaldosigae@colegiojc.cl`: puesta en marcha, filtro de Gmail, copia a Drive y cómo cargar un respaldo. |
 | [`docs/mailer-smtp-produccion.md`](docs/mailer-smtp-produccion.md) | Cómo dejar funcionando el envío de códigos por correo en producción (Google Workspace, SPF/DKIM/DMARC, prueba desde la EC2 y diagnóstico de errores). |
 | [`docs/decisiones-rf60-rf61-periodos.txt`](docs/decisiones-rf60-rf61-periodos.txt) | Acuerdos del Incremento 4 que van más allá del mockup: profesor jefe, situación final, promoción, períodos lectivos y limpieza de datos. |

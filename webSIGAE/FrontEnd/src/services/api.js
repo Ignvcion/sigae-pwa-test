@@ -63,11 +63,12 @@ throw error;
 
 // ── CU19: Editar datos personales del propio perfil ──
 
-export async function editarPerfilPropio({ correo, telefono, direccion }) {
+// nombre y rut: solo el Super Administrador puede corregirlos en su propio perfil
+export async function editarPerfilPropio({ correo, telefono, direccion, nombre, rut }) {
   const res = await fetch(`${BASE_URL}/usuarios/perfil`, {
     method : 'PUT',
     headers: authHeaders(),
-    body   : JSON.stringify({ correo, telefono, direccion }),
+    body   : JSON.stringify({ correo, telefono, direccion, nombre, rut }),
   });
   return handleResponse(res);
 }
@@ -943,4 +944,22 @@ export async function eliminarElectivo(id) {
 
 export async function getElectivosDeCurso(cursoId) {
   return handleResponse(await apiFetch(`${BASE_URL}/electivos/curso/${cursoId}`));
+}
+
+// ── CU101: notificaciones de mensajes y citaciones ──
+export async function getNotificaciones(rol) {
+  const q = rol ? `?rol=${encodeURIComponent(rol)}` : '';
+  return handleResponse(await apiFetch(`${BASE_URL}/notificaciones${q}`));
+}
+
+export async function marcarNotificacionLeida(id) {
+  return handleResponse(await apiFetch(`${BASE_URL}/notificaciones/${id}/leida`, { method: 'PATCH' }));
+}
+
+export async function marcarNotificacionesLeidas(rol) {
+  return handleResponse(await apiFetch(`${BASE_URL}/notificaciones/leidas`, {
+    method : 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({ rol }),
+  }));
 }

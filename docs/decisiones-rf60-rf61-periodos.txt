@@ -268,7 +268,8 @@ Cada punto indica:
         jornada distinta);
       - preferencias del docente en el horario de atención;
       - RF62, notificaciones: la tabla notificacion queda en el esquema
-        sin uso;
+        sin uso; [ACTUALIZADO] ya implementadas como CU101, ver
+        docs/notificaciones.md;
       - modalidad técnico-profesional;
       - importación de datos desde Lirmi.
 8.3 [CORRIGE MOCKUP] RF55 dice que el sistema "advierte" un choque con
