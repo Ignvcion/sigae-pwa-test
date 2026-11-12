@@ -7,12 +7,13 @@ import HorarioSemanal from "../../components/horarios/HorarioSemanal";
 import AvisoTopes from "../../components/horarios/AvisoTopes";
 import HorarioAtencionSemanal from "../../components/HorarioAtencionSemanal";
 import { detectarTopes } from "../../utils/horarios";
+import { esAdministradorCompleto, esAdministradorUTP } from "../../utils/permisos";
 
 function MiHorario() {
   const { usuario, rolActivo } = useAuth();
-  const esAdmin =
-    (rolActivo || usuario?.roles?.[0]) === "Administrador" ||
-    usuario?.administradorTipo === "Super Admin";
+  // Horario de Docente (selector de docentes): administración y administrador con UTP.
+  // Un docente (con o sin UTP) ve aquí su propio horario.
+  const esAdmin = esAdministradorCompleto(usuario, rolActivo) || esAdministradorUTP(usuario, rolActivo);
 
   const [docentes, setDocentes] = useState([]);
   const [docenteId, setDocenteId] = useState(esAdmin ? "" : usuario?.id ?? "");

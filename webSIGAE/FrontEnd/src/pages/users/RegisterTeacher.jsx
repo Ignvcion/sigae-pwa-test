@@ -32,7 +32,6 @@ function RegisterTeacher() {
     horasPIE: "0",
     disponibilidad: [],
     horarioAtencion: [],
-    estado: "Activo",
   });
 
 
@@ -50,7 +49,7 @@ function RegisterTeacher() {
 
 
   const validarCampo = (name, value, datos = formData) => {
-    if (CAMPOS_DIRECCION.includes(name)) return errorCampoDireccion(name, value, datos);
+    if (CAMPOS_DIRECCION.includes(name)) return errorCampoDireccion(name, value, datos, true);
     switch (name) {
       case "nombre":
         return value && !validarNombreCompleto(value)
@@ -108,7 +107,7 @@ function RegisterTeacher() {
           disponibilidad: formData.disponibilidad,
         })[0] || ""
         : "",
-      ...validarDireccion(formData),
+      ...validarDireccion(formData, { opcional: true }),
     };
 
     if (Object.values(nuevosErrores).some((msg) => msg)) {
@@ -200,6 +199,7 @@ function RegisterTeacher() {
 
         <p className="form-registro-aviso">
           La contraseña se genera automáticamente y se envía al correo del usuario.
+          La cuenta queda inactiva hasta el primer inicio de sesión del usuario.
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -266,7 +266,8 @@ function RegisterTeacher() {
 
 
 
-          <CamposDireccion valores={formData} errores={errores} onChange={handleChange} />
+          {/* Dirección opcional: si se ingresa, va completa (calle, número y comuna) */}
+          <CamposDireccion valores={formData} errores={errores} onChange={handleChange} opcional />
 
 
 
@@ -380,22 +381,6 @@ function RegisterTeacher() {
 
 
 
-          <select
-            name="estado"
-            value={formData.estado}
-            onChange={handleChange}
-          >
-
-            <option value="Activo">
-              Activo
-            </option>
-
-            <option value="Inactivo">
-              Inactivo
-            </option>
-
-
-          </select>
 
 
 

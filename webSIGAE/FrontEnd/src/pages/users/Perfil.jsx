@@ -8,6 +8,7 @@ import HorarioAtencionSemanal from "../../components/HorarioAtencionSemanal";
 import { apiFetch, getAsignacionesDocente, getEstudiantesAsociados, getDetalleEstudiante, editarPerfilPropio, confirmarCorreoPropio, actualizarFotoPerfil } from "../../services/api";
 import { CampoCodigo, AvisoDevCodigo, textoReenviar } from "../../components/CodigoVerificacion";
 import useEspera from "../../hooks/useEspera";
+import { tieneEtiquetaUTP } from "../../utils/permisos";
 import { validarTelefonoChileno, validarDireccion, formatearDireccion, COLUMNAS_DIRECCION_ESTUDIANTE, MENSAJE_TELEFONO } from "../../utils/validaciones";
 
 // CU20: placeholder cuando el usuario no tiene fotografía de perfil registrada
@@ -187,6 +188,8 @@ function Perfil() {
     const roles = [];
     if (datos.Es_Administrador) roles.push("Administrador");
     if (datos.Es_Docente) roles.push("Docente");
+    // Etiqueta UTP: se muestra junto al rol de administrador o docente
+    if (tieneEtiquetaUTP(datos)) roles.push("UTP");
     if (datos.Es_Apoderado) roles.push("Apoderado");
     return roles;
   };
@@ -200,6 +203,7 @@ function Perfil() {
     }
     if (rol === "Docente") return <span key="docente" className="badge-rol badge-docente">Docente</span>;
     if (rol === "Apoderado") return <span key="apoderado" className="badge-rol badge-apoderado">Apoderado</span>;
+    if (rol === "UTP") return <span key="utp" className="badge-rol badge-utp" title="Etiqueta UTP">UTP</span>;
     return null;
   };
 
@@ -292,13 +296,15 @@ function Perfil() {
       setMsgErrorPerfil(MENSAJE_TELEFONO);
       return;
     }
-    // La dirección aplica a todo usuario: obligatoria para el apoderado; en los demás
-    // roles se valida y se envía solo si se ingresó
+    // La dirección es opcional para todo usuario: se envía si se ingresó o si ya había
+    // una (dejar todos los campos vacíos la borra); si se ingresa, va completa
     const { calle, numero, depto, comuna } = formPerfil;
+    const teniaDireccion = [datos?.Usuario_Direccion_Calle, datos?.Usuario_Direccion_Numero, datos?.Usuario_Direccion_Comuna]
+      .some((v) => String(v || "").trim() !== "");
     const incluyeDireccion =
-      !!datos?.Es_Apoderado || [calle, numero, depto, comuna].some((v) => String(v || "").trim() !== "");
+      teniaDireccion || [calle, numero, depto, comuna].some((v) => String(v || "").trim() !== "");
     if (incluyeDireccion) {
-      const erroresDireccion = Object.values(validarDireccion(formPerfil));
+      const erroresDireccion = Object.values(validarDireccion(formPerfil, { opcional: true }));
       if (erroresDireccion.length > 0) {
         setMsgErrorPerfil(erroresDireccion[0]);
         return;

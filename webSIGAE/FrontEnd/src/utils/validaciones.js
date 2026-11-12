@@ -74,8 +74,11 @@ export function validarFortalezaContrasena(pwd) {
 
 // Dirección particular (todo usuario y estudiante): { calle, numero, depto (opcional), comuna }.
 // Devuelve un objeto { campo: mensaje } solo con los campos inválidos.
-export function validarDireccion({ calle = "", numero = "", depto = "", comuna = "" }) {
+// { opcional: true }: la dirección de un usuario puede quedar vacía; si se ingresa
+// algo, calle, número y comuna son obligatorios (la del estudiante es obligatoria).
+export function validarDireccion({ calle = "", numero = "", depto = "", comuna = "" }, { opcional = false } = {}) {
   const errores = {};
+  if (opcional && [calle, numero, depto, comuna].every((v) => !String(v ?? "").trim())) return errores;
   if (!calle.trim()) errores.calle = "La calle es obligatoria";
   else if (calle.trim().length > 100) errores.calle = "Máximo 100 caracteres";
   if (!numero.trim()) errores.numero = "El número es obligatorio";

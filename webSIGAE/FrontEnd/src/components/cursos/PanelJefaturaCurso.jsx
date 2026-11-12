@@ -11,7 +11,9 @@ import {
 
 const RUTAS = ["Científica", "Humanística", "Técnica"];
 
-export default function PanelJefaturaCurso({ curso, esAdmin, onCambio }) {
+// esAdmin: gestión académica (administración o etiqueta UTP): ve estudiantes y asigna la ruta.
+// puedeJefatura: solo la administración designa, reemplaza o retira al profesor jefe.
+export default function PanelJefaturaCurso({ curso, esAdmin, puedeJefatura = esAdmin, onCambio }) {
   const [docentes, setDocentes] = useState([]);
   const [docenteId, setDocenteId] = useState("");
   const [estudiantes, setEstudiantes] = useState([]);
@@ -34,11 +36,11 @@ export default function PanelJefaturaCurso({ curso, esAdmin, onCambio }) {
         setPermiteRuta(Boolean(d.curso?.Permite_Ruta));
       })
       .catch((e) => vivo && setMensajeEstudiantes(e.message));
-    if (esAdmin) {
+    if (puedeJefatura) {
       getDocentesActivos().then((d) => vivo && d && setDocentes(d)).catch(() => {});
     }
     return () => { vivo = false; };
-  }, [curso.Curso_Id, esAdmin]);
+  }, [curso.Curso_Id, puedeJefatura]);
 
   // Las confirmaciones del backend (reemplazo y situaciones en registro) se piden aquí
   const asignar = async () => {
@@ -128,7 +130,7 @@ export default function PanelJefaturaCurso({ curso, esAdmin, onCambio }) {
           : "Este curso no tiene profesor jefe."}
       </p>
 
-      {esAdmin && (
+      {puedeJefatura && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
           <select value={docenteId} onChange={(e) => setDocenteId(e.target.value)} style={{ minWidth: "16rem", maxWidth: "100%" }}>
             <option value="">Seleccionar docente...</option>
@@ -144,7 +146,7 @@ export default function PanelJefaturaCurso({ curso, esAdmin, onCambio }) {
           )}
         </div>
       )}
-      {esAdmin && <p style={{ fontSize: "0.85rem", opacity: 0.8 }}>Un docente puede ser profesor jefe de hasta 2 cursos por período.</p>}
+      {puedeJefatura && <p style={{ fontSize: "0.85rem", opacity: 0.8 }}>Un docente puede ser profesor jefe de hasta 2 cursos por período.</p>}
       {exito && <p className="msg-exito">{exito}</p>}
       {error && <p className="msg-error">{error}</p>}
 

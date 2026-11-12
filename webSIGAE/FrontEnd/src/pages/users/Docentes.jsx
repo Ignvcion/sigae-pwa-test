@@ -4,6 +4,7 @@ import EtiquetasInput, { separarEtiquetas } from "../../components/EtiquetasInpu
 import SelectorColor from "../../components/SelectorColor";
 import { fijarColor } from "../../hooks/useColores";
 import "./Docentes.css";
+import { tieneEtiquetaUTP } from "../../utils/permisos";
 
 // CU30 y CU31: listado y filtros de docentes.
 // - Barra de especialidades (etiquetas): clic para filtrar; varias elegidas muestran a los
@@ -264,7 +265,12 @@ function Docentes() {
                           diferido
                         />
                       </td>
-                      <td>{d.Usuario_Nombre_Completo}</td>
+                      <td>
+                        {d.Usuario_Nombre_Completo}
+                        {tieneEtiquetaUTP(d) && (
+                          <span className="badge-rol badge-utp" title="Etiqueta UTP" style={{ marginLeft: "6px" }}>UTP</span>
+                        )}
+                      </td>
                       <td>{d.Usuario_RUT}</td>
                       <td className="docentes-celda-especialidades">
                         {editando ? (

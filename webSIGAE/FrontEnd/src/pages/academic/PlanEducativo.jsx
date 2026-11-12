@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import { puedeGestionAcademica } from "../../utils/permisos";
 
 const TOKEN = () => localStorage.getItem("token");
 const authH = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${TOKEN()}` });
@@ -711,8 +712,8 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
 }
 
 function PlanEducativo() {
-  const { usuario } = useAuth();
-  const esAdmin = usuario?.roles?.some((r) => r === "Administrador" || r === "Super Admin");
+  const { usuario, rolActivo } = useAuth();
+  const esAdmin = puedeGestionAcademica(usuario, rolActivo); // administración o etiqueta UTP
 
   const [planes, setPlanes]               = useState([]);
   const [cargando, setCargando]           = useState(true);

@@ -39,7 +39,8 @@ function validarCampo(name, value, form) {
     return value.length === 0 ? "Agrega al menos una especialidad" : "";
   }
   if (COLUMNAS_DIRECCION[name]) {
-    return validarDireccion({ ...direccionDesdeForm(form), [COLUMNAS_DIRECCION[name]]: value })[COLUMNAS_DIRECCION[name]] || "";
+    // Dirección opcional: puede quedar vacía; si se ingresa, va completa
+    return validarDireccion({ ...direccionDesdeForm(form), [COLUMNAS_DIRECCION[name]]: value }, { opcional: true })[COLUMNAS_DIRECCION[name]] || "";
   }
   switch (name) {
     case "Usuario_Nombre_Completo":
@@ -137,10 +138,11 @@ function BloqueDatosPersonales({ datos, onGuardado }) {
   const [errores, setErrores] = useState({});
   const [estado, guardar] = useGuardarBloque(datos.Usuario_Id, onGuardado);
 
-  // La dirección es obligatoria para el apoderado; en los demás roles se valida y
-  // envía solo si se ingresó (cuentas antiguas pueden no tenerla registrada)
+  // La dirección es opcional: se envía si se ingresó o si ya había una (para poder
+  // borrarla dejando todos sus campos vacíos)
+  const teniaDireccion = Object.keys(COLUMNAS_DIRECCION).some((col) => String(datos[col] || "").trim() !== "");
   const incluyeDireccion =
-    datos.Es_Apoderado || Object.keys(COLUMNAS_DIRECCION).some((col) => String(form[col]).trim() !== "");
+    teniaDireccion || Object.keys(COLUMNAS_DIRECCION).some((col) => String(form[col]).trim() !== "");
   const campos = ["Usuario_Nombre_Completo", "Usuario_Telefono", ...(incluyeDireccion ? Object.keys(COLUMNAS_DIRECCION) : [])];
 
   const onChange = (e) => {

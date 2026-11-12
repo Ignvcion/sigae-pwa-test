@@ -147,7 +147,7 @@ function AppRouter() {
           <Route
             path="/consulta-horarios"
             element={
-              <RoleRoute roles={["Administrador"]}>
+              <RoleRoute roles={["Administrador"]} utp>
                 <ConsultaHorarios />
               </RoleRoute>
             }
@@ -157,7 +157,7 @@ function AppRouter() {
           <Route
             path="/horarios"
             element={
-              <RoleRoute roles={["Docente", "Administrador"]}>
+              <RoleRoute roles={["Docente", "Administrador"]} utp>
                 <Horarios />
               </RoleRoute>
             }
@@ -167,7 +167,7 @@ function AppRouter() {
           <Route
             path="/mi-horario"
             element={
-              <RoleRoute roles={["Docente", "Administrador"]}>
+              <RoleRoute roles={["Docente", "Administrador"]} utp>
                 <MiHorario />
               </RoleRoute>
             }
@@ -217,7 +217,7 @@ function AppRouter() {
           <Route
             path="/horario-maestro"
             element={
-              <RoleRoute roles={["Administrador"]}>
+              <RoleRoute roles={["Administrador"]} utp>
                 <HorarioMaestro />
               </RoleRoute>
             }
@@ -326,12 +326,12 @@ function AppRouter() {
             }
           />
 
-          {/* ACADEMIC */}
+          {/* ACADEMIC — `utp`: también la etiqueta UTP (utils/permisos.js) */}
 
           <Route
             path="/asignaturas"
             element={
-              <RoleRoute roles={["Administrador"]}>
+              <RoleRoute roles={["Administrador"]} utp>
                 <Asignaturas />
               </RoleRoute>
             }
@@ -340,7 +340,7 @@ function AppRouter() {
           <Route
             path="/cursos"
             element={
-              <RoleRoute roles={["Administrador"]}>
+              <RoleRoute roles={["Administrador"]} utp>
                 <Cursos />
               </RoleRoute>
             }
@@ -350,7 +350,7 @@ function AppRouter() {
           <Route
             path="/estudiantes"
             element={
-              <RoleRoute roles={["Administrador", "Docente"]}>
+              <RoleRoute roles={["Administrador", "Docente"]} utp>
                 <Estudiantes />
               </RoleRoute>
             }
@@ -359,7 +359,7 @@ function AppRouter() {
           <Route
             path="/bloques"
             element={
-              <RoleRoute roles={["Administrador"]}>
+              <RoleRoute roles={["Administrador"]} utp>
                 <BloquesHorarios />
               </RoleRoute>
             }
@@ -368,7 +368,7 @@ function AppRouter() {
           <Route
             path="/bloques-horarios"
             element={
-              <RoleRoute roles={["Administrador"]}>
+              <RoleRoute roles={["Administrador"]} utp>
                 <BloquesHorarios />
               </RoleRoute>
             }
@@ -377,7 +377,7 @@ function AppRouter() {
           <Route
             path="/plan-educativo"
             element={
-              <RoleRoute roles={["Administrador"]}>
+              <RoleRoute roles={["Administrador"]} utp>
                 <PlanEducativo />
               </RoleRoute>
             }
@@ -387,7 +387,7 @@ function AppRouter() {
           <Route
             path="/electivos"
             element={
-              <RoleRoute roles={["Administrador"]}>
+              <RoleRoute roles={["Administrador"]} utp>
                 <Electivos />
               </RoleRoute>
             }

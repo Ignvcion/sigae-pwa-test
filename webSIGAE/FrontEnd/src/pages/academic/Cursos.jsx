@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import PanelJefaturaCurso from "../../components/cursos/PanelJefaturaCurso";
 import { getEstadoPeriodo } from "../../services/promocion";
+import { esAdministradorCompleto, puedeGestionAcademica } from "../../utils/permisos";
 import BarraFiltrosCursos, { tramoDelCurso, TRAMOS_CURSO } from "../../components/cursos/BarraFiltrosCursos";
 
 function ModalAsignarAsignaturas({ curso, token, onClose, onExito }) {
@@ -143,7 +144,7 @@ function ModalAsignarAsignaturas({ curso, token, onClose, onExito }) {
   );
 }
 
-function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatura }) {
+function PanelAsignaturasCurso({ curso, token, esAdmin, esAdminCompleto, onVolver, onCambioJefatura }) {
   const [asignadas, setAsignadas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -192,7 +193,7 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
       </div>
 
       {/* RF60: profesor jefe y estudiantes del curso (CU95, CU96, CU97) */}
-      <PanelJefaturaCurso curso={curso} esAdmin={esAdmin} onCambio={onCambioJefatura} />
+      <PanelJefaturaCurso curso={curso} esAdmin={esAdmin} puedeJefatura={esAdminCompleto} onCambio={onCambioJefatura} />
 
       <h3>Asignaturas del curso</h3>
       {exito && <p className="msg-exito">{exito}</p>}
@@ -242,8 +243,10 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
 }
 
 function Cursos() {
-  const { usuario } = useAuth();
-  const esAdmin = usuario?.roles?.some(r => r === 'Administrador' || r === 'Super Admin');
+  const { usuario, rolActivo } = useAuth();
+  // Cursos y sus asignaturas: administración y etiqueta UTP; la jefatura, solo la administración
+  const esAdmin = puedeGestionAcademica(usuario, rolActivo);
+  const esAdminCompleto = esAdministradorCompleto(usuario, rolActivo);
 
   const [cursos, setCursos] = useState([]);
   const [niveles, setNiveles] = useState([]);
@@ -376,6 +379,7 @@ function Cursos() {
           curso={cursoSeleccionado}
           token={token}
           esAdmin={esAdmin}
+          esAdminCompleto={esAdminCompleto}
           onVolver={() => setCursoSeleccionado(null)}
           onCambioJefatura={cargarDatos}
         />

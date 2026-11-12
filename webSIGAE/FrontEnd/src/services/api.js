@@ -97,28 +97,32 @@ export async function actualizarFotoPerfil(archivo) {
 }
 
 
-// Dirección particular de cualquier usuario (Incremento 3): depto vacío se envía como null
+// Dirección particular de cualquier usuario (Incremento 3), opcional: los campos vacíos se envían como null
 function columnasDireccionUsuario({ calle, numero, depto, comuna }) {
   return {
-    Usuario_Direccion_Calle : calle,
-    Usuario_Direccion_Numero: numero,
+    Usuario_Direccion_Calle : calle || null,
+    Usuario_Direccion_Numero: numero || null,
     Usuario_Direccion_Depto : depto || null,
-    Usuario_Direccion_Comuna: comuna,
+    Usuario_Direccion_Comuna: comuna || null,
   };
 }
 
-// La contraseña inicial la genera el backend y la envía al correo del usuario
+// La contraseña inicial la genera el backend y la envía al correo del usuario.
+// La cuenta queda inactiva hasta el primer inicio de sesión del usuario.
 export function textoContrasenaEnviada(creado) {
-  return creado?.Contrasena_Enviada_A
+  const contrasena = creado?.Contrasena_Enviada_A
     ? `La contraseña se envió a ${creado.Contrasena_Enviada_A}.`
     : "La contraseña se envió al correo del usuario.";
+  const estado = creado?.Aviso_Estado || "La cuenta figura como inactiva hasta el primer inicio de sesión del usuario.";
+  return `${contrasena}\n\n${estado}`;
 }
 
 // Los espacios del teléfono no cuentan como caracteres ("9 1234 5678" → "912345678")
 const quitarEspacios = (texto) => String(texto ?? "").replace(/\s+/g, "");
 
 // ── ADMINISTRADOR ────────────────────────────
-export async function registrarAdmin({ nombre, rut, correo, telefono, estado, calle, numero, depto, comuna }) {
+// La cuenta se registra inactiva hasta el primer inicio de sesión: el formulario no elige el estado
+export async function registrarAdmin({ nombre, rut, correo, telefono, calle, numero, depto, comuna }) {
   const res = await fetch(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
@@ -126,7 +130,6 @@ export async function registrarAdmin({ nombre, rut, correo, telefono, estado, ca
       Usuario_Nombre_Completo            : nombre,
       Usuario_RUT                        : rut,
       Usuario_Telefono                   : quitarEspacios(telefono),
-      Usuario_Estado_Cuenta              : estado === 'Activo' ? 1 : 0,
       Es_Administrador                   : 1,
       Administrador_Tipo                 : 'Administrador Normal',
       Administrador_Correo_Institucional : correo,
@@ -139,7 +142,7 @@ export async function registrarAdmin({ nombre, rut, correo, telefono, estado, ca
 }
 
 // ── DOCENTE ──────────────────────────────────
-export async function registrarDocente({ nombre, rut, correo, telefono, especialidades, cargaHoraria, horasPIE, disponibilidad, horarioAtencion, estado, calle, numero, depto, comuna }) {
+export async function registrarDocente({ nombre, rut, correo, telefono, especialidades, cargaHoraria, horasPIE, disponibilidad, horarioAtencion, calle, numero, depto, comuna }) {
   const res = await fetch(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
@@ -147,7 +150,6 @@ export async function registrarDocente({ nombre, rut, correo, telefono, especial
       Usuario_Nombre_Completo      : nombre,
       Usuario_RUT                  : rut,
       Usuario_Telefono             : quitarEspacios(telefono),
-      Usuario_Estado_Cuenta        : estado === 'Activo' ? 1 : 0,
       Es_Docente                   : 1,
       Docente_Especialidades       : especialidades,
       Docente_Carga_Horaria_Semanal : parseInt(cargaHoraria, 10), // carga horaria semanal
@@ -164,7 +166,7 @@ export async function registrarDocente({ nombre, rut, correo, telefono, especial
 }
 
 // ── APODERADO ────────────────────────────────
-export async function registrarApoderado({ nombre, rut, correo, telefono, calle, numero, depto, comuna, estado }) {
+export async function registrarApoderado({ nombre, rut, correo, telefono, calle, numero, depto, comuna }) {
   const res = await fetch(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
@@ -172,7 +174,6 @@ export async function registrarApoderado({ nombre, rut, correo, telefono, calle,
       Usuario_Nombre_Completo : nombre,
       Usuario_RUT             : rut,
       Usuario_Telefono        : quitarEspacios(telefono),
-      Usuario_Estado_Cuenta   : estado === 'Activo' ? 1 : 0,
       Es_Apoderado            : 1,
       ...columnasDireccionUsuario({ calle, numero, depto, comuna }),
       Apoderado_Correo_Natural: correo,

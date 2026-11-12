@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../pages/context/AuthContext";
 import { MOSTRAR_MIS_CURSOS } from "../config/funcionalidades";
+import { etiquetaRol, enlacesUTP, tieneUTPActiva } from "../utils/permisos";
 
 function MainLayout() {
   const { usuario, rolActivo, logout } = useAuth();
@@ -28,6 +29,8 @@ function MainLayout() {
     usuario?.roles?.includes("Administrador");
   const esDocente = rolEfectivo === "Docente";
   const esApoderado = rolEfectivo === "Apoderado";
+  // Etiqueta UTP: administrador con UTP (solo estas funciones) o docente con UTP (las suma)
+  const conUTP = tieneUTPActiva(usuario, rolActivo);
 
   const confirmarCierre = async () => {
     if (!window.confirm("¿Estás seguro de que deseas cerrar tu sesión?")) return;
@@ -94,7 +97,7 @@ function MainLayout() {
               </div>
 
               <div className="rol-badge">
-                {rolEfectivo || "Usuario"}
+                {rolEfectivo ? etiquetaRol(rolEfectivo, usuario) : "Usuario"}
               </div>
             </div>
           )}
@@ -322,6 +325,20 @@ function MainLayout() {
                 <Link to="/mensajes">
                   Mensajes
                 </Link>
+              </>
+            )}
+
+            {conUTP && (
+              <>
+                <span className="menu-section">
+                  UTP
+                </span>
+
+                {enlacesUTP(usuario, rolActivo).map((enlace) => (
+                  <Link key={enlace.to} to={enlace.to}>
+                    {enlace.label}
+                  </Link>
+                ))}
               </>
             )}
 

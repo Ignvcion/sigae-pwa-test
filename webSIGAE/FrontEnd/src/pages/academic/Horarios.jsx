@@ -9,6 +9,7 @@ import PanelConflictos from "../../components/horarios/PanelConflictos";
 import EtiquetaPeriodo, { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
 import { COLOR_PENDIENTE } from "../../utils/horarios";
 import { getElectivosDeCurso } from "../../services/api";
+import { esAdministradorCompleto, puedeGestionAcademica, etiquetaRol } from "../../utils/permisos";
 
 const API = "/api";
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
@@ -235,10 +236,9 @@ export default function Horarios() {
   };
   const rolEfectivo = rolActivo || usuario?.roles?.[0];
   const esSuperAdmin = usuario?.administradorTipo === "Super Admin";
-  const esAdmin =
-    rolEfectivo === "Administrador" ||
-    esSuperAdmin ||
-    usuario?.roles?.includes("Administrador");
+  // Creador de horarios: administración y etiqueta UTP (utils/permisos.js)
+  const esAdmin = puedeGestionAcademica(usuario, rolActivo);
+  const esAdminCompleto = esAdministradorCompleto(usuario, rolActivo);
   const esDocente = rolEfectivo === "Docente";
   const esApoderado = rolEfectivo === "Apoderado";
 
@@ -649,7 +649,7 @@ export default function Horarios() {
           )}
 
           <RolBadge
-            rol={esAdmin ? (esSuperAdmin ? "Super Administrador" : "Administrador") : "Docente"}
+            rol={esSuperAdmin ? "Super Administrador" : esAdminCompleto ? "Administrador" : etiquetaRol(rolEfectivo, usuario)}
           />
         </div>
       </div>
@@ -996,7 +996,7 @@ export default function Horarios() {
       )}
 
       {/* Clases pendientes de reubicar tras redefinir la jornada o los bloques */}
-      {esAdmin && <PanelConflictos onCambio={alResolverConflicto} />}
+      {esAdminCompleto && <PanelConflictos onCambio={alResolverConflicto} />}
 
       {/* Listado de cursos (left overlay sidebar) */}
       {esAdmin && listadoAbierto && (

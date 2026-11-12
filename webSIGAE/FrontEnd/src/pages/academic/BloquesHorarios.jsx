@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import PanelConflictos from "../../components/horarios/PanelConflictos";
+import { esAdministradorCompleto, tieneUTPActiva, etiquetaRol, rolEfectivoDe } from "../../utils/permisos";
 
 const API = "/api/bloques";
 
@@ -108,16 +109,24 @@ function BloquesAfectadosBadge({ count }) {
 ══════════════════════════════════════════════════════════════════ */
 export default function BloquesHorarios() {
   const { rolActivo, usuario } = useAuth();
-  const rolEfectivo = rolActivo || usuario?.roles?.[0];
   const esSuperAdmin = usuario?.administradorTipo === "Super Admin";
-  const esAdmin = rolEfectivo === "Administrador" || esSuperAdmin || usuario?.roles?.includes("Administrador");
+  const esAdmin = esAdministradorCompleto(usuario, rolActivo);
+  // Etiqueta UTP: solo registra eventos institucionales y suspensiones de clases;
+  // no ve ni toca los parámetros ni los bloques horarios.
+  const soloEventos = !esAdmin && tieneUTPActiva(usuario, rolActivo);
 
   // ?tab=bloques | eventos abre directamente esa pestaña (accesos del dashboard)
   const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState(() => {
+  const [tabElegida, setTab] = useState(() => {
     const pedido = searchParams.get("tab");
     return ["parametros", "bloques", "eventos"].includes(pedido) ? pedido : "parametros";
   });
+  const tab = soloEventos ? "eventos" : tabElegida;
+  const pestanas = [
+    { key: "parametros", label: "⚙ Parámetros institucionales" },
+    { key: "bloques",    label: "🕐 Bloques horarios" },
+    { key: "eventos",    label: "📅 Eventos institucionales" },
+  ].filter((t) => !soloEventos || t.key === "eventos");
 
   // Panel de clases por reubicar (compartido por las pestañas)
   const [senalConflictos, setSenalConflictos] = useState(0);
@@ -135,7 +144,7 @@ export default function BloquesHorarios() {
     recargarBloques();
   };
 
-  if (!esAdmin) {
+  if (!esAdmin && !soloEventos) {
     return (
       <div style={s.page}>
         <div style={s.accessDenied}>
@@ -154,23 +163,21 @@ export default function BloquesHorarios() {
       {/* Encabezado */}
       <div style={s.header}>
         <div>
-          <h1 style={s.titulo}>Parámetros Institución</h1>
+          <h1 style={s.titulo}>{soloEventos ? "Eventos Institucionales" : "Parámetros Institución"}</h1>
           <p style={s.subtitulo}>
-            Parámetros institucionales, bloques horarios y eventos {/* CU52 · CU49 */}
+            {soloEventos
+              ? "Registro de eventos institucionales y suspensión de clases" /* CU65 · CU66 · CU70–CU72 */
+              : "Parámetros institucionales, bloques horarios y eventos" /* CU52 · CU49 */}
           </p>
         </div>
         <span style={s.rolBadge}>
-          {esSuperAdmin ? "Super Administrador" : "Administrador"}
+          {esSuperAdmin ? "Super Administrador" : soloEventos ? etiquetaRol(rolEfectivoDe(usuario, rolActivo), usuario) : "Administrador"}
         </span>
       </div>
 
       {/* Pestañas */}
       <div style={s.tabBar}>
-        {[
-          { key: "parametros", label: "⚙ Parámetros institucionales" },
-          { key: "bloques",    label: "🕐 Bloques horarios" },
-          { key: "eventos",    label: "📅 Eventos institucionales" },
-        ].map((t) => (
+        {pestanas.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
@@ -194,13 +201,16 @@ export default function BloquesHorarios() {
         {tab === "eventos"    && <TabEventos />}
       </div>
 
-      <PanelConflictos
-        abrirSenal={senalConflictos}
-        bloqueAEliminar={bloqueAEliminar}
-        onEliminarBloque={eliminarBloquePendiente}
-        onCancelarEliminarBloque={() => setBloqueAEliminar(null)}
-        onCambio={recargarBloques}
-      />
+      {/* Clases por reubicar (CU81): solo la administración */}
+      {esAdmin && (
+        <PanelConflictos
+          abrirSenal={senalConflictos}
+          bloqueAEliminar={bloqueAEliminar}
+          onEliminarBloque={eliminarBloquePendiente}
+          onCancelarEliminarBloque={() => setBloqueAEliminar(null)}
+          onCambio={recargarBloques}
+        />
+      )}
     </div>
   );
 }
