@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getHorarioMaestro, getDocentes } from "../../services/api";
+import { getHorarioMaestro, getDocentes, apiUrl} from '../../services/api';
 import ExportMenu from "../../components/ExportMenu";
 import { COLORES_ASIGNATURA, COLOR_PENDIENTE, DIAS_SEMANA, aMinutos, hhmm } from "../../utils/horarios";
 import EtiquetaPeriodo, { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
@@ -46,7 +46,7 @@ function HorarioMaestro() {
     let vigente = true;
     Promise.all([
       getHorarioMaestro(),
-      fetch("/api/horarios/bloques", { headers: authHeaders() }).then((r) => (r.ok ? r.json() : [])),
+      fetch(apiUrl("/api/horarios/bloques"), { headers: authHeaders() }).then((r) => (r.ok ? r.json() : [])),
     ])
       .then(([data, bh]) => {
         if (!vigente) return;

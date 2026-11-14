@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import PanelConflictos from "../../components/horarios/PanelConflictos";
 import { esAdministradorCompleto, tieneUTPActiva, etiquetaRol, rolEfectivoDe } from "../../utils/permisos";
+import { apiUrl } from '../../services/api';
 
 const API = "/api/bloques";
 
@@ -1570,7 +1571,7 @@ function SuspenderJornadaModal({ onClose, onExito }) {
     setDetalle("");
     setEnviando(true);
     try {
-      const res = await fetch("/api/horarios/suspender-jornada", {
+      const res = await fetch(apiUrl("/api/horarios/suspender-jornada"), {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify(form),

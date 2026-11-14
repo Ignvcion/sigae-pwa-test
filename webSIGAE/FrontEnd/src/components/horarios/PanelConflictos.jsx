@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { COLORES_ASIGNATURA, COLOR_PENDIENTE, hhmm } from "../../utils/horarios";
 import useColores from "../../hooks/useColores";
+import { apiUrl } from '../../services/api';
 
 // Panel desplegable (derecha) con las clases pendientes de reubicar tras
 // redefinir la jornada o los bloques horarios. Por cada clase: migrar a un
@@ -134,7 +135,7 @@ export default function PanelConflictos({
     const faltantes = [...new Set(clases.map((c) => c.Curso_Id))].filter((id) => !cursosCargados.current.has(id));
     faltantes.forEach((cursoId) => {
       cursosCargados.current.add(cursoId);
-      fetch(`/api/horarios/asignaturas-curso?curso_id=${cursoId}`, { headers: authHeaders() })
+      fetch(apiUrl(`/api/horarios/asignaturas-curso?curso_id=${cursoId}`), { headers: authHeaders() })
         .then((r) => (r.ok ? r.json() : []))
         .then((lista) => {
           const mapa = {};

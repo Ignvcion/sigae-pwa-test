@@ -5,7 +5,7 @@ import FormEditarUsuario from "./FormEditarUsuario";
 import { EtiquetasLectura } from "../../components/EtiquetasInput";
 import MiDisponibilidadLaboral from "../../components/MiDisponibilidadLaboral";
 import HorarioAtencionSemanal from "../../components/HorarioAtencionSemanal";
-import { apiFetch, getAsignacionesDocente, getEstudiantesAsociados, getDetalleEstudiante, editarPerfilPropio, confirmarCorreoPropio, actualizarFotoPerfil } from "../../services/api";
+import { apiFetch, getAsignacionesDocente, getEstudiantesAsociados, getDetalleEstudiante, editarPerfilPropio, confirmarCorreoPropio, actualizarFotoPerfil, apiUrl} from '../../services/api';
 import { CampoCodigo, AvisoDevCodigo, textoReenviar } from "../../components/CodigoVerificacion";
 import useEspera from "../../hooks/useEspera";
 import { tieneEtiquetaUTP } from "../../utils/permisos";
@@ -239,7 +239,7 @@ function Perfil() {
     setEnviando(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("/api/auth/cambiar-contrasena", {
+      const res = await fetch(apiUrl("/api/auth/cambiar-contrasena"), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

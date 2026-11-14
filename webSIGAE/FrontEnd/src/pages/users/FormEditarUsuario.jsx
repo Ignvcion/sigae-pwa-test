@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import BloquePIE from "../../components/BloquePIE";
-import { getEspecialidades, getDisponibilidadDocente } from "../../services/api";
+import { getEspecialidades, getDisponibilidadDocente, apiUrl} from '../../services/api';
 import EtiquetasInput, { separarEtiquetas } from "../../components/EtiquetasInput";
 import DisponibilidadSemanal, { errorTramos } from "../../components/DisponibilidadSemanal";
 import "./FormEditarUsuario.css";
@@ -72,7 +72,7 @@ function useGuardarBloque(usuarioId, onGuardado) {
   const guardar = async (cuerpo, mensajeExito) => {
     setEstado({ enviando: true, exito: "", error: "" });
     try {
-      const res = await fetch(`/api/usuarios/${usuarioId}`, {
+      const res = await fetch(apiUrl(`/api/usuarios/${usuarioId}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify(cuerpo),

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { apiUrl } from '../../services/api';
 
 export const AuthContext = createContext();
 
@@ -89,7 +90,7 @@ export function AuthProvider({ children }) {
     if (timerRef.current) clearTimeout(timerRef.current);
     // Invalidar sesión en el servidor (fire-and-forget, no bloquear UI si falla)
     if (currentToken) {
-      fetch("/api/auth/logout", {
+      fetch(apiUrl("/api/auth/logout"), {
         method: "POST",
         headers: { Authorization: `Bearer ${currentToken}` },
       }).catch(() => {});

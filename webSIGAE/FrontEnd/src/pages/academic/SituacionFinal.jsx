@@ -11,6 +11,7 @@ import {
   cargarExcel,
   promoverCurso,
 } from "../../services/promocion";
+import { apiUrl } from '../../services/api';
 
 const ETIQUETA_ESTADO = { Borrador: "Borrador", Registrado: "Registrada", Aplicado: "Aplicada" };
 
@@ -36,7 +37,7 @@ function SituacionFinal() {
     (async () => {
       try {
         if (esAdmin) {
-          const res = await fetch("/api/cursos", { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
+          const res = await fetch(apiUrl("/api/cursos"), { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
           const lista = await res.json();
           const vigente = lista.length ? lista.map((c) => c.Curso_Periodo_Lectivo).sort()[0] : null;
           setCursos(lista.filter((c) => c.Curso_Periodo_Lectivo === vigente));

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { puedeGestionAcademica } from "../../utils/permisos";
+import { apiUrl } from '../../services/api';
 
 const TOKEN = () => localStorage.getItem("token");
 const authH = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${TOKEN()}` });
@@ -152,7 +153,7 @@ function ModalDetallePlan({ planId, onClose, onEditar }) {
   useEffect(() => {
     const cargar = async () => {
       try {
-        const res = await fetch(`/api/planes/${planId}`, { headers: { Authorization: `Bearer ${TOKEN()}` } });
+        const res = await fetch(apiUrl(`/api/planes/${planId}`), { headers: { Authorization: `Bearer ${TOKEN()}` } });
         const data = await res.json();
         if (!res.ok) setError(data.error || "Error al cargar el plan");
         else setPlan(data);
@@ -204,8 +205,8 @@ function FormCrearPlan({ onExito, onCancelar, periodoPropuesto }) {
     const cargar = async () => {
       try {
         const [rNiveles, rAsig] = await Promise.all([
-          fetch(`/api/planes/niveles-sin-plan?periodo=${periodo}`, { headers: { Authorization: `Bearer ${TOKEN()}` } }),
-          fetch(`/api/planes/asignaturas`, { headers: { Authorization: `Bearer ${TOKEN()}` } }),
+          fetch(apiUrl(`/api/planes/niveles-sin-plan?periodo=${periodo}`), { headers: { Authorization: `Bearer ${TOKEN()}` } }),
+          fetch(apiUrl(`/api/planes/asignaturas`), { headers: { Authorization: `Bearer ${TOKEN()}` } }),
         ]);
         setNiveles(await rNiveles.json());
         const asig = await rAsig.json();
@@ -255,7 +256,7 @@ function FormCrearPlan({ onExito, onCancelar, periodoPropuesto }) {
 
     setEnviando(true);
     try {
-      const res = await fetch("/api/planes", { method: "POST", headers: authH(), body: JSON.stringify(payload) });
+      const res = await fetch(apiUrl("/api/planes"), { method: "POST", headers: authH(), body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) setError(data.error);
       else onExito(data.mensaje);
@@ -358,9 +359,9 @@ function FormEditarPlan({ planId, onExito, onCancelar }) {
       try {
         const h = { Authorization: `Bearer ${TOKEN()}` };
         const [rPlan, rNiveles, rAsig] = await Promise.all([
-          fetch(`/api/planes/${planId}`, { headers: h }),
-          fetch("/api/cursos/niveles", { headers: h }),
-          fetch("/api/planes/asignaturas", { headers: h }),
+          fetch(apiUrl(`/api/planes/${planId}`), { headers: h }),
+          fetch(apiUrl("/api/cursos/niveles"), { headers: h }),
+          fetch(apiUrl("/api/planes/asignaturas"), { headers: h }),
         ]);
         const plan = await rPlan.json();
         if (!rPlan.ok) { setError(plan.error || "Error al cargar el plan"); return; }
@@ -427,7 +428,7 @@ function FormEditarPlan({ planId, onExito, onCancelar }) {
 
     setEnviando(true);
     try {
-      const res = await fetch(`/api/planes/${planId}`, { method: "PUT", headers: authH(), body: JSON.stringify(payload) });
+      const res = await fetch(apiUrl(`/api/planes/${planId}`), { method: "PUT", headers: authH(), body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) setError(data.error);
       else onExito([data.mensaje, ...(data.advertencias || [])].join(" · "));
@@ -527,8 +528,8 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
     const cargar = async () => {
       try {
         const [rNiveles, rAsig] = await Promise.all([
-          fetch("/api/cursos/niveles", { headers: { Authorization: `Bearer ${TOKEN()}` } }),
-          fetch("/api/planes/asignaturas", { headers: { Authorization: `Bearer ${TOKEN()}` } }),
+          fetch(apiUrl("/api/cursos/niveles"), { headers: { Authorization: `Bearer ${TOKEN()}` } }),
+          fetch(apiUrl("/api/planes/asignaturas"), { headers: { Authorization: `Bearer ${TOKEN()}` } }),
         ]);
         setNiveles(await rNiveles.json());
         const asig = await rAsig.json();
@@ -549,7 +550,7 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
     if (!id) { setAsignaturas([]); return; }
     setCargandoAsig(true);
     try {
-      const res = await fetch(`/api/planes/${id}`, { headers: { Authorization: `Bearer ${TOKEN()}` } });
+      const res = await fetch(apiUrl(`/api/planes/${id}`), { headers: { Authorization: `Bearer ${TOKEN()}` } });
       const data = await res.json();
       if (ultimoPlanOrigen.current !== id) return;
       if (!res.ok) { setError(data.error); return; }
@@ -609,7 +610,7 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
 
     setEnviando(true);
     try {
-      const res = await fetch("/api/planes/clonar", { method: "POST", headers: authH(), body: JSON.stringify(payload) });
+      const res = await fetch(apiUrl("/api/planes/clonar"), { method: "POST", headers: authH(), body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) setError(data.error);
       else onExito(data.mensaje);
@@ -725,7 +726,7 @@ function PlanEducativo() {
 
   // El estado cambia solo al llegar la respuesta (callbacks), así puede llamarse desde el efecto.
   const pedirPlanes = useCallback(() =>
-    fetch("/api/planes", { headers: { Authorization: `Bearer ${TOKEN()}` } })
+    fetch(apiUrl("/api/planes"), { headers: { Authorization: `Bearer ${TOKEN()}` } })
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) setError(data.error || "Error al cargar planes");

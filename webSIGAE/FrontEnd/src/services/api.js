@@ -1,5 +1,35 @@
 // src/services/api.js
-const BASE_URL = '/api';
+export const BASE_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '');
+
+// Origen del servidor para archivos (/uploads/...) cuando VITE_API_URL apunta a otro host
+const ASSET_ORIGIN = /^https?:\/\//i.test(BASE_URL)
+  ? (BASE_URL.endsWith('/api') ? BASE_URL.slice(0, -4) : BASE_URL)
+  : '';
+
+export function apiUrl(path = '') {
+  if (/^https?:\/\//i.test(path)) return path;
+  const clean = String(path || '');
+  if (clean === '/api' || clean === '/api/') return BASE_URL;
+  if (clean.startsWith('/api/')) return `${BASE_URL}${clean.slice(4)}`;
+  return `${BASE_URL}${clean.startsWith('/') ? '' : '/'}${clean}`;
+}
+
+export function resolveAssetUrl(url) {
+  if (!url) return url;
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  const clean = String(url);
+  if (ASSET_ORIGIN) {
+    return `${ASSET_ORIGIN}${clean.startsWith('/') ? '' : '/'}${clean}`;
+  }
+  const base = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/');
+  if (clean.startsWith('/uploads')) return `${base}${clean.slice(1)}`;
+  return clean;
+}
+
+export function appPath(path = '') {
+  const base = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/');
+  return `${base}${String(path).replace(/^\/+/, '')}`;
+}
 
 function getToken() {
   return localStorage.getItem('token');
@@ -16,12 +46,12 @@ function clearSessionAndRedirect() {
   localStorage.removeItem('usuario');
   localStorage.removeItem('token');
   localStorage.removeItem('rolActivo');
-  window.location.href = '/session-expired';
+  window.location.href = appPath('/session-expired');
 }
 
 export async function apiFetch(url, options = {}) {
   const token = getToken();
-  const res = await fetch(url, {
+  const res = await fetch(apiUrl(url), {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -63,12 +93,11 @@ throw error;
 
 // ── CU19: Editar datos personales del propio perfil ──
 
-// nombre y rut: solo el Super Administrador puede corregirlos en su propio perfil
-export async function editarPerfilPropio({ correo, telefono, direccion, nombre, rut }) {
+export async function editarPerfilPropio({ correo, telefono, direccion }) {
   const res = await fetch(`${BASE_URL}/usuarios/perfil`, {
     method : 'PUT',
     headers: authHeaders(),
-    body   : JSON.stringify({ correo, telefono, direccion, nombre, rut }),
+    body   : JSON.stringify({ correo, telefono, direccion }),
   });
   return handleResponse(res);
 }
@@ -98,32 +127,28 @@ export async function actualizarFotoPerfil(archivo) {
 }
 
 
-// Dirección particular de cualquier usuario (Incremento 3), opcional: los campos vacíos se envían como null
+// Dirección particular de cualquier usuario (Incremento 3): depto vacío se envía como null
 function columnasDireccionUsuario({ calle, numero, depto, comuna }) {
   return {
-    Usuario_Direccion_Calle : calle || null,
-    Usuario_Direccion_Numero: numero || null,
+    Usuario_Direccion_Calle : calle,
+    Usuario_Direccion_Numero: numero,
     Usuario_Direccion_Depto : depto || null,
-    Usuario_Direccion_Comuna: comuna || null,
+    Usuario_Direccion_Comuna: comuna,
   };
 }
 
-// La contraseña inicial la genera el backend y la envía al correo del usuario.
-// La cuenta queda inactiva hasta el primer inicio de sesión del usuario.
+// La contraseña inicial la genera el backend y la envía al correo del usuario
 export function textoContrasenaEnviada(creado) {
-  const contrasena = creado?.Contrasena_Enviada_A
+  return creado?.Contrasena_Enviada_A
     ? `La contraseña se envió a ${creado.Contrasena_Enviada_A}.`
     : "La contraseña se envió al correo del usuario.";
-  const estado = creado?.Aviso_Estado || "La cuenta figura como inactiva hasta el primer inicio de sesión del usuario.";
-  return `${contrasena}\n\n${estado}`;
 }
 
 // Los espacios del teléfono no cuentan como caracteres ("9 1234 5678" → "912345678")
 const quitarEspacios = (texto) => String(texto ?? "").replace(/\s+/g, "");
 
 // ── ADMINISTRADOR ────────────────────────────
-// La cuenta se registra inactiva hasta el primer inicio de sesión: el formulario no elige el estado
-export async function registrarAdmin({ nombre, rut, correo, telefono, calle, numero, depto, comuna }) {
+export async function registrarAdmin({ nombre, rut, correo, telefono, estado, calle, numero, depto, comuna }) {
   const res = await fetch(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
@@ -131,6 +156,7 @@ export async function registrarAdmin({ nombre, rut, correo, telefono, calle, num
       Usuario_Nombre_Completo            : nombre,
       Usuario_RUT                        : rut,
       Usuario_Telefono                   : quitarEspacios(telefono),
+      Usuario_Estado_Cuenta              : estado === 'Activo' ? 1 : 0,
       Es_Administrador                   : 1,
       Administrador_Tipo                 : 'Administrador Normal',
       Administrador_Correo_Institucional : correo,
@@ -143,7 +169,7 @@ export async function registrarAdmin({ nombre, rut, correo, telefono, calle, num
 }
 
 // ── DOCENTE ──────────────────────────────────
-export async function registrarDocente({ nombre, rut, correo, telefono, especialidades, cargaHoraria, horasPIE, disponibilidad, horarioAtencion, calle, numero, depto, comuna }) {
+export async function registrarDocente({ nombre, rut, correo, telefono, especialidades, cargaHoraria, horasPIE, disponibilidad, horarioAtencion, estado, calle, numero, depto, comuna }) {
   const res = await fetch(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
@@ -151,6 +177,7 @@ export async function registrarDocente({ nombre, rut, correo, telefono, especial
       Usuario_Nombre_Completo      : nombre,
       Usuario_RUT                  : rut,
       Usuario_Telefono             : quitarEspacios(telefono),
+      Usuario_Estado_Cuenta        : estado === 'Activo' ? 1 : 0,
       Es_Docente                   : 1,
       Docente_Especialidades       : especialidades,
       Docente_Carga_Horaria_Semanal : parseInt(cargaHoraria, 10), // carga horaria semanal
@@ -167,7 +194,7 @@ export async function registrarDocente({ nombre, rut, correo, telefono, especial
 }
 
 // ── APODERADO ────────────────────────────────
-export async function registrarApoderado({ nombre, rut, correo, telefono, calle, numero, depto, comuna }) {
+export async function registrarApoderado({ nombre, rut, correo, telefono, calle, numero, depto, comuna, estado }) {
   const res = await fetch(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
@@ -175,6 +202,7 @@ export async function registrarApoderado({ nombre, rut, correo, telefono, calle,
       Usuario_Nombre_Completo : nombre,
       Usuario_RUT             : rut,
       Usuario_Telefono        : quitarEspacios(telefono),
+      Usuario_Estado_Cuenta   : estado === 'Activo' ? 1 : 0,
       Es_Apoderado            : 1,
       ...columnasDireccionUsuario({ calle, numero, depto, comuna }),
       Apoderado_Correo_Natural: correo,
@@ -946,20 +974,22 @@ export async function getElectivosDeCurso(cursoId) {
   return handleResponse(await apiFetch(`${BASE_URL}/electivos/curso/${cursoId}`));
 }
 
-// ── CU101: notificaciones de mensajes y citaciones ──
-export async function getNotificaciones(rol) {
-  const q = rol ? `?rol=${encodeURIComponent(rol)}` : '';
-  return handleResponse(await apiFetch(`${BASE_URL}/notificaciones${q}`));
+// -- CU101: Notificaciones -----------------------------------------------------
+
+export async function getNotificaciones() {
+  const res = await apiFetch('/notificaciones');
+  if (!res) return [];
+  return res.json();
 }
 
 export async function marcarNotificacionLeida(id) {
-  return handleResponse(await apiFetch(`${BASE_URL}/notificaciones/${id}/leida`, { method: 'PATCH' }));
+  const res = await apiFetch(/notificaciones//leida, { method: 'PUT' });
+  if (!res) return;
+  return res.json().catch(() => ({}));
 }
 
-export async function marcarNotificacionesLeidas(rol) {
-  return handleResponse(await apiFetch(`${BASE_URL}/notificaciones/leidas`, {
-    method : 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body   : JSON.stringify({ rol }),
-  }));
+export async function marcarNotificacionesLeidas() {
+  const res = await apiFetch('/notificaciones/leer-todas', { method: 'PUT' });
+  if (!res) return;
+  return res.json().catch(() => ({}));
 }

@@ -8,7 +8,7 @@ import DetalleBloqueModal from "../../components/horarios/DetalleBloqueModal";
 import PanelConflictos from "../../components/horarios/PanelConflictos";
 import EtiquetaPeriodo, { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
 import { COLOR_PENDIENTE } from "../../utils/horarios";
-import { getElectivosDeCurso } from "../../services/api";
+import { getElectivosDeCurso, apiUrl} from '../../services/api';
 import { esAdministradorCompleto, puedeGestionAcademica, etiquetaRol } from "../../utils/permisos";
 
 const API = "/api";
@@ -147,8 +147,8 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
     try {
       const h = { Authorization: `Bearer ${localStorage.getItem("token")}` };
       const [rH, rA] = await Promise.all([
-        fetch(`/api/horarios?curso_id=${cursoId}&incluir_eliminadas=1`, { headers: h }).then(r => r.json()),
-        fetch(`/api/horarios/asignaturas-curso?curso_id=${cursoId}`, { headers: h }).then(r => r.json()),
+        fetch(apiUrl(`/api/horarios?curso_id=${cursoId}&incluir_eliminadas=1`), { headers: h }).then(r => r.json()),
+        fetch(apiUrl(`/api/horarios/asignaturas-curso?curso_id=${cursoId}`), { headers: h }).then(r => r.json()),
       ]);
       const colorMap = {};
       (Array.isArray(rA) ? rA : []).forEach((a, i) => {
@@ -1708,7 +1708,7 @@ function PanelForm({
 
   useEffect(() => {
     if (!consulta) return;
-    fetch(`/api/horarios/docentes-disponibles?${consulta}`, { headers: authHeaders() })
+    fetch(apiUrl(`/api/horarios/docentes-disponibles?${consulta}`), { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => {
         // CU56: el servidor indica si alguna especialidad (etiqueta) coincide con la asignatura;

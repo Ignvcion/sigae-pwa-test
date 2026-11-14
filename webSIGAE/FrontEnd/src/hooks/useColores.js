@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { tonosDesdeHex } from "../utils/colores";
+import { apiUrl } from '../services/api';
 
 // Colores de asignaturas y docentes (GET /api/colores), compartidos por todas
 // las vistas. Se piden una vez por sesión de página y se actualizan al
@@ -13,7 +14,7 @@ const avisar = () => suscriptores.forEach((fn) => fn(datos));
 function cargar() {
   if (datos) return Promise.resolve(datos);
   if (!pendiente) {
-    pendiente = fetch("/api/colores", { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } })
+    pendiente = fetch(apiUrl("/api/colores"), { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         datos = d && { asignaturas: d.asignaturas || {}, docentes: d.docentes || {} };

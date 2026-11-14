@@ -4,6 +4,7 @@ import { puedeGestionAcademica } from "../../utils/permisos";
 import SelectorColor, { PuntoColor } from "../../components/SelectorColor";
 import { colorAleatorio, nombreColor } from "../../utils/colores";
 import { fijarColor } from "../../hooks/useColores";
+import { apiUrl } from '../../services/api';
 
 // Tramo de la asignatura: solo se usa en planes (cursos, horarios) de niveles de ese tramo
 const TRAMOS = [
@@ -139,7 +140,7 @@ function Asignaturas() {
   // así puede llamarse desde el efecto de montaje. `cargando` parte en true; recargar()
   // lo vuelve a encender antes de pedir de nuevo.
   const cargar = () =>
-    fetch("/api/planes/asignaturas", { headers: { Authorization: `Bearer ${token}` } })
+    fetch(apiUrl("/api/planes/asignaturas"), { headers: { Authorization: `Bearer ${token}` } })
       .then(async (res) => {
         const data = await res.json();
         if (res.ok) setAsignaturas(data);
@@ -165,7 +166,7 @@ function Asignaturas() {
     setGuardando(true);
     setError("");
     try {
-      const res = await fetch("/api/planes/asignaturas", {
+      const res = await fetch(apiUrl("/api/planes/asignaturas"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -190,7 +191,7 @@ function Asignaturas() {
     setGuardando(true);
     setError("");
     try {
-      const res = await fetch(`/api/planes/asignaturas/${editando.id}`, {
+      const res = await fetch(apiUrl(`/api/planes/asignaturas/${editando.id}`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -217,7 +218,7 @@ function Asignaturas() {
     setAsignaturas((lista) => lista.map((x) => (x.Asignatura_Id === a.Asignatura_Id ? { ...x, Asignatura_Color: color } : x)));
     setError("");
     try {
-      const res = await fetch(`/api/colores/asignaturas/${a.Asignatura_Id}`, {
+      const res = await fetch(apiUrl(`/api/colores/asignaturas/${a.Asignatura_Id}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ color }),
