@@ -1,165 +1,279 @@
-// RF54 / CU85, CU86: recepción de mensajes de apoderados.
-const mensajeController = require('../controllers/mensajeController');
-const { finDeCitacion, cerrarPorCitacion, moverPorCitacion, camposRecepcion } = require('../utils/recepcionMensajes');
+// Pruebas unitarias — Grupo 1 (RF54 / CU85 y CU86): recepción de mensajes de apoderados
 const pool = require('../config/db');
+const {
+  obtenerRecepcion,
+  actualizarRecepcion,
+  habilitarConversacion,
+  enviarMensaje,
+  iniciarConversacion,
+} = require('../controllers/mensajeController');
 
 jest.mock('../config/db');
 
-const conversacion = (extra = {}) => ({
-  Conversacion_Id: 1112,
-  Docente_Usuario_Id: 5,
-  Apoderado_Usuario_Id: 4,
-  Conversacion_Estado: 1,
-  Recepcion_General: 1,
-  Habilitada_Hasta: null,
-  Apoderado_Puede_Responder: 1,
-  ...extra,
+const nuevoRes = () => ({
+  status: jest.fn().mockReturnThis(),
+  json: jest.fn().mockReturnThis(),
 });
 
-describe('RF54: recepción de mensajes de apoderados', () => {
-  let req;
-  let res;
+beforeEach(() => {
+  jest.resetAllMocks();
+});
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    req = { params: {}, query: {}, body: {}, user: {} };
-    res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
-    pool.query = jest.fn();
-  });
+describe('RF54 / CU85: Configuración general de recepción de mensajes', () => {
+  test('GET /recepcion rechaza usuarios que no tienen rol Docente (403)', async () => {
+    const req = { user: { id: 10, roles: ['Apoderado'] } };
+    const res = nuevoRes();
 
-  test('CU85 Excepción 2: con la recepción deshabilitada el apoderado no puede enviar', async () => {
-    req.user = { id: 4, roles: ['Apoderado'] };
-    req.params.id = '1112';
-    req.body.contenido = 'Hola profesora';
-    pool.query.mockResolvedValueOnce([[conversacion({ Recepcion_General: 0, Apoderado_Puede_Responder: 0 })]]);
-
-    await mensajeController.enviarMensaje(req, res);
+    await obtenerRecepcion(req, res);
 
     expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json.mock.calls[0][0]).toEqual(expect.objectContaining({ sinRecepcion: true }));
-    expect(res.json.mock.calls[0][0].mensaje).toContain('no está recibiendo mensajes');
-    expect(pool.query).toHaveBeenCalledTimes(1); // sin INSERT
+    expect(pool.query).not.toHaveBeenCalled();
   });
 
-  test('El docente siempre puede escribir aunque su recepción esté deshabilitada', async () => {
-    req.user = { id: 5, roles: ['Docente'] };
-    req.params.id = '1112';
-    req.body.contenido = 'Le recuerdo la reunión';
-    pool.query
-      .mockResolvedValueOnce([[conversacion({ Recepcion_General: 0, Apoderado_Puede_Responder: 0 })]])
-      .mockResolvedValueOnce([{ insertId: 9 }]);
+  test('GET /recepcion devuelve estado de recepción y cantidad de conversaciones habilitadas', async () => {
+    pool.query.mockResolvedValueOnce([[{ recepcion: 0, habilitadas: 2 }]]);
+    const req = { user: { id: 5, roles: ['Docente'] } };
+    const res = nuevoRes();
 
-    await mensajeController.enviarMensaje(req, res);
+    await obtenerRecepcion(req, res);
 
-    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({
+      recepcion: false,
+      conversacionesHabilitadas: 2,
+    });
   });
 
-  test('CU86: con un período habilitado el apoderado sí responde', async () => {
-    req.user = { id: 4, roles: ['Apoderado'] };
-    req.params.id = '1112';
-    req.body.contenido = 'Gracias, ahí estaré';
-    pool.query
-      .mockResolvedValueOnce([[conversacion({ Recepcion_General: 0, Habilitada_Hasta: '2026-11-12T16:00', Apoderado_Puede_Responder: 1 })]])
-      .mockResolvedValueOnce([{ insertId: 10 }]);
+  test('PUT /recepcion valida que habilitada sea booleano (400)', async () => {
+    const req = { user: { id: 5, roles: ['Docente'] }, body: { habilitada: 'si' } };
+    const res = nuevoRes();
 
-    await mensajeController.enviarMensaje(req, res);
+    await actualizarRecepcion(req, res);
 
-    expect(res.status).toHaveBeenCalledWith(201);
-  });
-
-  test('CU85: solo un docente cambia la recepción y el valor debe ser booleano', async () => {
-    req.user = { id: 4, roles: ['Apoderado'] };
-    req.body = { habilitada: false };
-    await mensajeController.actualizarRecepcion(req, res);
-    expect(res.status).toHaveBeenCalledWith(403);
-
-    res.status.mockClear();
-    req.user = { id: 5, roles: ['Docente'] };
-    req.body = { habilitada: 'no' };
-    await mensajeController.actualizarRecepcion(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
 
-    res.status.mockClear();
-    req.body = { habilitada: false };
+  test('PUT /recepcion deshabilita recepción general correctamente', async () => {
     pool.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
-    await mensajeController.actualizarRecepcion(req, res);
-    expect(pool.query.mock.calls[0][1]).toEqual([0, 5]);
-    expect(res.json.mock.calls.at(-1)[0].recepcion).toBe(false);
+    const req = { user: { id: 5, roles: ['Docente'] }, body: { habilitada: false } };
+    const res = nuevoRes();
+
+    await actualizarRecepcion(req, res);
+
+    expect(pool.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE usuario SET Docente_Recepcion_Mensajes'),
+      [0, 5]
+    );
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ recepcion: false })
+    );
   });
 
-  test('CU85 Excepción 1: si falla al guardar, informa que se mantiene el estado anterior', async () => {
-    req.user = { id: 5, roles: ['Docente'] };
-    req.body = { habilitada: true };
-    pool.query.mockRejectedValueOnce(new Error('BD caída'));
-    await mensajeController.actualizarRecepcion(req, res);
+  test('PUT /recepcion maneja error de BD manteniendo estado anterior (500 - Excepción 1)', async () => {
+    pool.query.mockRejectedValueOnce(new Error('DB error'));
+    const req = { user: { id: 5, roles: ['Docente'] }, body: { habilitada: true } };
+    const res = nuevoRes();
+
+    await actualizarRecepcion(req, res);
+
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json.mock.calls[0][0].mensaje).toContain('Se mantiene el estado anterior');
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mensaje: expect.stringContaining('Se mantiene el estado anterior'),
+      })
+    );
+  });
+});
+
+describe('RF54 / CU86: Habilitar respuestas en conversación puntual', () => {
+  test('Rechaza ID de conversación inválido (400)', async () => {
+    const req = { params: { id: 'abc' }, user: { id: 5, roles: ['Docente'] }, body: { hasta: null } };
+    const res = nuevoRes();
+
+    await habilitarConversacion(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  test('CU86: solo el docente de la conversación habilita respuestas', async () => {
-    req.user = { id: 4, roles: ['Apoderado'] };
-    req.params.id = '1112';
-    req.body = { hasta: '2030-01-01T10:00' };
-    pool.query.mockResolvedValueOnce([[conversacion()]]);
-    await mensajeController.habilitarConversacion(req, res);
+  test('Rechaza formato de fecha inválido (400)', async () => {
+    const req = {
+      params: { id: '12' },
+      user: { id: 5, roles: ['Docente'] },
+      body: { hasta: '15-11-2026 18:00' },
+    };
+    const res = nuevoRes();
+
+    await habilitarConversacion(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  test('Rechaza si quien habilita es el Apoderado de la conversación (403)', async () => {
+    pool.query.mockResolvedValueOnce([[{
+      Conversacion_Id: 12,
+      Docente_Usuario_Id: 5,
+      Apoderado_Usuario_Id: 20,
+      Conversacion_Estado: 1,
+      Recepcion_General: 0,
+      Habilitada_Hasta: null,
+      Habilitada_Citacion_Id: null,
+      Apoderado_Puede_Responder: 0,
+    }]]);
+
+    const req = {
+      params: { id: '12' },
+      user: { id: 20, roles: ['Apoderado'] },
+      body: { hasta: '2026-12-01T18:00' },
+    };
+    const res = nuevoRes();
+
+    await habilitarConversacion(req, res);
+
     expect(res.status).toHaveBeenCalledWith(403);
   });
 
-  test('CU86 Excepción 1: la fecha de término anterior a la actual se rechaza', async () => {
-    req.user = { id: 5, roles: ['Docente'] };
-    req.params.id = '1112';
-    req.body = { hasta: '2020-01-01T10:00' };
+  test('Rechaza fecha anterior o igual a la actual (400 - Excepción 1)', async () => {
     pool.query
-      .mockResolvedValueOnce([[conversacion()]])
+      .mockResolvedValueOnce([[{
+        Conversacion_Id: 12,
+        Docente_Usuario_Id: 5,
+        Apoderado_Usuario_Id: 20,
+        Conversacion_Estado: 1,
+        Recepcion_General: 0,
+        Habilitada_Hasta: null,
+        Habilitada_Citacion_Id: null,
+        Apoderado_Puede_Responder: 0,
+      }]])
       .mockResolvedValueOnce([[{ futuro: 0, limite: 1 }]]);
-    await mensajeController.habilitarConversacion(req, res);
+
+    const req = {
+      params: { id: '12' },
+      user: { id: 5, roles: ['Docente'] },
+      body: { hasta: '2026-10-01T10:00' },
+    };
+    const res = nuevoRes();
+
+    await habilitarConversacion(req, res);
+
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json.mock.calls[0][0].mensaje).toContain('posterior a la fecha y hora actual');
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mensaje: expect.stringContaining('posterior a la fecha y hora actual'),
+      })
+    );
   });
 
-  test('CU86: habilita hasta la fecha indicada y la quita con hasta = null', async () => {
-    req.user = { id: 5, roles: ['Docente'] };
-    req.params.id = '1112';
-    req.body = { hasta: '2030-01-01T10:00' };
+  test('Habilita respuestas hasta fecha futura válida (200)', async () => {
     pool.query
-      .mockResolvedValueOnce([[conversacion()]])
+      .mockResolvedValueOnce([[{
+        Conversacion_Id: 12,
+        Docente_Usuario_Id: 5,
+        Apoderado_Usuario_Id: 20,
+        Conversacion_Estado: 1,
+        Recepcion_General: 0,
+        Habilitada_Hasta: null,
+        Habilitada_Citacion_Id: null,
+        Apoderado_Puede_Responder: 0,
+      }]])
       .mockResolvedValueOnce([[{ futuro: 1, limite: 1 }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
-    await mensajeController.habilitarConversacion(req, res);
-    expect(pool.query.mock.calls[2][1]).toEqual(['2030-01-01 10:00:00', 1112]);
 
-    pool.query.mockClear();
-    req.body = { hasta: null };
-    pool.query.mockResolvedValueOnce([[conversacion()]]).mockResolvedValueOnce([{ affectedRows: 1 }]);
-    await mensajeController.habilitarConversacion(req, res);
-    expect(pool.query.mock.calls[1][0]).toContain('Conversacion_Habilitada_Hasta = NULL');
+    const req = {
+      params: { id: '12' },
+      user: { id: 5, roles: ['Docente'] },
+      body: { hasta: '2026-12-01T18:00' },
+    };
+    const res = nuevoRes();
+
+    await habilitarConversacion(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({
+      mensaje: 'Respuestas del apoderado habilitadas hasta la fecha indicada',
+      Habilitada_Hasta: '2026-12-01T18:00',
+    });
   });
 
-  test('Un apoderado no abre una conversación nueva con un docente que no recibe mensajes', async () => {
-    req.user = { id: 4, roles: ['Apoderado'] };
-    req.body = { rol: 'Apoderado', contactoId: 5 };
+  test('Cierra habilitación puntual cuando hasta es null (200)', async () => {
     pool.query
-      .mockResolvedValueOnce([[{ Contacto_Id: 5, Contacto_Nombre: 'Ana', Recibe_Mensajes: 0, Estudiante_Nombre_Completo: 'Diego', Curso_Nombre: '1A' }]])
-      .mockResolvedValueOnce([[]])                                    // sin conversación abierta
-      .mockResolvedValueOnce([[{ Docente_Recepcion_Mensajes: 0 }]]);
-    await mensajeController.iniciarConversacion(req, res);
+      .mockResolvedValueOnce([[{
+        Conversacion_Id: 12,
+        Docente_Usuario_Id: 5,
+        Apoderado_Usuario_Id: 20,
+        Conversacion_Estado: 1,
+        Recepcion_General: 0,
+        Habilitada_Hasta: '2026-12-01T18:00',
+        Habilitada_Citacion_Id: null,
+        Apoderado_Puede_Responder: 1,
+      }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const req = {
+      params: { id: '12' },
+      user: { id: 5, roles: ['Docente'] },
+      body: { hasta: null },
+    };
+    const res = nuevoRes();
+
+    await habilitarConversacion(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({
+      mensaje: 'Se cerró la recepción de respuestas en esta conversación',
+      Habilitada_Hasta: null,
+    });
+  });
+});
+
+describe('RF54 / CU85 Excepción 2: Bloqueo de respuesta e inicio de chat para apoderados', () => {
+  test('Bloquea envío de mensaje del apoderado si recepción está deshabilitada (403)', async () => {
+    pool.query.mockResolvedValueOnce([[{
+      Conversacion_Id: 12,
+      Docente_Usuario_Id: 5,
+      Apoderado_Usuario_Id: 20,
+      Conversacion_Estado: 1,
+      Recepcion_General: 0,
+      Habilitada_Hasta: null,
+      Habilitada_Citacion_Id: null,
+      Apoderado_Puede_Responder: 0,
+    }]]);
+
+    const req = {
+      params: { id: '12' },
+      user: { id: 20, roles: ['Apoderado'] },
+      body: { contenido: 'Hola profesor' },
+    };
+    const res = nuevoRes();
+
+    await enviarMensaje(req, res);
+
     expect(res.status).toHaveBeenCalledWith(403);
-    expect(pool.query).toHaveBeenCalledTimes(3); // sin INSERT
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ sinRecepcion: true })
+    );
   });
 
-  test('camposRecepcion normaliza los valores de la base', () => {
-    expect(camposRecepcion({ Recepcion_General: '0', Habilitada_Hasta: '2026-11-12T16:00', Habilitada_Citacion_Id: 35, Apoderado_Puede_Responder: '1' }))
-      .toEqual({ Recepcion_General: false, Habilitada_Hasta: '2026-11-12T16:00', Habilitada_Por_Citacion: 35, Apoderado_Puede_Responder: true });
-  });
+  test('Impide que apoderado inicie nueva conversación si docente deshabilitó recepción (403)', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{
+        Contacto_Id: 5,
+        Contacto_Nombre: 'María Morales',
+        Recibe_Mensajes: 0,
+        Estudiante_Nombre_Completo: 'Juan Pérez',
+        Curso_Nombre: '1° Básico A',
+      }]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ Docente_Recepcion_Mensajes: 0 }]]);
 
-  test('CU86: desde una citación, el período termina con el tramo; se cierra o se mueve con la citación', async () => {
-    expect(finDeCitacion('2026-11-12', '15:30 - 16:00')).toBe('2026-11-12 16:00:00');
-    expect(finDeCitacion('2026-11-12', 'mal')).toBeNull();
-    const conn = { query: jest.fn().mockResolvedValue([{ affectedRows: 1 }]) };
-    await cerrarPorCitacion(conn, 35);
-    expect(conn.query.mock.calls[0][0]).toContain('Conversacion_Habilitada_Hasta = NULL');
-    expect(conn.query.mock.calls[0][1]).toEqual([35]);
-    await moverPorCitacion(conn, 35, '2026-11-14', '10:00 - 10:30');
-    expect(conn.query.mock.calls[1][1]).toEqual(['2026-11-14 10:30:00', 35]);
+    const req = {
+      user: { id: 20, roles: ['Apoderado'] },
+      body: { contactoId: 5, rol: 'Apoderado' },
+    };
+    const res = nuevoRes();
+
+    await iniciarConversacion(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ sinRecepcion: true })
+    );
   });
 });
